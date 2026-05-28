@@ -24,6 +24,7 @@ export const BookAppointment = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [booked, setBooked] = useState<any>(null);
+  const availableDoctors = doctors.filter((d: any) => !['OFF_DUTY', 'On Leave', 'Inactive'].includes(d.status));
 
   const [formData, setFormData] = useState({
     patientName: '',
@@ -71,9 +72,11 @@ export const BookAppointment = () => {
       };
       const data = await api.post('/patient/appointments', payload);
       setBooked({
+        id: data.id,
         token: data.tokenNumber,
         time: data.time,
         date: new Date(data.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+        doctorName: data.doctor?.name,
       });
     } catch (err) {
       setError('Failed to book appointment. Please try again.');
@@ -154,6 +157,7 @@ export const BookAppointment = () => {
                 <p className="font-extrabold">{booked.date}</p>
               </div>
             </div>
+            {booked.doctorName && <p className="mt-4 text-sm font-bold text-white/80">Doctor: {booked.doctorName}</p>}
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-left">
@@ -260,7 +264,7 @@ export const BookAppointment = () => {
                   <select className="w-full px-4 py-3.5 bg-black/40 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-rose-500/50 transition-all appearance-none cursor-pointer text-sm"
                     value={formData.doctorId} onChange={e => setFormData({...formData, doctorId: e.target.value})}>
                     <option value="" className="bg-[#0a0f1d] text-white">Any Available Specialist</option>
-                    {doctors.filter((d: any) => d.status === 'ACTIVE').map((d: any) => (
+                    {availableDoctors.map((d: any) => (
                       <option key={d.id} value={d.id} className="bg-[#0a0f1d] text-white">{d.name} — {d.specialty}</option>
                     ))}
                   </select>
@@ -312,7 +316,7 @@ export const BookAppointment = () => {
               <div className="glass-card rounded-[32px] p-8 border border-white/5 space-y-4">
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Available Doctors</h3>
                 <div className="space-y-3">
-                  {doctors.filter((d: any) => d.status === 'ACTIVE').slice(0, 5).map((d: any) => (
+                  {availableDoctors.slice(0, 5).map((d: any) => (
                     <div key={d.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-rose-500/30 hover:bg-rose-500/5 transition-all duration-300 cursor-pointer"
                       onClick={() => setFormData({...formData, doctorId: d.id})}>
                       <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-red-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md shadow-rose-950/20">
@@ -342,7 +346,7 @@ export const BookAppointment = () => {
               <ul className="space-y-3 text-sm text-slate-400 font-medium">
                 <li className="flex gap-2">✓ Board-certified medical specialists</li>
                 <li className="flex gap-2">✓ Advanced diagnostic & lab facilities</li>
-                <li className="flex gap-2">✓ Instant token & confirmation</li>
+                <li className="flex gap-2">✓ Instant token, confirmation, cancellation, and rescheduling</li>
                 <li className="flex gap-2">✓ Digital prescriptions & records</li>
               </ul>
             </div>

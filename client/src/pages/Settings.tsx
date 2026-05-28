@@ -1,14 +1,72 @@
 import { useState, useEffect, useRef } from 'react';
-import { Clock, Shield, Bell, Save, Globe, Hospital, Upload, Camera, CheckCircle, ImagePlus, Trash2 } from 'lucide-react';
+import { Activity, Clock, Shield, Bell, Save, Globe, Hospital, Upload, Camera, CheckCircle, ImagePlus, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations';
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
 
+type HospitalPhoto = {
+  id: string;
+  url: string;
+  caption: string;
+  isCover: boolean;
+  key?: string;
+  size?: number;
+};
+
+const photoId = () => `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const normalizePhotos = (photos: unknown): HospitalPhoto[] => {
+  if (!Array.isArray(photos)) return [];
+  const normalized = photos
+    .map((photo: any, index) => {
+      if (typeof photo === 'string') {
+        return { id: photoId(), url: photo, caption: '', isCover: index === 0 };
+      }
+      if (photo && typeof photo.url === 'string') {
+        return {
+          id: photo.id || photoId(),
+          url: photo.url,
+          caption: typeof photo.caption === 'string' ? photo.caption : '',
+          isCover: Boolean(photo.isCover),
+          key: typeof photo.key === 'string' ? photo.key : undefined,
+          size: typeof photo.size === 'number' ? photo.size : undefined,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as HospitalPhoto[];
+  if (normalized.length > 0 && !normalized.some(photo => photo.isCover)) normalized[0].isCover = true;
+  return normalized;
+};
+
+const compressImage = (file: File, maxWidth = 1600, quality = 0.82): Promise<File> => {
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return Promise.resolve(file);
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, maxWidth / image.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(file);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return resolve(file);
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }));
+      }, 'image/webp', quality);
+    };
+    image.onerror = () => resolve(file);
+    image.src = URL.createObjectURL(file);
+  });
+};
+
 export const Settings = () => {
   const [activeTab, setActiveTab] = useState('GENERAL');
   const [hours, setHours] = useState<any[]>([]);
   const [status, setStatus] = useState({ success: false, error: '' });
+  const [usage, setUsage] = useState<any>(null);
   const [hospitalData, setHospitalData] = useState({
     name: '',
     address: '',
@@ -18,7 +76,7 @@ export const Settings = () => {
     contact: '',
     description: '',
     logo: '',
-    photos: [] as string[],
+    photos: [] as HospitalPhoto[],
   });
   const [uploading, setUploading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -31,12 +89,13 @@ export const Settings = () => {
       setHospitalData(prev => ({
         ...prev,
         ...data,
-        photos: Array.isArray(data?.photos) ? data.photos : [],
+        photos: normalizePhotos(data?.photos),
       }));
     }).catch(() => {});
+    api.get('/hospital/usage').then(setUsage).catch(() => {});
   }, []);
 
-  const hospitalPhotos = Array.isArray(hospitalData.photos) ? hospitalData.photos.filter(Boolean) : [];
+  const hospitalPhotos = normalizePhotos(hospitalData.photos);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,10 +127,11 @@ export const Settings = () => {
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const sourceFile = e.target.files?.[0];
+    if (!sourceFile) return;
     setUploadingPhoto(true);
     try {
+      const file = await compressImage(sourceFile);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folder', 'hospital-photos');
@@ -83,7 +143,17 @@ export const Settings = () => {
       });
       const data = await res.json();
       if (data.success) {
-        const nextPhotos = [...hospitalPhotos, data.url].slice(0, 12);
+        const nextPhotos = [
+          ...hospitalPhotos,
+          {
+            id: photoId(),
+            url: data.url,
+            key: data.key,
+            size: data.size,
+            caption: '',
+            isCover: hospitalPhotos.length === 0,
+          },
+        ].slice(0, 12);
         setHospitalData(prev => ({ ...prev, photos: nextPhotos }));
         await api.patch('/hospital/update', { photos: nextPhotos });
         setStatus({ success: true, error: '' });
@@ -98,7 +168,10 @@ export const Settings = () => {
   };
 
   const removePhoto = async (url: string) => {
-    const nextPhotos = hospitalPhotos.filter(photo => photo !== url);
+    let nextPhotos = hospitalPhotos.filter(photo => photo.url !== url);
+    if (nextPhotos.length > 0 && !nextPhotos.some(photo => photo.isCover)) {
+      nextPhotos = nextPhotos.map((photo, index) => ({ ...photo, isCover: index === 0 }));
+    }
     setHospitalData(prev => ({ ...prev, photos: nextPhotos }));
     try {
       await api.patch('/hospital/update', { photos: nextPhotos });
@@ -107,6 +180,38 @@ export const Settings = () => {
     } catch (err) {
       setStatus({ success: false, error: 'Failed to remove hospital photo' });
     }
+  };
+
+  const updatePhotos = async (photos: HospitalPhoto[]) => {
+    const nextPhotos = normalizePhotos(photos);
+    setHospitalData(prev => ({ ...prev, photos: nextPhotos }));
+    await api.patch('/hospital/update', { photos: nextPhotos });
+  };
+
+  const movePhoto = (fromIndex: number, direction: -1 | 1) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= hospitalPhotos.length) return;
+    const nextPhotos = [...hospitalPhotos];
+    const [photo] = nextPhotos.splice(fromIndex, 1);
+    nextPhotos.splice(toIndex, 0, photo);
+    updatePhotos(nextPhotos).catch(() => setStatus({ success: false, error: 'Failed to reorder photos' }));
+  };
+
+  const setCoverPhoto = (url: string) => {
+    updatePhotos(hospitalPhotos.map(photo => ({ ...photo, isCover: photo.url === url })))
+      .catch(() => setStatus({ success: false, error: 'Failed to set cover photo' }));
+  };
+
+  const setPhotoCaption = (url: string, caption: string) => {
+    setHospitalData(prev => ({
+      ...prev,
+      photos: normalizePhotos(prev.photos).map(photo => photo.url === url ? { ...photo, caption } : photo),
+    }));
+  };
+
+  const savePhotoCaption = (url: string, caption: string) => {
+    updatePhotos(hospitalPhotos.map(photo => photo.url === url ? { ...photo, caption } : photo))
+      .catch(() => setStatus({ success: false, error: 'Failed to save caption' }));
   };
 
   const handleSaveGeneral = async () => {
@@ -133,6 +238,12 @@ export const Settings = () => {
   const fieldClass = 'w-full px-4 py-3 bg-[#111827]/80 border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400/40';
   const panelClass = 'bg-white/[0.04] border border-white/[0.08] rounded-2xl';
   const labelClass = 'text-xs font-bold text-slate-400 uppercase mb-1.5 block';
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
+  };
 
   return (
     <div className="space-y-5 sm:space-y-6 max-w-4xl mx-auto pb-10">
@@ -147,6 +258,7 @@ export const Settings = () => {
           <div className="flex md:block gap-2 overflow-x-auto md:overflow-visible md:space-y-1 pb-1 md:pb-0">
           {[
             { id: 'GENERAL', label: 'General', icon: Globe },
+            { id: 'USAGE', label: 'Usage', icon: Activity },
             { id: 'HOURS', label: 'Operating Hours', icon: Clock },
             { id: 'SECURITY', label: 'Security', icon: Shield },
             { id: 'NOTIFICATIONS', label: 'Notifications', icon: Bell },
@@ -227,17 +339,36 @@ export const Settings = () => {
 
                 {hospitalPhotos.length > 0 ? (
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 gap-3">
-                    {hospitalPhotos.map((photo) => (
-                      <div key={photo} className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-950 border border-white/[0.08] group">
-                        <img src={photo} alt="Hospital facility" className="w-full h-full object-cover" />
+                    {hospitalPhotos.map((photo, index) => (
+                      <div key={photo.id} className="relative rounded-2xl overflow-hidden bg-slate-950 border border-white/[0.08] group">
+                        <div className="relative aspect-[4/3]">
+                          <img src={photo.url} alt={photo.caption || 'Hospital facility'} className="w-full h-full object-cover" />
+                          {photo.isCover && (
+                            <span className="absolute left-2 top-2 rounded-full bg-blue-600 text-white text-[10px] font-black px-2 py-1">Cover</span>
+                          )}
+                        </div>
                         <button
                           type="button"
-                          onClick={() => removePhoto(photo)}
+                          onClick={() => removePhoto(photo.url)}
                           className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 text-rose-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                           aria-label="Remove hospital photo"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        <div className="p-3 space-y-2">
+                          <input
+                            value={photo.caption}
+                            onChange={(event) => setPhotoCaption(photo.url, event.target.value)}
+                            onBlur={(event) => savePhotoCaption(photo.url, event.target.value)}
+                            placeholder="Caption"
+                            className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-slate-500"
+                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <button type="button" disabled={index === 0} onClick={() => movePhoto(index, -1)} className="rounded-lg bg-white/[0.04] disabled:opacity-40 py-2 text-[10px] font-bold text-slate-300">Left</button>
+                            <button type="button" onClick={() => setCoverPhoto(photo.url)} className="rounded-lg bg-blue-600/15 py-2 text-[10px] font-bold text-blue-200">Cover</button>
+                            <button type="button" disabled={index === hospitalPhotos.length - 1} onClick={() => movePhoto(index, 1)} className="rounded-lg bg-white/[0.04] disabled:opacity-40 py-2 text-[10px] font-bold text-slate-300">Right</button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -299,6 +430,50 @@ export const Settings = () => {
                     className={`${fieldClass} resize-none`} />
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'USAGE' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-600" /> Usage & Storage
+              </h3>
+              {usage ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { label: 'Active Staff', value: usage.hospital?.users?.toLocaleString?.() || '0' },
+                      { label: 'Patients', value: usage.hospital?.patients?.toLocaleString?.() || '0' },
+                      { label: 'Appointments', value: usage.hospital?.appointments?.toLocaleString?.() || '0' },
+                    ].map((item) => (
+                      <div key={item.label} className={`p-4 ${panelClass}`}>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{item.label}</p>
+                        <p className="mt-2 text-2xl font-black text-white">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className={`p-5 ${panelClass}`}>
+                      <p className="text-sm font-bold text-slate-100">Neon Database</p>
+                      <p className="mt-2 text-2xl font-black text-white">{formatBytes(usage.neon?.storageBytes || 0)}</p>
+                      <p className="mt-1 text-xs text-slate-400">Shared multi-tenant database storage. Estimated storage cost: ${(usage.neon?.estimatedStorageCostUsd || 0).toFixed(4)}/mo.</p>
+                    </div>
+                    <div className={`p-5 ${panelClass}`}>
+                      <p className="text-sm font-bold text-slate-100">Cloudflare R2</p>
+                      <p className="mt-2 text-2xl font-black text-white">{formatBytes(usage.r2?.storageBytes || 0)}</p>
+                      <p className="mt-1 text-xs text-slate-400">{usage.r2?.isConfigured ? `${usage.r2.objectCount} objects in ${usage.r2.bucket}` : 'R2 is not configured'}.</p>
+                      <p className="mt-1 text-xs text-slate-500">Hospital profile photos with known size: {formatBytes(usage.r2?.hospitalProfilePhotoBytes || 0)}.</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-4">
+                    {(usage.notes || []).slice(0, 3).map((note: string) => (
+                      <p key={note} className="text-xs leading-5 text-amber-100/80 font-semibold">{note}</p>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className={`p-6 ${panelClass} text-sm font-bold text-slate-400`}>Loading usage telemetry...</div>
+              )}
             </div>
           )}
 

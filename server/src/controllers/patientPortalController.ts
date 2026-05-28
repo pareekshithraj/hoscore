@@ -122,3 +122,37 @@ export const closeAppointment = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to close appointment' });
   }
 };
+
+export const cancelAppointment = async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, include: { patientProfile: true } });
+    if (!user?.patientProfile) return res.status(404).json({ error: 'Patient profile not found' });
+    const appointment = await prisma.appointment.findUnique({ where: { id: req.params.id } });
+    if (!appointment || appointment.patientId !== user.patientProfile.id) return res.status(404).json({ error: 'Appointment not found' });
+    if (appointment.status === 'COMPLETED') return res.status(400).json({ error: 'Completed appointments cannot be cancelled' });
+    const updated = await prisma.appointment.update({ where: { id: req.params.id }, data: { status: 'CANCELLED' } });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel appointment' });
+  }
+};
+
+export const rescheduleAppointment = async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, time } = req.body;
+    if (!date || !time) return res.status(400).json({ error: 'Date and time are required' });
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, include: { patientProfile: true } });
+    if (!user?.patientProfile) return res.status(404).json({ error: 'Patient profile not found' });
+    const appointment = await prisma.appointment.findUnique({ where: { id: req.params.id } });
+    if (!appointment || appointment.patientId !== user.patientProfile.id) return res.status(404).json({ error: 'Appointment not found' });
+    if (appointment.status === 'COMPLETED' || appointment.status === 'CANCELLED') return res.status(400).json({ error: 'This appointment cannot be rescheduled' });
+    const updated = await prisma.appointment.update({
+      where: { id: req.params.id },
+      data: { date: new Date(date), time, status: 'PENDING' },
+      include: { hospital: { select: { name: true } }, doctor: { select: { name: true, specialty: true } } },
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to reschedule appointment' });
+  }
+};

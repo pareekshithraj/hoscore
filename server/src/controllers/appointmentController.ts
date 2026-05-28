@@ -68,6 +68,7 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
         tokenNumber,
         status: 'PENDING',
       },
+      include: { doctor: { select: { name: true, specialty: true } }, hospital: { select: { name: true } } },
     });
 
     await logAudit(req, 'CREATE', 'Appointment', appointment.id, `Patient booked appointment at ${hospital.name}`);

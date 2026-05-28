@@ -64,6 +64,8 @@ router.patch('/hospitals/staff/:id', requireFeature(FEATURES.STAFF), hospitalCon
 router.get('/patient/dashboard', patientPortalController.getPatientDashboard);
 router.post('/patient/skip-alert', patientPortalController.skipAlert);
 router.patch('/patient/appointments/:id/close', patientPortalController.closeAppointment);
+router.patch('/patient/appointments/:id/cancel', patientPortalController.cancelAppointment);
+router.patch('/patient/appointments/:id/reschedule', patientPortalController.rescheduleAppointment);
 router.get('/patient/appointments', patientPortalController.getMyAppointments);
 router.post('/patient/appointments', requirePatientContext, appointmentController.createPatientAppointment);
 router.get('/patient/prescriptions', patientPortalController.getMyPrescriptions);
@@ -95,6 +97,7 @@ router.delete('/staff-types/:id', requireFeature(FEATURES.STAFF_TYPES), staffTyp
 // Hospital profile
 router.get('/hospital/current', requireFeature(FEATURES.SETTINGS), hospitalController.getCurrentHospital);
 router.patch('/hospital/update', requireFeature(FEATURES.SETTINGS), hospitalController.updateHospital);
+router.get('/hospital/usage', requireFeature(FEATURES.SETTINGS), hospitalController.getHospitalUsageTelemetry);
 
 // Stats
 router.get('/stats', requireFeature(FEATURES.DASHBOARD), statsController.getStats);

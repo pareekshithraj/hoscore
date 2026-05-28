@@ -93,3 +93,48 @@ export async function getPlatformUsage() {
     ],
   };
 }
+
+function extractPhotoBytes(photos: unknown) {
+  if (!Array.isArray(photos)) return 0;
+  return photos.reduce((sum, photo: any) => sum + (typeof photo?.size === 'number' ? photo.size : 0), 0);
+}
+
+export async function getHospitalUsage(hospitalId: string) {
+  const [platform, hospital, users, patients, appointments, documents] = await Promise.all([
+    getPlatformUsage(),
+    prisma.hospital.findUnique({ where: { id: hospitalId }, select: { id: true, name: true, photos: true, logo: true } }),
+    prisma.membership.count({ where: { hospitalId, status: 'ACTIVE' } }),
+    prisma.patient.count({ where: { OR: [{ hospitalId }, { appointments: { some: { hospitalId } } }] } }),
+    prisma.appointment.count({ where: { hospitalId } }),
+    prisma.report.count({ where: { admission: { bed: { room: { hospitalId } } } } }),
+  ]);
+
+  const profilePhotoBytes = extractPhotoBytes(hospital?.photos);
+  return {
+    generatedAt: platform.generatedAt,
+    hospital: {
+      id: hospital?.id,
+      name: hospital?.name,
+      users,
+      patients,
+      appointments,
+      clinicalDocuments: documents,
+    },
+    neon: platform.neon,
+    r2: {
+      ...platform.r2,
+      hospitalProfilePhotoBytes: profilePhotoBytes,
+      hospitalProfilePhotoCostUsd: estimateStorageCost(
+        bytesToGb(profilePhotoBytes),
+        pricing.r2.freeStorageGbMonth,
+        pricing.r2.storageUsdPerGbMonth
+      ),
+    },
+    pricing,
+    notes: [
+      'Hospital-level Neon is reported from the shared database size because this app uses one multi-tenant database.',
+      'Hospital R2 photo bytes are exact for new uploaded photos that include object size metadata; legacy URLs may not include size.',
+      ...platform.notes,
+    ],
+  };
+}

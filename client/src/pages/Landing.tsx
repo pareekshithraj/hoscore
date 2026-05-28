@@ -227,8 +227,10 @@ export const Landing = () => {
               { id: 'h1', name: 'St. Vincent Medical Center', rating: 4.9, description: 'Elite tertiary care hospital with advanced robotic surgery and state-of-the-art cardiology.', city: 'Mumbai', state: 'Maharashtra' },
               { id: 'h2', name: 'Apollo General Hospital', rating: 4.8, description: 'World-renowned medical expertise and research-driven treatments for complex cases.', city: 'Delhi', state: 'Delhi' },
             ]).map((h: any, i: number) => {
-              const photos = Array.isArray(h.photos) ? h.photos.filter(Boolean) : [];
-              const cardImage = photos[0] || h.logo;
+              const photos = Array.isArray(h.photos)
+                ? h.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url)
+                : [];
+              const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || h.logo;
               const location = [h.city, h.state, h.country].filter(Boolean).join(', ');
               return (
               <div key={h.id || i} className="relative group rounded-[28px] bg-white border border-slate-200/60 hover:border-rose-200 hover:shadow-2xl transition-all duration-500 overflow-hidden">

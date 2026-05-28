@@ -1,13 +1,15 @@
 import type { ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { hasFeature } from '../utils/features';
 
 interface ProtectedRouteProps {
   children: ReactElement;
   requireContext?: 'hospital' | 'patient' | 'superadmin';
+  requireFeature?: string;
 }
 
-export const ProtectedRoute = ({ children, requireContext }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requireContext, requireFeature }: ProtectedRouteProps) => {
   const { user, activeContext, isLoading } = useAuth();
 
   if (isLoading) {
@@ -29,6 +31,10 @@ export const ProtectedRoute = ({ children, requireContext }: ProtectedRouteProps
     if (activeContext?.type === 'patient') return <Navigate to="/patient" replace />;
     if (activeContext?.type === 'hospital') return <Navigate to="/dashboard" replace />;
     return <Navigate to="/login" replace />;
+  }
+
+  if (requireFeature && activeContext?.type === 'hospital' && !hasFeature(activeContext.permissions, requireFeature, activeContext.role)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

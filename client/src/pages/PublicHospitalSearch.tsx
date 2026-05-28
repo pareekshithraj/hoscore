@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Building2, MapPin, Search, Shield, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,12 +16,13 @@ type Hospital = {
   address?: string | null;
   description?: string | null;
   logo?: string | null;
-  photos?: string[] | null;
+  photos?: Array<string | { url: string; caption?: string; isCover?: boolean }> | null;
   rating?: number;
   isPartnered?: boolean;
 };
 
 export const PublicHospitalSearch = () => {
+  const { country, state, city } = useParams();
   const { activeContext } = useAuth();
   const isPatient = activeContext?.type === 'patient';
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
@@ -29,8 +31,10 @@ export const PublicHospitalSearch = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    document.title = 'Find Hospitals Near You | HOSCORE Verified Hospital Profiles';
-    const description = 'Search verified HOSCORE hospital profiles by name, city, state, and area. View ratings, doctors, trust profile, and appointment access.';
+    const locationParts = [city, state, country].filter(Boolean).map((part) => String(part).replace(/-/g, ' '));
+    const locationTitle = locationParts.length ? ` in ${locationParts.join(', ')}` : ' Near You';
+    document.title = `Find Hospitals${locationTitle} | HOSCORE Verified Hospital Profiles`;
+    const description = `Search verified HOSCORE hospital profiles${locationParts.length ? ` in ${locationParts.join(', ')}` : ''} by name, city, state, and area. View ratings, doctors, trust profile, and appointment access.`;
     let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
     if (!meta) {
       meta = document.createElement('meta');
@@ -38,7 +42,7 @@ export const PublicHospitalSearch = () => {
       document.head.appendChild(meta);
     }
     meta.content = description;
-  }, []);
+  }, [country, state, city]);
 
   useEffect(() => {
     fetch(`${BASE_URL}/hospitals`)
@@ -60,11 +64,14 @@ export const PublicHospitalSearch = () => {
     return Array.from(values).sort();
   }, [hospitals]);
 
+  const locationFilter = [country, state, city].filter(Boolean).join(' ').replace(/-/g, ' ').toLowerCase();
+
   const filtered = hospitals.filter((hospital) => {
     const haystack = [hospital.name, hospital.city, hospital.state, hospital.country, hospital.address, hospital.description].filter(Boolean).join(' ').toLowerCase();
     const matchesQuery = !query || haystack.includes(query.toLowerCase());
     const matchesArea = !area || haystack.includes(area.toLowerCase());
-    return matchesQuery && matchesArea;
+    const matchesLocationRoute = !locationFilter || locationFilter.split(' ').every((part) => haystack.includes(part));
+    return matchesQuery && matchesArea && matchesLocationRoute;
   });
 
   return (
@@ -138,8 +145,10 @@ export const PublicHospitalSearch = () => {
             <div className="grid md:grid-cols-2 gap-6">
               {filtered.map((hospital, index) => {
                 const bookingPath = `/patient/book/${hospital.id}`;
-                const photos = Array.isArray(hospital.photos) ? hospital.photos.filter(Boolean) : [];
-                const cardImage = photos[0] || hospital.logo;
+                const photos = Array.isArray(hospital.photos)
+                  ? hospital.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url)
+                  : [];
+                const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || hospital.logo;
                 const location = [hospital.city, hospital.state, hospital.country].filter(Boolean).join(', ');
                 return (
                   <div key={hospital.id} className="rounded-[28px] border border-slate-200 bg-white overflow-hidden hover:border-rose-200 hover:shadow-2xl transition-all duration-300">

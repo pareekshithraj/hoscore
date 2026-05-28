@@ -4,7 +4,9 @@ import { Layout } from './components/Layout';
 import { PatientLayout } from './components/PatientLayout';
 import { SuperAdminLayout } from './components/SuperAdminLayout';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { hasFeature } from './utils/features';
 
 // Public pages
 const Landing = lazy(() => import('./pages/Landing').then((module) => ({ default: module.Landing })));
@@ -71,6 +73,14 @@ const PublicBookRedirect = () => {
   return <Navigate to="/login" state={{ next: hospitalId ? `/patient/book/${hospitalId}` : '/patient/find' }} replace />;
 };
 
+const FeatureGate = ({ feature, children }: { feature: string; children: React.ReactElement }) => {
+  const { activeContext } = useAuth();
+  if (activeContext?.type === 'hospital' && !hasFeature(activeContext.permissions, feature, activeContext.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -83,6 +93,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register-hospital" element={<RegisterHospital />} />
           <Route path="/hospitals" element={<PublicHospitalSearch />} />
+          <Route path="/hospitals/:country/:state/:city" element={<PublicHospitalSearch />} />
           <Route path="/hospitals/:id" element={<HospitalProfile />} />
           <Route path="/book/:hospitalId" element={<PublicBookRedirect />} />
 
@@ -94,32 +105,32 @@ function App() {
                 <Layout>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/queue" element={<OPDQueue />} />
-                    <Route path="/prescriptions" element={<Prescriptions />} />
-                    <Route path="/labs" element={<LabOrders />} />
-                    <Route path="/vitals" element={<Vitals />} />
-                    <Route path="/discharges" element={<Discharges />} />
-                    <Route path="/shifts" element={<ShiftSchedule />} />
-                    <Route path="/claims" element={<InsuranceClaims />} />
-                    <Route path="/expenses" element={<Expenses />} />
-                    <Route path="/rooms" element={<Rooms />} />
-                    <Route path="/patients" element={<Patients />} />
-                    <Route path="/patients/:id" element={<PatientDetail />} />
-                    <Route path="/admissions" element={<Admissions />} />
-                    <Route path="/doctors" element={<Doctors />} />
-                    <Route path="/staff" element={<Staff />} />
-                    <Route path="/staff-types" element={<StaffTypes />} />
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/billing" element={<Billing />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/simulator" element={<Simulator />} />
-                    <Route path="/calendar" element={<CalendarSchedule />} />
-                    <Route path="/notices" element={<NoticeBoard />} />
-                    <Route path="/leaves" element={<LeaveManagement />} />
-                    <Route path="/groups" element={<Groups />} />
-                    <Route path="/feedback" element={<Feedback />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/audit-logs" element={<AuditLogs />} />
+                    <Route path="/queue" element={<FeatureGate feature="queue"><OPDQueue /></FeatureGate>} />
+                    <Route path="/prescriptions" element={<FeatureGate feature="prescriptions"><Prescriptions /></FeatureGate>} />
+                    <Route path="/labs" element={<FeatureGate feature="labs"><LabOrders /></FeatureGate>} />
+                    <Route path="/vitals" element={<FeatureGate feature="vitals"><Vitals /></FeatureGate>} />
+                    <Route path="/discharges" element={<FeatureGate feature="discharges"><Discharges /></FeatureGate>} />
+                    <Route path="/shifts" element={<FeatureGate feature="shifts"><ShiftSchedule /></FeatureGate>} />
+                    <Route path="/claims" element={<FeatureGate feature="claims"><InsuranceClaims /></FeatureGate>} />
+                    <Route path="/expenses" element={<FeatureGate feature="expenses"><Expenses /></FeatureGate>} />
+                    <Route path="/rooms" element={<FeatureGate feature="rooms"><Rooms /></FeatureGate>} />
+                    <Route path="/patients" element={<FeatureGate feature="patients"><Patients /></FeatureGate>} />
+                    <Route path="/patients/:id" element={<FeatureGate feature="patients"><PatientDetail /></FeatureGate>} />
+                    <Route path="/admissions" element={<FeatureGate feature="admissions"><Admissions /></FeatureGate>} />
+                    <Route path="/doctors" element={<FeatureGate feature="doctors"><Doctors /></FeatureGate>} />
+                    <Route path="/staff" element={<FeatureGate feature="staff"><Staff /></FeatureGate>} />
+                    <Route path="/staff-types" element={<FeatureGate feature="staff_types"><StaffTypes /></FeatureGate>} />
+                    <Route path="/inventory" element={<FeatureGate feature="inventory"><Inventory /></FeatureGate>} />
+                    <Route path="/billing" element={<FeatureGate feature="billing"><Billing /></FeatureGate>} />
+                    <Route path="/analytics" element={<FeatureGate feature="analytics"><Analytics /></FeatureGate>} />
+                    <Route path="/simulator" element={<FeatureGate feature="simulator"><Simulator /></FeatureGate>} />
+                    <Route path="/calendar" element={<FeatureGate feature="calendar"><CalendarSchedule /></FeatureGate>} />
+                    <Route path="/notices" element={<FeatureGate feature="notices"><NoticeBoard /></FeatureGate>} />
+                    <Route path="/leaves" element={<FeatureGate feature="leaves"><LeaveManagement /></FeatureGate>} />
+                    <Route path="/groups" element={<FeatureGate feature="groups"><Groups /></FeatureGate>} />
+                    <Route path="/feedback" element={<FeatureGate feature="feedback"><Feedback /></FeatureGate>} />
+                    <Route path="/settings" element={<FeatureGate feature="settings"><Settings /></FeatureGate>} />
+                    <Route path="/audit-logs" element={<FeatureGate feature="audit_logs"><AuditLogs /></FeatureGate>} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </Layout>

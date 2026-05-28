@@ -33,11 +33,18 @@ type HospitalProfileData = {
   contact?: string | null;
   description?: string | null;
   logo?: string | null;
-  photos?: string[] | null;
+  photos?: Array<string | { url: string; caption?: string; isCover?: boolean }> | null;
   rating?: number;
   isPartnered?: boolean;
   doctors?: Array<{ id: string; name: string; specialty: string; rating?: number; status?: string }>;
   _count?: { rooms?: number; doctors?: number; appointments?: number };
+};
+
+const normalizePhotos = (photos: HospitalProfileData['photos']) => {
+  if (!Array.isArray(photos)) return [];
+  return photos
+    .map((photo) => typeof photo === 'string' ? { url: photo, caption: '', isCover: false } : photo)
+    .filter((photo): photo is { url: string; caption?: string; isCover?: boolean } => Boolean(photo?.url));
 };
 
 function setMeta(name: string, content: string, property = false) {
@@ -87,8 +94,9 @@ export const HospitalProfile = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const photos = useMemo(() => Array.isArray(hospital?.photos) ? hospital.photos.filter(Boolean) : [], [hospital]);
-  const primaryImage = photos[0] || hospital?.logo || `${window.location.origin}/hoscore-logo.png`;
+  const photos = useMemo(() => normalizePhotos(hospital?.photos), [hospital]);
+  const coverPhoto = photos.find((photo) => photo.isCover) || photos[0];
+  const primaryImage = coverPhoto?.url || hospital?.logo || `${window.location.origin}/hoscore-logo.png`;
   const locationText = [hospital?.city, hospital?.state, hospital?.country].filter(Boolean).join(', ');
   const specialties = useMemo(() => {
     const unique = new Set((hospital?.doctors || []).map((doctor) => doctor.specialty).filter(Boolean));
@@ -133,7 +141,7 @@ export const HospitalProfile = () => {
       name: hospital.name,
       description,
       url: canonical,
-      image: [primaryImage, ...photos.slice(1)],
+      image: [primaryImage, ...photos.slice(1).map((photo) => photo.url)],
       telephone: hospital.contact || undefined,
       address: {
         '@type': 'PostalAddress',
@@ -296,8 +304,8 @@ export const HospitalProfile = () => {
               <div className="relative rounded-[36px] bg-white/[0.08] border border-white/10 p-6 shadow-2xl backdrop-blur-xl">
                 <div className="rounded-[28px] bg-white text-slate-950 p-6 space-y-6">
                   <div className="h-56 rounded-[24px] bg-gradient-to-br from-rose-600 via-red-500 to-blue-600 relative overflow-hidden flex items-center justify-center">
-                    {photos[0] && <img src={photos[0]} alt={`${hospital.name} facility`} className="absolute inset-0 w-full h-full object-cover" />}
-                    <div className={`absolute inset-0 ${photos[0] ? 'bg-slate-950/35' : 'opacity-15'}`} style={photos[0] ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
+                    {coverPhoto && <img src={coverPhoto.url} alt={coverPhoto.caption || `${hospital.name} facility`} className="absolute inset-0 w-full h-full object-cover" />}
+                    <div className={`absolute inset-0 ${coverPhoto ? 'bg-slate-950/35' : 'opacity-15'}`} style={coverPhoto ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
                     <div className="relative z-10 w-28 h-28 rounded-[28px] bg-white/95 shadow-2xl flex items-center justify-center overflow-hidden">
                       {hospital.logo ? (
                         <img src={hospital.logo} alt={hospital.name} className="w-full h-full object-cover" />
@@ -361,12 +369,12 @@ export const HospitalProfile = () => {
               </div>
               <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
                 <div className="aspect-[16/10] rounded-[32px] overflow-hidden bg-slate-100">
-                  <img src={photos[0]} alt={`${hospital.name} main facility`} className="w-full h-full object-cover" />
+                  <img src={coverPhoto?.url || photos[0].url} alt={coverPhoto?.caption || `${hospital.name} main facility`} className="w-full h-full object-cover" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {photos.slice(1, 5).map((photo, index) => (
-                    <div key={photo} className="aspect-[4/3] rounded-[24px] overflow-hidden bg-slate-100">
-                      <img src={photo} alt={`${hospital.name} facility ${index + 2}`} className="w-full h-full object-cover" />
+                  {photos.filter((photo) => photo.url !== coverPhoto?.url).slice(0, 4).map((photo, index) => (
+                    <div key={photo.url} className="aspect-[4/3] rounded-[24px] overflow-hidden bg-slate-100">
+                      <img src={photo.url} alt={photo.caption || `${hospital.name} facility ${index + 2}`} className="w-full h-full object-cover" />
                     </div>
                   ))}
                   {photos.length === 1 && (

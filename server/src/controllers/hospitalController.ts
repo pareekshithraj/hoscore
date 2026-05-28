@@ -4,6 +4,7 @@ import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { ALL_FEATURES, permissionsForRole } from '../utils/features.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { getHospitalUsage } from '../services/usagePricing.js';
 
 const normalizePermissions = (permissions: unknown) => {
   if (!Array.isArray(permissions)) return undefined;
@@ -157,6 +158,16 @@ export const updateHospital = async (req: AuthRequest, res: Response) => {
     res.json(hospital);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update hospital' });
+  }
+};
+
+export const getHospitalUsageTelemetry = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user?.hospitalId) return res.status(403).json({ error: 'Hospital context required' });
+    res.json(await getHospitalUsage(req.user.hospitalId));
+  } catch (error) {
+    console.error('Hospital usage telemetry error:', error);
+    res.status(500).json({ error: 'Failed to get hospital usage telemetry' });
   }
 };
 
