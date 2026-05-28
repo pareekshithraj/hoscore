@@ -265,7 +265,7 @@ export const Landing = () => {
                     <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{h.description}</p>
                     <div className="flex gap-2.5 pt-1">
                       <Link to={isPatient ? `/patient/book/${h.id}` : '/login'} state={isPatient ? undefined : { next: `/patient/book/${h.id}` }} className={`flex-1 text-center py-3 font-bold rounded-xl active:scale-[0.97] transition-all text-sm ${i % 2 === 0 ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white hover:from-rose-700 hover:to-red-700 shadow-lg shadow-rose-500/20' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/20'}`}>Book Appointment</Link>
-                      <button className="px-5 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-sm">Details</button>
+                      <Link to={`/hospitals/${h.slug || h.id}`} className="px-5 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-sm">Details</Link>
                     </div>
                   </div>
                 </div>

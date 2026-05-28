@@ -43,7 +43,10 @@ export const FindHospitals = () => {
               </div>
             </div>
             <div className="px-6 pb-6">
-              <Link to={`/patient/book/${h.id}`} className="block text-center py-3 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/25 active:scale-[0.98] transition-all duration-300">Book Appointment</Link>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to={`/hospitals/${h.slug || h.id}`} className="block text-center py-3 border border-white/10 hover:bg-white/10 text-white font-bold rounded-xl active:scale-[0.98] transition-all duration-300">Profile</Link>
+                <Link to={`/patient/book/${h.id}`} className="block text-center py-3 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/25 active:scale-[0.98] transition-all duration-300">Book</Link>
+              </div>
             </div>
           </div>
         ))}
