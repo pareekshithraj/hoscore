@@ -21,6 +21,12 @@ type Hospital = {
   isPartnered?: boolean;
 };
 
+const locationSlug = (value?: string | null) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
 export const PublicHospitalSearch = () => {
   const { country, state, city } = useParams();
   const { activeContext } = useAuth();
@@ -150,6 +156,9 @@ export const PublicHospitalSearch = () => {
                   : [];
                 const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || hospital.logo;
                 const location = [hospital.city, hospital.state, hospital.country].filter(Boolean).join(', ');
+                const locationPath = hospital.country && hospital.state && hospital.city
+                  ? `/hospitals/${locationSlug(hospital.country)}/${locationSlug(hospital.state)}/${locationSlug(hospital.city)}`
+                  : '';
                 return (
                   <div key={hospital.id} className="rounded-[28px] border border-slate-200 bg-white overflow-hidden hover:border-rose-200 hover:shadow-2xl transition-all duration-300">
                     <div className="grid sm:grid-cols-[180px_1fr]">
@@ -168,12 +177,17 @@ export const PublicHospitalSearch = () => {
                               Verified
                             </div>
                             <h2 className="text-xl font-black">{hospital.name}</h2>
-                            {location && (
+                            {location && (locationPath ? (
+                              <Link to={locationPath} className="mt-1 text-sm font-bold text-slate-400 flex items-center gap-1 hover:text-rose-600 transition-colors">
+                                <MapPin className="w-3.5 h-3.5" />
+                                {location}
+                              </Link>
+                            ) : (
                               <p className="mt-1 text-sm font-bold text-slate-400 flex items-center gap-1">
                                 <MapPin className="w-3.5 h-3.5" />
                                 {location}
                               </p>
-                            )}
+                            ))}
                           </div>
                           <div className="flex items-center gap-1 rounded-xl bg-amber-50 px-3 py-2 text-amber-700 font-black">
                             <Star className="w-4 h-4 fill-amber-500 text-amber-500" />

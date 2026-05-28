@@ -44,7 +44,9 @@ const compressImage = (file: File, maxWidth = 1600, quality = 0.82): Promise<Fil
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return Promise.resolve(file);
   return new Promise((resolve) => {
     const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
     image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       const scale = Math.min(1, maxWidth / image.width);
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(image.width * scale);
@@ -57,8 +59,11 @@ const compressImage = (file: File, maxWidth = 1600, quality = 0.82): Promise<Fil
         resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }));
       }, 'image/webp', quality);
     };
-    image.onerror = () => resolve(file);
-    image.src = URL.createObjectURL(file);
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    image.src = objectUrl;
   });
 };
 
@@ -67,6 +72,7 @@ export const Settings = () => {
   const [hours, setHours] = useState<any[]>([]);
   const [status, setStatus] = useState({ success: false, error: '' });
   const [usage, setUsage] = useState<any>(null);
+  const [draggingPhotoId, setDraggingPhotoId] = useState('');
   const [hospitalData, setHospitalData] = useState({
     name: '',
     address: '',
@@ -197,6 +203,17 @@ export const Settings = () => {
     updatePhotos(nextPhotos).catch(() => setStatus({ success: false, error: 'Failed to reorder photos' }));
   };
 
+  const reorderPhoto = (fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+    const fromIndex = hospitalPhotos.findIndex(photo => photo.id === fromId);
+    const toIndex = hospitalPhotos.findIndex(photo => photo.id === toId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const nextPhotos = [...hospitalPhotos];
+    const [photo] = nextPhotos.splice(fromIndex, 1);
+    nextPhotos.splice(toIndex, 0, photo);
+    updatePhotos(nextPhotos).catch(() => setStatus({ success: false, error: 'Failed to reorder photos' }));
+  };
+
   const setCoverPhoto = (url: string) => {
     updatePhotos(hospitalPhotos.map(photo => ({ ...photo, isCover: photo.url === url })))
       .catch(() => setStatus({ success: false, error: 'Failed to set cover photo' }));
@@ -314,7 +331,7 @@ export const Settings = () => {
                 <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                 <div>
                   <p className="text-sm font-bold text-slate-100">Hospital Logo</p>
-                  <p className="text-xs text-slate-400 mt-1">Upload your hospital logo. Recommended: 512×512px, PNG or JPG.</p>
+                  <p className="text-xs text-slate-400 mt-1">Upload your hospital logo. Recommended: 512x512px, PNG or JPG.</p>
                   {uploading && <p className="text-xs text-blue-600 mt-1 font-medium">Uploading to cloud...</p>}
                 </div>
               </div>
@@ -323,7 +340,7 @@ export const Settings = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <p className="text-sm font-bold text-slate-100">Hospital Photos</p>
-                    <p className="text-xs text-slate-400 mt-1">Add public profile photos for the building, reception, wards, labs, and facilities.</p>
+                    <p className="text-xs text-slate-400 mt-1">Add public profile photos, drag to reorder, choose a cover, and write short captions.</p>
                   </div>
                   <button
                     type="button"
@@ -340,7 +357,21 @@ export const Settings = () => {
                 {hospitalPhotos.length > 0 ? (
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 gap-3">
                     {hospitalPhotos.map((photo, index) => (
-                      <div key={photo.id} className="relative rounded-2xl overflow-hidden bg-slate-950 border border-white/[0.08] group">
+                      <div
+                        key={photo.id}
+                        draggable
+                        onDragStart={() => setDraggingPhotoId(photo.id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          reorderPhoto(draggingPhotoId, photo.id);
+                          setDraggingPhotoId('');
+                        }}
+                        onDragEnd={() => setDraggingPhotoId('')}
+                        className={`relative rounded-2xl overflow-hidden bg-slate-950 border group cursor-grab active:cursor-grabbing transition-all ${
+                          draggingPhotoId === photo.id ? 'border-blue-400 opacity-60 ring-2 ring-blue-500/30' : 'border-white/[0.08]'
+                        }`}
+                      >
                         <div className="relative aspect-[4/3]">
                           <img src={photo.url} alt={photo.caption || 'Hospital facility'} className="w-full h-full object-cover" />
                           {photo.isCover && (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, AlertCircle, Archive, Calculator, Database, HardDrive, RefreshCw, Users } from 'lucide-react';
+import { Activity, AlertCircle, Archive, Calculator, CheckCircle2, Database, HardDrive, RefreshCw, ServerCog, Users } from 'lucide-react';
 import { api } from '../../services/api';
 
 interface UsagePricing {
@@ -46,6 +46,23 @@ interface PlatformUsage {
   notes: string[];
 }
 
+interface DeploymentAudit {
+  generatedAt: string;
+  environment: string;
+  summary: {
+    configured: number;
+    missingRequired: number;
+    missingRecommended: number;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'configured' | 'missing' | 'fallback';
+    severity: 'required' | 'recommended';
+    note: string;
+  }>;
+}
+
 const formatBytes = (bytes: number) => {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -57,6 +74,7 @@ const formatUsd = (value: number) => `$${value.toFixed(value < 1 ? 4 : 2)}`;
 
 export const UsageBilling = () => {
   const [usage, setUsage] = useState<PlatformUsage | null>(null);
+  const [audit, setAudit] = useState<DeploymentAudit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -64,7 +82,12 @@ export const UsageBilling = () => {
     setLoading(true);
     setError('');
     try {
-      setUsage(await api.get('/super-admin/usage'));
+      const [usageData, auditData] = await Promise.all([
+        api.get('/super-admin/usage'),
+        api.get('/super-admin/deployment-readiness').catch(() => null),
+      ]);
+      setUsage(usageData);
+      setAudit(auditData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load usage telemetry');
     } finally {
@@ -176,6 +199,56 @@ export const UsageBilling = () => {
           </div>
         ))}
       </div>
+
+      {audit && (
+        <div className="glass-card rounded-2xl p-6 border border-white/[0.04]">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-5">
+            <div>
+              <div className="flex items-center gap-2 text-white font-extrabold">
+                <ServerCog className="w-5 h-5 text-sky-400" />
+                Deployment Readiness
+              </div>
+              <p className="text-xs text-slate-400 font-semibold mt-1">
+                Production configuration audit for {audit.environment}.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                { label: 'Ready', value: audit.summary.configured, color: 'text-emerald-300' },
+                { label: 'Required', value: audit.summary.missingRequired, color: audit.summary.missingRequired ? 'text-rose-300' : 'text-slate-400' },
+                { label: 'Recommended', value: audit.summary.missingRecommended, color: audit.summary.missingRecommended ? 'text-amber-300' : 'text-slate-400' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-3 py-2">
+                  <div className={`text-lg font-black tabular-nums ${item.color}`}>{item.value}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-500 font-black">{item.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {audit.checks.map((check) => {
+              const ok = check.status === 'configured';
+              return (
+                <div key={check.key} className={`rounded-xl border p-4 ${ok ? 'border-emerald-500/15 bg-emerald-500/[0.03]' : check.severity === 'required' ? 'border-rose-500/20 bg-rose-500/[0.04]' : 'border-amber-500/20 bg-amber-500/[0.04]'}`}>
+                  <div className="flex items-start gap-3">
+                    {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-300 flex-shrink-0 mt-0.5" /> : <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${check.severity === 'required' ? 'text-rose-300' : 'text-amber-300'}`} />}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-black text-slate-100">{check.label}</p>
+                        <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-400">{check.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">{check.note}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-4 text-[11px] text-slate-500 font-semibold">
+            Last audited {new Date(audit.generatedAt).toLocaleString()}.
+          </p>
+        </div>
+      )}
 
       <div className="glass-card rounded-2xl p-6 border border-white/[0.04]">
         <h2 className="text-base font-extrabold text-white mb-4">Pricing Inputs</h2>

@@ -75,6 +75,7 @@ router.get('/patient/bills', patientPortalController.getMyBills);
 // ================= SUPER ADMIN =================
 router.get('/super-admin/stats', requireSuperAdmin, superAdminController.getDashboardStats);
 router.get('/super-admin/usage', requireSuperAdmin, superAdminController.getUsage);
+router.get('/super-admin/deployment-readiness', requireSuperAdmin, superAdminController.getDeploymentReadiness);
 router.get('/super-admin/hospitals', requireSuperAdmin, superAdminController.getAllHospitals);
 router.get('/super-admin/users', requireSuperAdmin, superAdminController.getAllUsers);
 router.get('/super-admin/subscriptions', requireSuperAdmin, superAdminController.getAllSubscriptions);

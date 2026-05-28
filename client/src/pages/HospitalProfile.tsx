@@ -47,6 +47,12 @@ const normalizePhotos = (photos: HospitalProfileData['photos']) => {
     .filter((photo): photo is { url: string; caption?: string; isCover?: boolean } => Boolean(photo?.url));
 };
 
+const locationSlug = (value?: string | null) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
 function setMeta(name: string, content: string, property = false) {
   const selector = property ? `meta[property="${name}"]` : `meta[name="${name}"]`;
   let tag = document.head.querySelector(selector) as HTMLMetaElement | null;
@@ -98,6 +104,9 @@ export const HospitalProfile = () => {
   const coverPhoto = photos.find((photo) => photo.isCover) || photos[0];
   const primaryImage = coverPhoto?.url || hospital?.logo || `${window.location.origin}/hoscore-logo.png`;
   const locationText = [hospital?.city, hospital?.state, hospital?.country].filter(Boolean).join(', ');
+  const locationPath = hospital?.country && hospital?.state && hospital?.city
+    ? `/hospitals/${locationSlug(hospital.country)}/${locationSlug(hospital.state)}/${locationSlug(hospital.city)}`
+    : '';
   const specialties = useMemo(() => {
     const unique = new Set((hospital?.doctors || []).map((doctor) => doctor.specialty).filter(Boolean));
     return Array.from(unique);
@@ -253,12 +262,17 @@ export const HospitalProfile = () => {
               </div>
 
               <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
-                {locationText && (
+                {locationText && (locationPath ? (
+                  <Link to={locationPath} className="inline-flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-4 py-3 hover:bg-white/10 transition-colors">
+                    <MapPin className="w-4 h-4 text-rose-300" />
+                    {locationText}
+                  </Link>
+                ) : (
                   <span className="inline-flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
                     <MapPin className="w-4 h-4 text-rose-300" />
                     {locationText}
                   </span>
-                )}
+                ))}
                 {hospital.contact && (
                   <span className="inline-flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
                     <Phone className="w-4 h-4 text-blue-300" />
@@ -368,13 +382,23 @@ export const HospitalProfile = () => {
                 </p>
               </div>
               <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
-                <div className="aspect-[16/10] rounded-[32px] overflow-hidden bg-slate-100">
+                <div className="relative aspect-[16/10] rounded-[32px] overflow-hidden bg-slate-100">
                   <img src={coverPhoto?.url || photos[0].url} alt={coverPhoto?.caption || `${hospital.name} main facility`} className="w-full h-full object-cover" />
+                  {coverPhoto?.caption && (
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 to-transparent p-5">
+                      <p className="text-sm font-black text-white">{coverPhoto.caption}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   {photos.filter((photo) => photo.url !== coverPhoto?.url).slice(0, 4).map((photo, index) => (
-                    <div key={photo.url} className="aspect-[4/3] rounded-[24px] overflow-hidden bg-slate-100">
+                    <div key={photo.url} className="relative aspect-[4/3] rounded-[24px] overflow-hidden bg-slate-100">
                       <img src={photo.url} alt={photo.caption || `${hospital.name} facility ${index + 2}`} className="w-full h-full object-cover" />
+                      {photo.caption && (
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 to-transparent p-3">
+                          <p className="text-xs font-black text-white line-clamp-2">{photo.caption}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {photos.length === 1 && (

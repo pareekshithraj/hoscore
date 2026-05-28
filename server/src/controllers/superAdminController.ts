@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
+import { getDeploymentAudit } from '../services/deploymentAudit.js';
 import { getPlatformUsage } from '../services/usagePricing.js';
 
 export const getDashboardStats = async (_req: AuthRequest, res: Response) => {
@@ -29,6 +30,15 @@ export const getUsage = async (_req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Usage telemetry error:', error);
     res.status(500).json({ error: 'Failed to get usage telemetry' });
+  }
+};
+
+export const getDeploymentReadiness = async (_req: AuthRequest, res: Response) => {
+  try {
+    res.json(getDeploymentAudit());
+  } catch (error) {
+    console.error('Deployment readiness error:', error);
+    res.status(500).json({ error: 'Failed to get deployment readiness' });
   }
 };
 
