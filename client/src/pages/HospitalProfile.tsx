@@ -62,8 +62,9 @@ function setCanonical(url: string) {
 
 export const HospitalProfile = () => {
   const { id } = useParams();
-  const { activeContext } = useAuth();
+  const { user, activeContext } = useAuth();
   const isPatient = activeContext?.type === 'patient';
+  const isLoggedIn = Boolean(user);
   const [hospital, setHospital] = useState<HospitalProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -91,6 +92,12 @@ export const HospitalProfile = () => {
   }, [hospital]);
   const profilePath = hospital ? `/hospitals/${hospital.slug || hospital.id}` : '';
   const bookingPath = hospital ? `/patient/book/${hospital.id}` : '/patient/find';
+  const dashboardPath = activeContext?.type === 'superadmin' ? '/super-admin' : activeContext?.type === 'hospital' ? '/dashboard' : '/patient';
+  const primaryAction = isPatient
+    ? { to: bookingPath, label: 'Book Appointment', state: undefined }
+    : isLoggedIn
+      ? { to: dashboardPath, label: 'Open Dashboard', state: undefined }
+      : { to: '/login', label: 'Login to Book', state: { next: bookingPath } };
 
   useEffect(() => {
     if (!hospital) return;
@@ -190,11 +197,11 @@ export const HospitalProfile = () => {
             <a href="#trust" className="hover:text-rose-600 transition-colors">Trust</a>
           </div>
           <Link
-            to={isPatient ? bookingPath : '/login'}
-            state={isPatient ? undefined : { next: bookingPath }}
+            to={primaryAction.to}
+            state={primaryAction.state}
             className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white text-sm font-black rounded-full shadow-lg shadow-rose-500/20 hover:from-rose-700 hover:to-red-700 active:scale-95 transition-all"
           >
-            Book Appointment
+            {primaryAction.label}
           </Link>
         </div>
       </nav>
@@ -203,7 +210,7 @@ export const HospitalProfile = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(244,63,94,0.25),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(37,99,235,0.22),transparent_30%)]" />
         <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
         <div className="max-w-7xl mx-auto px-6 relative">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-300 hover:text-white mb-8">
+          <Link to="/hospitals" className="inline-flex items-center gap-2 text-sm font-bold text-slate-300 hover:text-white mb-8">
             <ArrowLeft className="w-4 h-4" />
             Back to hospital network
           </Link>
@@ -253,13 +260,22 @@ export const HospitalProfile = () => {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
-                  to={isPatient ? bookingPath : '/login'}
-                  state={isPatient ? undefined : { next: bookingPath }}
+                  to={primaryAction.to}
+                  state={primaryAction.state}
                   className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black shadow-xl shadow-rose-950/30 hover:from-rose-500 hover:to-red-500 active:scale-[0.98] transition-all"
                 >
                   <Calendar className="w-5 h-5" />
-                  Book Appointment
+                  {primaryAction.label}
                 </Link>
+                {!isLoggedIn && (
+                  <Link
+                    to="/login"
+                    state={{ mode: 'register', next: bookingPath }}
+                    className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-slate-950 font-black hover:bg-slate-100 active:scale-[0.98] transition-all"
+                  >
+                    Sign Up Free
+                  </Link>
+                )}
                 <a
                   href="#doctors"
                   className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white/10 border border-white/15 text-white font-black hover:bg-white/15 active:scale-[0.98] transition-all"

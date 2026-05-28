@@ -13,7 +13,7 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(location.state?.mode === 'register' ? 'register' : 'login');
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
 

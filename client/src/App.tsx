@@ -13,6 +13,7 @@ const RegisterHospital = lazy(() => import('./pages/RegisterHospital').then((mod
 const ForHospitals = lazy(() => import('./pages/ForHospitals').then((module) => ({ default: module.ForHospitals })));
 const BookAppointment = lazy(() => import('./pages/BookAppointment').then((module) => ({ default: module.BookAppointment })));
 const HospitalProfile = lazy(() => import('./pages/HospitalProfile').then((module) => ({ default: module.HospitalProfile })));
+const PublicHospitalSearch = lazy(() => import('./pages/PublicHospitalSearch').then((module) => ({ default: module.PublicHospitalSearch })));
 
 // Hospital dashboard pages
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
@@ -81,6 +82,7 @@ function App() {
           <Route path="/for-hospitals" element={<ForHospitals />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register-hospital" element={<RegisterHospital />} />
+          <Route path="/hospitals" element={<PublicHospitalSearch />} />
           <Route path="/hospitals/:id" element={<HospitalProfile />} />
           <Route path="/book/:hospitalId" element={<PublicBookRedirect />} />
 

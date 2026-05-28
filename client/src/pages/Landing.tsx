@@ -217,7 +217,7 @@ export const Landing = () => {
               <p className="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-3">Trusted Network</p>
               <h2 className="text-4xl font-black text-slate-900">Top Hospitals Near You</h2>
             </div>
-            <Link to="/patient/find" className="text-sm font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 group">
+            <Link to="/hospitals" className="text-sm font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 group">
               View All <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
