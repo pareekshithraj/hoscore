@@ -130,17 +130,20 @@ export const Settings = () => {
   };
 
   const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const fieldClass = 'w-full px-4 py-3 bg-[#111827]/80 border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400/40';
+  const panelClass = 'bg-white/[0.04] border border-white/[0.08] rounded-2xl';
+  const labelClass = 'text-xs font-bold text-slate-400 uppercase mb-1.5 block';
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
       <div>
-        <h2 className="text-2xl font-extrabold text-slate-900">Hospital Settings</h2>
+        <h2 className="text-2xl font-extrabold text-white">Hospital Settings</h2>
         <p className="text-sm text-slate-400">Configure global operational defaults and system security</p>
       </div>
 
-      <div className="flex bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+      <div className="flex bg-[#070b16] rounded-2xl border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/30">
         {/* Sidebar */}
-        <div className="w-1/4 border-r border-slate-50 bg-slate-50/50 p-2 space-y-1">
+        <div className="w-1/4 border-r border-white/[0.08] bg-white/[0.03] p-2 space-y-1">
           {[
             { id: 'GENERAL', label: 'General', icon: Globe },
             { id: 'HOURS', label: 'Operating Hours', icon: Clock },
@@ -151,7 +154,7 @@ export const Settings = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                activeTab === tab.id ? 'bg-white text-blue-600 shadow-sm border border-slate-200/60' : 'text-slate-400 hover:bg-white/50'
+                activeTab === tab.id ? 'bg-blue-600/15 text-blue-300 shadow-sm border border-blue-500/30' : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200'
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -164,15 +167,15 @@ export const Settings = () => {
         <div className="flex-1 p-8">
           {activeTab === 'GENERAL' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Hospital className="w-5 h-5 text-blue-600" /> Institution Profile
               </h3>
 
               {/* Logo Upload */}
-              <div className="flex items-center gap-6 p-6 bg-slate-50/50 border border-slate-100 rounded-2xl">
+              <div className={`flex items-center gap-6 p-6 ${panelClass}`}>
                 <div
                   onClick={() => logoFileRef.current?.click()}
-                  className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 border-2 border-dashed border-blue-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all group overflow-hidden"
+                  className="relative w-24 h-24 rounded-2xl bg-blue-500/10 border-2 border-dashed border-blue-400/50 flex items-center justify-center cursor-pointer hover:border-blue-300 transition-all group overflow-hidden"
                 >
                   {hospitalData.logo ? (
                     <>
@@ -182,7 +185,7 @@ export const Settings = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center gap-1 text-blue-400 group-hover:text-blue-600 transition-colors">
+                    <div className="flex flex-col items-center gap-1 text-blue-300 group-hover:text-blue-200 transition-colors">
                       {uploading ? (
                         <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
                       ) : (
@@ -196,16 +199,16 @@ export const Settings = () => {
                 </div>
                 <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                 <div>
-                  <p className="text-sm font-bold text-slate-700">Hospital Logo</p>
+                  <p className="text-sm font-bold text-slate-100">Hospital Logo</p>
                   <p className="text-xs text-slate-400 mt-1">Upload your hospital logo. Recommended: 512×512px, PNG or JPG.</p>
                   {uploading && <p className="text-xs text-blue-600 mt-1 font-medium">Uploading to cloud...</p>}
                 </div>
               </div>
 
-              <div className="p-6 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-4">
+              <div className={`p-6 ${panelClass} space-y-4`}>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-slate-700">Hospital Photos</p>
+                    <p className="text-sm font-bold text-slate-100">Hospital Photos</p>
                     <p className="text-xs text-slate-400 mt-1">Add public profile photos for the building, reception, wards, labs, and facilities.</p>
                   </div>
                   <button
@@ -223,7 +226,7 @@ export const Settings = () => {
                 {hospitalPhotos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {hospitalPhotos.map((photo) => (
-                      <div key={photo} className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-white border border-slate-200 group">
+                      <div key={photo} className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-950 border border-white/[0.08] group">
                         <img src={photo} alt="Hospital facility" className="w-full h-full object-cover" />
                         <button
                           type="button"
@@ -240,7 +243,7 @@ export const Settings = () => {
                   <button
                     type="button"
                     onClick={() => photoFileRef.current?.click()}
-                    className="w-full min-h-32 rounded-2xl border-2 border-dashed border-slate-200 bg-white text-slate-400 flex flex-col items-center justify-center gap-2 hover:border-blue-300 hover:text-blue-600 transition-colors"
+                    className="w-full min-h-32 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.03] text-slate-400 flex flex-col items-center justify-center gap-2 hover:border-blue-400/50 hover:text-blue-300 transition-colors"
                   >
                     <ImagePlus className="w-6 h-6" />
                     <span className="text-xs font-bold">Upload hospital profile photos</span>
@@ -250,48 +253,48 @@ export const Settings = () => {
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Hospital Name</label>
+                  <label className={labelClass}>Hospital Name</label>
                   <input type="text" value={hospitalData.name} onChange={e => setHospitalData({...hospitalData, name: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    className={fieldClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Contact</label>
+                  <label className={labelClass}>Contact</label>
                   <input type="text" value={hospitalData.contact || ''} onChange={e => setHospitalData({...hospitalData, contact: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    className={fieldClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Country</label>
+                  <label className={labelClass}>Country</label>
                   <input list="country-options" type="text" value={hospitalData.country || ''} onChange={e => setHospitalData({...hospitalData, country: e.target.value, state: '', city: ''})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    className={fieldClass} />
                   <datalist id="country-options">
                     {COUNTRIES.map(country => <option key={country} value={country} />)}
                   </datalist>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">State</label>
+                  <label className={labelClass}>State</label>
                   <input list="state-options" type="text" value={hospitalData.state || ''} onChange={e => setHospitalData({...hospitalData, state: e.target.value, city: ''})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    className={fieldClass} />
                   <datalist id="state-options">
                     {statesForCountry(hospitalData.country).map(state => <option key={state} value={state} />)}
                   </datalist>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">City</label>
+                  <label className={labelClass}>City</label>
                   <input list="city-options" type="text" value={hospitalData.city || ''} onChange={e => setHospitalData({...hospitalData, city: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    className={fieldClass} />
                   <datalist id="city-options">
                     {citiesForRegion(hospitalData.country, hospitalData.state).map(city => <option key={city} value={city} />)}
                   </datalist>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Address</label>
+                  <label className={labelClass}>Address</label>
                   <textarea rows={2} value={hospitalData.address || ''} onChange={e => setHospitalData({...hospitalData, address: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
+                    className={`${fieldClass} resize-none`} />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Description</label>
+                  <label className={labelClass}>Description</label>
                   <textarea rows={3} value={hospitalData.description || ''} onChange={e => setHospitalData({...hospitalData, description: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
+                    className={`${fieldClass} resize-none`} />
                 </div>
               </div>
             </div>
@@ -299,27 +302,27 @@ export const Settings = () => {
 
           {activeTab === 'HOURS' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Clock className="w-5 h-5 text-blue-600" /> Default Operating Hours
               </h3>
               <div className="space-y-4">
                 {DAYS.map((day, i) => {
                   const hour = hours.find(h => h.dayOfWeek === i) || { isOpen: i !== 0, openTime: '08:00', closeTime: '20:00' };
                   return (
-                    <div key={day} className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                    <div key={day} className={`flex items-center justify-between p-4 ${panelClass}`}>
                       <div className="flex items-center gap-4">
                         <div className={`w-2 h-2 rounded-full ${hour.isOpen ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                        <span className="text-sm font-bold text-slate-700 w-24">{day}</span>
+                        <span className="text-sm font-bold text-slate-200 w-24">{day}</span>
                       </div>
                       <div className="flex items-center gap-4">
                         {hour.isOpen && (
                           <div className="flex items-center gap-2">
-                            <input type="time" defaultValue={hour.openTime} className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium" />
+                            <input type="time" defaultValue={hour.openTime} className="bg-[#111827]/80 border border-white/[0.08] rounded-lg px-2 py-1 text-xs font-medium text-white" />
                             <span className="text-slate-400">-</span>
-                            <input type="time" defaultValue={hour.closeTime} className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium" />
+                            <input type="time" defaultValue={hour.closeTime} className="bg-[#111827]/80 border border-white/[0.08] rounded-lg px-2 py-1 text-xs font-medium text-white" />
                           </div>
                         )}
-                        <button className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${hour.isOpen ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                        <button className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${hour.isOpen ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-white/[0.04] text-slate-500 border border-white/[0.08]'}`}>
                           {hour.isOpen ? 'Open' : 'Closed'}
                         </button>
                       </div>
@@ -332,7 +335,7 @@ export const Settings = () => {
 
           {activeTab === 'SECURITY' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Shield className="w-5 h-5 text-blue-600" /> Access & Security
               </h3>
               <div className="space-y-4">
@@ -341,9 +344,9 @@ export const Settings = () => {
                   { label: 'Auto-Audit Logging', desc: 'Automatically log all clinical records changes', enabled: true, locked: true },
                   { label: 'Session Timeout', desc: 'Auto logout after 30 minutes of inactivity', enabled: true },
                 ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                  <div key={item.label} className={`flex items-center justify-between p-4 ${panelClass}`}>
                     <div>
-                      <p className="text-sm font-bold text-slate-700">{item.label}</p>
+                      <p className="text-sm font-bold text-slate-100">{item.label}</p>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>
                     </div>
                     <div className={`w-10 h-5 rounded-full relative transition-all ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'} ${item.locked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
@@ -357,7 +360,7 @@ export const Settings = () => {
 
           {activeTab === 'NOTIFICATIONS' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Bell className="w-5 h-5 text-blue-600" /> Notification Preferences
               </h3>
               <div className="space-y-4">
@@ -367,9 +370,9 @@ export const Settings = () => {
                   { label: 'Low Inventory Warnings', desc: 'Notify when stock drops below reorder level', enabled: true },
                   { label: 'Leave Request Alerts', desc: 'Notify admin when staff requests leave', enabled: false },
                 ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                  <div key={item.label} className={`flex items-center justify-between p-4 ${panelClass}`}>
                     <div>
-                      <p className="text-sm font-bold text-slate-700">{item.label}</p>
+                      <p className="text-sm font-bold text-slate-100">{item.label}</p>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>
                     </div>
                     <div className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}>
@@ -381,11 +384,11 @@ export const Settings = () => {
             </div>
           )}
 
-          <div className="mt-10 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">
+          <div className="mt-10 pt-6 border-t border-white/[0.08] flex items-center justify-between gap-4">
             {status.success && <p className="text-sm font-bold text-emerald-600 flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Saved successfully!</p>}
             {status.error && <p className="text-sm font-bold text-rose-600">{status.error}</p>}
             <div className="flex-1" />
-            <button onClick={handleSaveGeneral} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg shadow-slate-900/10">
+            <button onClick={handleSaveGeneral} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-950/30">
               <Save className="w-4 h-4" /> Save Changes
             </button>
           </div>
