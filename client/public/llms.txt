@@ -1,0 +1,11 @@
+# HOSCORE
+
+HOSCORE is a public hospital discovery and healthcare operations platform.
+
+## Public pages
+- `/hospitals` lists verified public hospital profiles.
+- `/hospitals/{hospital-slug}` contains a public hospital profile with location, ratings, photos, doctors, specialties, and appointment access.
+- `/hospitals/{country}/{state}/{city}` lists verified hospitals in a location.
+
+## AI indexing guidance
+Public hospital profile pages are intended to be summarized by search engines and AI answer engines. Each profile includes visible facts, FAQ content, canonical metadata, Open Graph metadata, and Hospital structured data.

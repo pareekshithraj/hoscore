@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Building2, MapPin, Search, Shield, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,10 +28,11 @@ const locationSlug = (value?: string | null) => String(value || '')
 
 export const PublicHospitalSearch = () => {
   const { country, state, city } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { activeContext } = useAuth();
   const isPatient = activeContext?.type === 'patient';
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(searchParams.get('q') || '');
   const [area, setArea] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +48,19 @@ export const PublicHospitalSearch = () => {
       document.head.appendChild(meta);
     }
     meta.content = description;
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.appendChild(canonical);
+    }
+    canonical.href = `${window.location.origin}${window.location.pathname}`;
   }, [country, state, city]);
+
+  useEffect(() => {
+    const nextQuery = searchParams.get('q') || '';
+    setQuery(nextQuery);
+  }, [searchParams]);
 
   useEffect(() => {
     fetch(`${BASE_URL}/hospitals`)
@@ -119,7 +131,14 @@ export const PublicHospitalSearch = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setQuery(value);
+                  const next = new URLSearchParams(searchParams);
+                  if (value) next.set('q', value);
+                  else next.delete('q');
+                  setSearchParams(next, { replace: true });
+                }}
                 placeholder="Search hospital name, specialty, city, area..."
                 className="w-full h-14 pl-12 pr-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20"
               />

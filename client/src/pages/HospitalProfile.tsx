@@ -75,6 +75,16 @@ function setCanonical(url: string) {
   tag.href = url;
 }
 
+function setLink(rel: string, href: string) {
+  let tag = document.head.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+  if (!tag) {
+    tag = document.createElement('link');
+    tag.rel = rel;
+    document.head.appendChild(tag);
+  }
+  tag.href = href;
+}
+
 export const HospitalProfile = () => {
   const { id } = useParams();
   const { user, activeContext } = useAuth();
@@ -111,6 +121,16 @@ export const HospitalProfile = () => {
     const unique = new Set((hospital?.doctors || []).map((doctor) => doctor.specialty).filter(Boolean));
     return Array.from(unique);
   }, [hospital]);
+  const profileKeywords = [
+    hospital?.name,
+    hospital?.city && `hospital in ${hospital.city}`,
+    hospital?.state && `hospital in ${hospital.state}`,
+    hospital?.country && `hospital in ${hospital.country}`,
+    'HOSCORE hospital profile',
+    'verified hospital',
+    'book hospital appointment',
+    ...specialties,
+  ].filter(Boolean).join(', ');
   const profilePath = hospital ? `/hospitals/${hospital.slug || hospital.id}` : '';
   const bookingPath = hospital ? `/patient/book/${hospital.id}` : '/patient/find';
   const dashboardPath = activeContext?.type === 'superadmin' ? '/super-admin' : activeContext?.type === 'hospital' ? '/dashboard' : '/patient';
@@ -125,19 +145,43 @@ export const HospitalProfile = () => {
     const title = `${hospital.name} HOSCORE Profile | Doctors, Appointments, Ratings`;
     const description = `${hospital.name}${locationText ? ` in ${locationText}` : ''} on HOSCORE. View verified hospital profile, doctors, specialties, ratings, patient services, and appointment access.`;
     const canonical = `${window.location.origin}${profilePath}`;
+    const faq = [
+      {
+        question: `How can patients book an appointment at ${hospital.name}?`,
+        answer: `Patients can view ${hospital.name} on HOSCORE and continue to appointment booking after logging in with a patient account.`,
+      },
+      {
+        question: `Where is ${hospital.name} located?`,
+        answer: `${hospital.name}${locationText ? ` is located in ${locationText}` : ' has a verified HOSCORE hospital profile'}.`,
+      },
+      {
+        question: `Is ${hospital.name} verified on HOSCORE?`,
+        answer: `${hospital.name} has a public HOSCORE hospital profile with verification, doctors, specialties, ratings, and appointment access information.`,
+      },
+    ];
 
     document.title = title;
     setMeta('description', description);
+    setMeta('keywords', profileKeywords);
     setMeta('robots', 'index,follow,max-image-preview:large');
+    setMeta('author', 'HOSCORE');
+    setMeta('geo.region', [hospital.country, hospital.state].filter(Boolean).join('-'));
+    setMeta('geo.placename', locationText);
     setMeta('og:title', title, true);
     setMeta('og:description', description, true);
     setMeta('og:type', 'profile', true);
     setMeta('og:url', canonical, true);
     setMeta('og:image', primaryImage, true);
+    setMeta('og:image:alt', `${hospital.name} verified HOSCORE hospital profile`, true);
+    setMeta('og:site_name', 'HOSCORE', true);
+    setMeta('og:locale', 'en_IN', true);
     setMeta('twitter:card', 'summary_large_image');
     setMeta('twitter:title', title);
     setMeta('twitter:description', description);
+    setMeta('twitter:image', primaryImage);
+    setMeta('twitter:image:alt', `${hospital.name} hospital profile`);
     setCanonical(canonical);
+    setLink('alternate', `${window.location.origin}/llms.txt`);
 
     const schemaId = 'hospital-profile-schema';
     document.getElementById(schemaId)?.remove();
@@ -146,31 +190,90 @@ export const HospitalProfile = () => {
     script.type = 'application/ld+json';
     script.text = JSON.stringify({
       '@context': 'https://schema.org',
-      '@type': 'Hospital',
-      name: hospital.name,
-      description,
-      url: canonical,
-      image: [primaryImage, ...photos.slice(1).map((photo) => photo.url)],
-      telephone: hospital.contact || undefined,
-      address: {
-        '@type': 'PostalAddress',
-        streetAddress: hospital.address || undefined,
-        addressLocality: hospital.city || undefined,
-        addressRegion: hospital.state || undefined,
-        addressCountry: hospital.country || undefined,
-      },
-      aggregateRating: hospital.rating
-        ? {
-            '@type': 'AggregateRating',
-            ratingValue: hospital.rating,
-            bestRating: 5,
-            ratingCount: Math.max(hospital._count?.appointments || 1, 1),
-          }
-        : undefined,
-      medicalSpecialty: specialties,
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          '@id': `${window.location.origin}/#website`,
+          name: 'HOSCORE',
+          url: window.location.origin,
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: `${window.location.origin}/hospitals?q={search_term_string}`,
+            'query-input': 'required name=search_term_string',
+          },
+        },
+        {
+          '@type': 'WebPage',
+          '@id': `${canonical}#webpage`,
+          url: canonical,
+          name: title,
+          description,
+          isPartOf: { '@id': `${window.location.origin}/#website` },
+          about: { '@id': `${canonical}#hospital` },
+          primaryImageOfPage: { '@id': `${canonical}#primaryimage` },
+          breadcrumb: { '@id': `${canonical}#breadcrumb` },
+        },
+        {
+          '@type': 'ImageObject',
+          '@id': `${canonical}#primaryimage`,
+          url: primaryImage,
+          caption: `${hospital.name} hospital profile image`,
+        },
+        {
+          '@type': 'BreadcrumbList',
+          '@id': `${canonical}#breadcrumb`,
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'HOSCORE', item: window.location.origin },
+            { '@type': 'ListItem', position: 2, name: 'Hospitals', item: `${window.location.origin}/hospitals` },
+            ...(locationPath ? [{ '@type': 'ListItem', position: 3, name: locationText, item: `${window.location.origin}${locationPath}` }] : []),
+            { '@type': 'ListItem', position: locationPath ? 4 : 3, name: hospital.name, item: canonical },
+          ],
+        },
+        {
+          '@type': 'Hospital',
+          '@id': `${canonical}#hospital`,
+          name: hospital.name,
+          description,
+          url: canonical,
+          image: [primaryImage, ...photos.slice(1).map((photo) => photo.url)],
+          logo: hospital.logo || undefined,
+          telephone: hospital.contact || undefined,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: hospital.address || undefined,
+            addressLocality: hospital.city || undefined,
+            addressRegion: hospital.state || undefined,
+            addressCountry: hospital.country || undefined,
+          },
+          aggregateRating: hospital.rating
+            ? {
+                '@type': 'AggregateRating',
+                ratingValue: hospital.rating,
+                bestRating: 5,
+                ratingCount: Math.max(hospital._count?.appointments || 1, 1),
+              }
+            : undefined,
+          medicalSpecialty: specialties,
+          employee: (hospital.doctors || []).slice(0, 12).map((doctor) => ({
+            '@type': 'Physician',
+            name: doctor.name,
+            medicalSpecialty: doctor.specialty,
+          })),
+          knowsAbout: ['appointment booking', 'hospital care', 'patient records', ...specialties],
+        },
+        {
+          '@type': 'FAQPage',
+          '@id': `${canonical}#faq`,
+          mainEntity: faq.map((item) => ({
+            '@type': 'Question',
+            name: item.question,
+            acceptedAnswer: { '@type': 'Answer', text: item.answer },
+          })),
+        },
+      ],
     });
     document.head.appendChild(script);
-  }, [hospital, locationText, primaryImage, profilePath, specialties, photos]);
+  }, [hospital, locationText, primaryImage, profilePath, specialties, photos, profileKeywords, locationPath]);
 
   if (loading) {
     return (
@@ -204,6 +307,26 @@ export const HospitalProfile = () => {
     { label: 'Care Rooms', value: hospital._count?.rooms || 0, icon: Building2 },
     { label: 'Network Rating', value: hospital.rating?.toFixed(1) || 'N/A', icon: Star },
     { label: 'Appointments', value: hospital._count?.appointments || 0, icon: Calendar },
+  ];
+  const seoFacts = [
+    { label: 'Public HOSCORE URL', value: `${window.location.origin}${profilePath}` },
+    { label: 'Hospital Location', value: locationText || 'Verified HOSCORE network' },
+    { label: 'Clinical Specialties', value: specialties.length ? specialties.slice(0, 8).join(', ') : 'Specialist directory updating' },
+    { label: 'Appointment Access', value: isPatient ? 'Book from patient dashboard' : 'Patient login required before booking' },
+  ];
+  const profileFaqs = [
+    {
+      question: `Can I book an appointment at ${hospital.name} on HOSCORE?`,
+      answer: 'Yes. Appointment booking is available after patient login so bookings stay tied to a verified patient dashboard.',
+    },
+    {
+      question: `What information is public on this HOSCORE hospital profile?`,
+      answer: 'The public profile shows hospital name, location, description, photos, doctors, specialties, ratings, and appointment access.',
+    },
+    {
+      question: `Why does HOSCORE create public hospital profiles?`,
+      answer: 'Public profiles help patients and search engines find verified hospitals by name, location, specialty, and care access.',
+    },
   ];
 
   return (
@@ -487,6 +610,43 @@ export const HospitalProfile = () => {
                   <CheckCircle2 className="w-5 h-5 text-emerald-300 mb-4" />
                   <p className="text-sm font-bold text-slate-200 leading-relaxed">{text}</p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-[0.85fr_1.15fr] gap-10">
+            <div>
+              <p className="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-3">Search Profile</p>
+              <h2 className="text-4xl font-black tracking-tight">Public hospital information for search and AI answers</h2>
+              <p className="mt-4 text-sm leading-relaxed text-slate-500 font-medium">
+                This HOSCORE page is built to help patients, search engines, and AI assistants understand {hospital.name}, its location, public care profile, specialties, doctors, and appointment access.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {seoFacts.map((fact) => (
+                <div key={fact.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{fact.label}</p>
+                  <p className="mt-2 text-sm font-black text-slate-800 break-words">{fact.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="max-w-3xl mb-8">
+              <p className="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-3">Patient Questions</p>
+              <h2 className="text-4xl font-black">Frequently asked questions</h2>
+            </div>
+            <div className="grid md:grid-cols-3 gap-5">
+              {profileFaqs.map((item) => (
+                <article key={item.question} className="rounded-[24px] border border-slate-200 bg-white p-6">
+                  <h3 className="text-base font-black text-slate-950">{item.question}</h3>
+                  <p className="mt-3 text-sm leading-relaxed font-medium text-slate-500">{item.answer}</p>
+                </article>
               ))}
             </div>
           </div>

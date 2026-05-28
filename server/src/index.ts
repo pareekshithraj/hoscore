@@ -50,32 +50,89 @@ function publicBaseUrl(req: Request) {
 }
 
 function urlPart(value?: string | null) {
-  return encodeURIComponent(String(value || '').trim().toLowerCase().replace(/\s+/g, '-'));
+  return encodeURIComponent(String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
+}
+
+function xmlEscape(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function normalizePhotos(photos: unknown) {
+  if (!Array.isArray(photos)) return [];
+  return photos
+    .map((photo: any) => typeof photo === 'string' ? { url: photo, caption: '' } : photo)
+    .filter((photo: any): photo is { url: string; caption?: string } => Boolean(photo?.url));
 }
 
 app.get('/robots.txt', (req: Request, res: Response) => {
-  const sitemapBaseUrl = `${req.protocol}://${req.get('host')}`.replace(/\/$/, '');
-  res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: ${sitemapBaseUrl}/sitemap.xml\n`);
+  const baseUrl = publicBaseUrl(req);
+  res.type('text/plain').send(`User-agent: *\nAllow: /\n\nUser-agent: Googlebot\nAllow: /\n\nUser-agent: Bingbot\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nHost: ${baseUrl}\nSitemap: ${baseUrl}/sitemap.xml\n`);
+});
+
+app.get('/llms.txt', async (req: Request, res: Response) => {
+  const baseUrl = publicBaseUrl(req);
+  const hospitals = await prisma.hospital.findMany({
+    where: { isActive: true },
+    select: { name: true, slug: true, id: true, city: true, state: true, country: true, description: true, rating: true },
+    orderBy: [{ rating: 'desc' }, { updatedAt: 'desc' }],
+    take: 50,
+  });
+  const lines = [
+    '# HOSCORE',
+    '',
+    'HOSCORE is a public hospital discovery and healthcare operations platform. Public hospital profile pages are intended to be indexed and summarized by search engines and AI answer engines.',
+    '',
+    '## Public Pages',
+    `- Hospital search: ${baseUrl}/hospitals`,
+    `- Sitemap: ${baseUrl}/sitemap.xml`,
+    '',
+    '## Verified Hospital Profiles',
+    ...hospitals.map((hospital) => {
+      const location = [hospital.city, hospital.state, hospital.country].filter(Boolean).join(', ');
+      return `- ${hospital.name}${location ? ` (${location})` : ''}: ${baseUrl}/hospitals/${hospital.slug || hospital.id}${hospital.description ? ` - ${hospital.description}` : ''}`;
+    }),
+    '',
+    '## Indexing Guidance',
+    'Hospital profile pages include structured Hospital schema, canonical URLs, public photos, doctor/specialty summaries, ratings, and location pages.',
+  ];
+  res.type('text/plain').send(`${lines.join('\n')}\n`);
 });
 
 app.get('/sitemap.xml', async (req: Request, res: Response) => {
   const baseUrl = publicBaseUrl(req);
   const hospitals = await prisma.hospital.findMany({
     where: { isActive: true },
-    select: { slug: true, id: true, country: true, state: true, city: true, updatedAt: true },
+    select: { slug: true, id: true, name: true, logo: true, photos: true, country: true, state: true, city: true, updatedAt: true },
     orderBy: { updatedAt: 'desc' },
   });
-  const urls = new Map<string, string>();
-  urls.set(`${baseUrl}/`, new Date().toISOString());
-  urls.set(`${baseUrl}/hospitals`, new Date().toISOString());
+  const urls: Array<{ loc: string; lastmod: string; priority: string; images?: Array<{ loc: string; caption?: string }> }> = [
+    { loc: `${baseUrl}/`, lastmod: new Date().toISOString(), priority: '0.9' },
+    { loc: `${baseUrl}/hospitals`, lastmod: new Date().toISOString(), priority: '0.95' },
+  ];
+  const locationUrls = new Map<string, string>();
   for (const hospital of hospitals) {
     const lastmod = hospital.updatedAt.toISOString();
-    urls.set(`${baseUrl}/hospitals/${hospital.slug || hospital.id}`, lastmod);
+    const images = [
+      ...(hospital.logo ? [{ url: hospital.logo, caption: `${hospital.name} logo` }] : []),
+      ...normalizePhotos(hospital.photos).slice(0, 10),
+    ].map((photo) => ({ loc: photo.url, caption: photo.caption || `${hospital.name} hospital profile photo` }));
+    urls.push({ loc: `${baseUrl}/hospitals/${hospital.slug || hospital.id}`, lastmod, priority: '0.9', images });
     if (hospital.country && hospital.state && hospital.city) {
-      urls.set(`${baseUrl}/hospitals/${urlPart(hospital.country)}/${urlPart(hospital.state)}/${urlPart(hospital.city)}`, lastmod);
+      locationUrls.set(`${baseUrl}/hospitals/${urlPart(hospital.country)}/${urlPart(hospital.state)}/${urlPart(hospital.city)}`, lastmod);
     }
   }
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${Array.from(urls.entries()).map(([loc, lastmod]) => `  <url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><changefreq>daily</changefreq><priority>${loc.endsWith('/hospitals') ? '0.9' : '0.8'}</priority></url>`).join('\n')}\n</urlset>`;
+  for (const [loc, lastmod] of locationUrls.entries()) {
+    urls.push({ loc, lastmod, priority: '0.85' });
+  }
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urls.map((item) => {
+    const imageTags = (item.images || []).map((image) => `    <image:image><image:loc>${xmlEscape(image.loc)}</image:loc>${image.caption ? `<image:caption>${xmlEscape(image.caption)}</image:caption>` : ''}</image:image>`).join('\n');
+    return `  <url><loc>${xmlEscape(item.loc)}</loc><lastmod>${item.lastmod}</lastmod><changefreq>daily</changefreq><priority>${item.priority}</priority>${imageTags ? `\n${imageTags}` : ''}</url>`;
+  }).join('\n')}\n</urlset>`;
   res.type('application/xml').send(body);
 });
 
