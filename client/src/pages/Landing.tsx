@@ -226,13 +226,18 @@ export const Landing = () => {
             {(hospitals.length > 0 ? hospitals : [
               { id: 'h1', name: 'St. Vincent Medical Center', rating: 4.9, description: 'Elite tertiary care hospital with advanced robotic surgery and state-of-the-art cardiology.', city: 'Mumbai', state: 'Maharashtra' },
               { id: 'h2', name: 'Apollo General Hospital', rating: 4.8, description: 'World-renowned medical expertise and research-driven treatments for complex cases.', city: 'Delhi', state: 'Delhi' },
-            ]).map((h: any, i: number) => (
+            ]).map((h: any, i: number) => {
+              const photos = Array.isArray(h.photos) ? h.photos.filter(Boolean) : [];
+              const cardImage = photos[0] || h.logo;
+              const location = [h.city, h.state, h.country].filter(Boolean).join(', ');
+              return (
               <div key={h.id || i} className="relative group rounded-[28px] bg-white border border-slate-200/60 hover:border-rose-200 hover:shadow-2xl transition-all duration-500 overflow-hidden">
                 <div className="flex">
                   {/* Square Logo / Photo Area */}
                   <div className={`w-40 min-h-full flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${i % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
                     {/* Grid pattern overlay */}
-                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+                    {cardImage && <img src={cardImage} alt={h.name} className="absolute inset-0 w-full h-full object-cover" />}
+                    <div className={`absolute inset-0 ${cardImage ? 'bg-slate-950/35' : 'opacity-10'}`} style={cardImage ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
                       <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden">
                         {h.logo ? (
@@ -260,7 +265,7 @@ export const Landing = () => {
                         </span>
                       </div>
                       <h3 className="text-xl font-black text-slate-900 group-hover:text-rose-600 transition-colors leading-tight">{h.name}</h3>
-                      {h.city && <p className="text-sm text-slate-400 mt-1.5 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{h.city}{h.state ? `, ${h.state}` : ''}</p>}
+                      {location && <p className="text-sm text-slate-400 mt-1.5 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{location}</p>}
                     </div>
                     <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{h.description}</p>
                     <div className="flex gap-2.5 pt-1">
@@ -270,7 +275,8 @@ export const Landing = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

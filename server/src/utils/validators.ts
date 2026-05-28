@@ -17,6 +17,7 @@ export const registerSchema = z.object({
 export const hospitalRegisterSchema = z.object({
   hospitalName: z.string().min(3, 'Hospital name must be at least 3 characters'),
   address: z.string().optional(),
+  country: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   contact: z.string().optional(),

@@ -27,11 +27,13 @@ type HospitalProfileData = {
   name: string;
   slug?: string;
   address?: string | null;
+  country?: string | null;
   city?: string | null;
   state?: string | null;
   contact?: string | null;
   description?: string | null;
   logo?: string | null;
+  photos?: string[] | null;
   rating?: number;
   isPartnered?: boolean;
   doctors?: Array<{ id: string; name: string; specialty: string; rating?: number; status?: string }>;
@@ -85,7 +87,9 @@ export const HospitalProfile = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const locationText = [hospital?.city, hospital?.state].filter(Boolean).join(', ');
+  const photos = useMemo(() => Array.isArray(hospital?.photos) ? hospital.photos.filter(Boolean) : [], [hospital]);
+  const primaryImage = photos[0] || hospital?.logo || `${window.location.origin}/hoscore-logo.png`;
+  const locationText = [hospital?.city, hospital?.state, hospital?.country].filter(Boolean).join(', ');
   const specialties = useMemo(() => {
     const unique = new Set((hospital?.doctors || []).map((doctor) => doctor.specialty).filter(Boolean));
     return Array.from(unique);
@@ -112,7 +116,7 @@ export const HospitalProfile = () => {
     setMeta('og:description', description, true);
     setMeta('og:type', 'profile', true);
     setMeta('og:url', canonical, true);
-    setMeta('og:image', hospital.logo || `${window.location.origin}/hoscore-logo.png`, true);
+    setMeta('og:image', primaryImage, true);
     setMeta('twitter:card', 'summary_large_image');
     setMeta('twitter:title', title);
     setMeta('twitter:description', description);
@@ -129,13 +133,14 @@ export const HospitalProfile = () => {
       name: hospital.name,
       description,
       url: canonical,
-      image: hospital.logo || `${window.location.origin}/hoscore-logo.png`,
+      image: [primaryImage, ...photos.slice(1)],
       telephone: hospital.contact || undefined,
       address: {
         '@type': 'PostalAddress',
         streetAddress: hospital.address || undefined,
         addressLocality: hospital.city || undefined,
         addressRegion: hospital.state || undefined,
+        addressCountry: hospital.country || undefined,
       },
       aggregateRating: hospital.rating
         ? {
@@ -148,7 +153,7 @@ export const HospitalProfile = () => {
       medicalSpecialty: specialties,
     });
     document.head.appendChild(script);
-  }, [hospital, locationText, profilePath, specialties]);
+  }, [hospital, locationText, primaryImage, profilePath, specialties, photos]);
 
   if (loading) {
     return (
@@ -291,8 +296,9 @@ export const HospitalProfile = () => {
               <div className="relative rounded-[36px] bg-white/[0.08] border border-white/10 p-6 shadow-2xl backdrop-blur-xl">
                 <div className="rounded-[28px] bg-white text-slate-950 p-6 space-y-6">
                   <div className="h-56 rounded-[24px] bg-gradient-to-br from-rose-600 via-red-500 to-blue-600 relative overflow-hidden flex items-center justify-center">
-                    <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
-                    <div className="w-28 h-28 rounded-[28px] bg-white/95 shadow-2xl flex items-center justify-center overflow-hidden">
+                    {photos[0] && <img src={photos[0]} alt={`${hospital.name} facility`} className="absolute inset-0 w-full h-full object-cover" />}
+                    <div className={`absolute inset-0 ${photos[0] ? 'bg-slate-950/35' : 'opacity-15'}`} style={photos[0] ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
+                    <div className="relative z-10 w-28 h-28 rounded-[28px] bg-white/95 shadow-2xl flex items-center justify-center overflow-hidden">
                       {hospital.logo ? (
                         <img src={hospital.logo} alt={hospital.name} className="w-full h-full object-cover" />
                       ) : (
@@ -340,6 +346,39 @@ export const HospitalProfile = () => {
             })}
           </div>
         </section>
+
+        {photos.length > 0 && (
+          <section className="py-16 bg-white">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                <div>
+                  <p className="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-3">Hospital Photos</p>
+                  <h2 className="text-4xl font-black">Facilities and Care Spaces</h2>
+                </div>
+                <p className="max-w-xl text-sm text-slate-500 font-medium leading-relaxed">
+                  Public photos help patients recognize the hospital, reception, rooms, and clinical areas before they visit.
+                </p>
+              </div>
+              <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
+                <div className="aspect-[16/10] rounded-[32px] overflow-hidden bg-slate-100">
+                  <img src={photos[0]} alt={`${hospital.name} main facility`} className="w-full h-full object-cover" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {photos.slice(1, 5).map((photo, index) => (
+                    <div key={photo} className="aspect-[4/3] rounded-[24px] overflow-hidden bg-slate-100">
+                      <img src={photo} alt={`${hospital.name} facility ${index + 2}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                  {photos.length === 1 && (
+                    <div className="col-span-2 h-full min-h-48 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-sm font-black text-slate-400">
+                      More photos coming soon
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section id="doctors" className="py-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-6">

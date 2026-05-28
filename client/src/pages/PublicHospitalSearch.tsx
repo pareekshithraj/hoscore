@@ -11,9 +11,11 @@ type Hospital = {
   slug?: string;
   city?: string | null;
   state?: string | null;
+  country?: string | null;
   address?: string | null;
   description?: string | null;
   logo?: string | null;
+  photos?: string[] | null;
   rating?: number;
   isPartnered?: boolean;
 };
@@ -53,12 +55,13 @@ export const PublicHospitalSearch = () => {
     hospitals.forEach((hospital) => {
       if (hospital.city) values.add(hospital.city);
       if (hospital.state) values.add(hospital.state);
+      if (hospital.country) values.add(hospital.country);
     });
     return Array.from(values).sort();
   }, [hospitals]);
 
   const filtered = hospitals.filter((hospital) => {
-    const haystack = [hospital.name, hospital.city, hospital.state, hospital.address, hospital.description].filter(Boolean).join(' ').toLowerCase();
+    const haystack = [hospital.name, hospital.city, hospital.state, hospital.country, hospital.address, hospital.description].filter(Boolean).join(' ').toLowerCase();
     const matchesQuery = !query || haystack.includes(query.toLowerCase());
     const matchesArea = !area || haystack.includes(area.toLowerCase());
     return matchesQuery && matchesArea;
@@ -135,11 +138,15 @@ export const PublicHospitalSearch = () => {
             <div className="grid md:grid-cols-2 gap-6">
               {filtered.map((hospital, index) => {
                 const bookingPath = `/patient/book/${hospital.id}`;
+                const photos = Array.isArray(hospital.photos) ? hospital.photos.filter(Boolean) : [];
+                const cardImage = photos[0] || hospital.logo;
+                const location = [hospital.city, hospital.state, hospital.country].filter(Boolean).join(', ');
                 return (
                   <div key={hospital.id} className="rounded-[28px] border border-slate-200 bg-white overflow-hidden hover:border-rose-200 hover:shadow-2xl transition-all duration-300">
                     <div className="grid sm:grid-cols-[180px_1fr]">
                       <div className={`min-h-56 relative bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-600 to-red-600' : 'from-blue-600 to-indigo-600'} flex items-center justify-center`}>
-                        <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+                        {cardImage && <img src={cardImage} alt={hospital.name} className="absolute inset-0 w-full h-full object-cover" />}
+                        <div className={`absolute inset-0 ${cardImage ? 'bg-slate-950/30' : 'opacity-15'}`} style={cardImage ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
                         <div className="w-20 h-20 rounded-3xl bg-white/95 shadow-2xl flex items-center justify-center overflow-hidden relative z-10">
                           {hospital.logo ? <img src={hospital.logo} alt={hospital.name} className="w-full h-full object-cover" /> : <Building2 className="w-10 h-10 text-rose-600" />}
                         </div>
@@ -152,10 +159,10 @@ export const PublicHospitalSearch = () => {
                               Verified
                             </div>
                             <h2 className="text-xl font-black">{hospital.name}</h2>
-                            {[hospital.city, hospital.state].filter(Boolean).length > 0 && (
+                            {location && (
                               <p className="mt-1 text-sm font-bold text-slate-400 flex items-center gap-1">
                                 <MapPin className="w-3.5 h-3.5" />
-                                {[hospital.city, hospital.state].filter(Boolean).join(', ')}
+                                {location}
                               </p>
                             )}
                           </div>

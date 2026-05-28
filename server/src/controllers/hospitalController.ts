@@ -31,8 +31,8 @@ export const listHospitals = async (_req: Request, res: Response) => {
     const hospitals = await prisma.hospital.findMany({
       where: { isActive: true },
       select: {
-        id: true, name: true, slug: true, address: true, city: true, state: true,
-        contact: true, description: true, logo: true, rating: true, isPartnered: true,
+        id: true, name: true, slug: true, address: true, country: true, city: true, state: true,
+        contact: true, description: true, logo: true, photos: true, rating: true, isPartnered: true,
       },
       orderBy: { rating: 'desc' },
     });
@@ -61,7 +61,7 @@ export const getHospital = async (req: Request, res: Response) => {
 
 // Register a new hospital (self-service)
 export const registerHospital = async (req: Request, res: Response) => {
-  const { hospitalName, address, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
+  const { hospitalName, address, country, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
 
   try {
     // Check if admin email exists
@@ -81,6 +81,7 @@ export const registerHospital = async (req: Request, res: Response) => {
         name: hospitalName,
         slug,
         address,
+        country,
         city,
         state,
         contact,

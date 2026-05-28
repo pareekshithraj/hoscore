@@ -72,12 +72,14 @@ model Hospital {
   name          String
   slug          String         @unique
   address       String?
+  country       String?
   city          String?
   state         String?
   contact       String?
   email         String?
   description   String?
   logo          String?
+  photos        Json?
   rating        Float          @default(0)
   isPartnered   Boolean        @default(false)
   isActive      Boolean        @default(true)

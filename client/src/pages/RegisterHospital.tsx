@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Building2, User, Mail, Lock, Phone, MapPin, CheckCircle2, ArrowLeft, ArrowRight, IndianRupee, Sparkles } from 'lucide-react';
+import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations';
 
 export const RegisterHospital = () => {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export const RegisterHospital = () => {
   const [success, setSuccess] = useState(false);
 
   const [form, setForm] = useState({
-    hospitalName: '', address: '', city: '', state: '', contact: '', description: '',
+    hospitalName: '', address: '', country: 'India', city: '', state: '', contact: '', description: '',
     adminName: '', adminEmail: '', adminPassword: '', adminPhone: '',
   });
 
@@ -85,14 +86,27 @@ export const RegisterHospital = () => {
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Address</label>
                 <input type="text" placeholder="123 Medical Street" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.address} onChange={e => update('address', e.target.value)} />
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Country</label>
+                <input list="register-country-options" type="text" placeholder="India" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.country} onChange={e => setForm(prev => ({ ...prev, country: e.target.value, state: '', city: '' }))} />
+                <datalist id="register-country-options">
+                  {COUNTRIES.map(country => <option key={country} value={country} />)}
+                </datalist>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">City</label>
-                  <input type="text" placeholder="Mumbai" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.city} onChange={e => update('city', e.target.value)} />
+                  <input list="register-city-options" type="text" placeholder="Mumbai" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.city} onChange={e => update('city', e.target.value)} />
+                  <datalist id="register-city-options">
+                    {citiesForRegion(form.country, form.state).map(city => <option key={city} value={city} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">State</label>
-                  <input type="text" placeholder="Maharashtra" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.state} onChange={e => update('state', e.target.value)} />
+                  <input list="register-state-options" type="text" placeholder="Maharashtra" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.state} onChange={e => setForm(prev => ({ ...prev, state: e.target.value, city: '' }))} />
+                  <datalist id="register-state-options">
+                    {statesForCountry(form.country).map(state => <option key={state} value={state} />)}
+                  </datalist>
                 </div>
               </div>
               <div>

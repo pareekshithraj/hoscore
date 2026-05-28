@@ -40,12 +40,14 @@ export interface Hospital {
   name: string;
   slug: string;
   address?: string | null;
+  country?: string | null;
   city?: string | null;
   state?: string | null;
   contact?: string | null;
   email?: string | null;
   description?: string | null;
   logo?: string | null;
+  photos?: string[] | null;
   rating: number;
   isPartnered: boolean;
   isActive: boolean;

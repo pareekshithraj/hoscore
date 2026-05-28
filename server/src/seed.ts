@@ -52,8 +52,13 @@ async function main() {
   const h1 = await prisma.hospital.create({
     data: {
       name: 'St. Vincent Medical Center', slug: 'st-vincent-medical',
-      address: '123 Healthcare Ave', city: 'Mumbai', state: 'Maharashtra',
+      address: '123 Healthcare Ave', country: 'India', city: 'Mumbai', state: 'Maharashtra',
       contact: '+91 22 1234 5678', description: 'Elite tertiary care hospital with advanced robotic surgery and state-of-the-art cardiology.',
+      photos: [
+        'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=1400&q=80',
+        'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1512678080530-7760d81faba6?auto=format&fit=crop&w=1200&q=80',
+      ],
       isPartnered: true, rating: 4.9, isActive: true,
     },
   });
@@ -61,8 +66,12 @@ async function main() {
   const h2 = await prisma.hospital.create({
     data: {
       name: 'Apollo General Hospital', slug: 'apollo-general',
-      address: '456 Medical Blvd', city: 'Delhi', state: 'Delhi',
+      address: '456 Medical Blvd', country: 'India', city: 'Delhi', state: 'Delhi',
       contact: '+91 11 9876 5432', description: 'World-renowned medical expertise and research-driven treatments for complex cases.',
+      photos: [
+        'https://images.unsplash.com/photo-1538108149393-fbbd81895907?auto=format&fit=crop&w=1400&q=80',
+        'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80',
+      ],
       isPartnered: true, rating: 4.8, isActive: true,
     },
   });
