@@ -58,6 +58,13 @@ export const requireHospitalContext = (req: AuthRequest, res: Response, next: Ne
   next();
 };
 
+export const requirePatientContext = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (req.user?.contextType !== 'patient') {
+    return res.status(403).json({ error: 'Patient context required' });
+  }
+  next();
+};
+
 // Ensures the user is a super admin
 export const requireSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user?.isSuperAdmin) {

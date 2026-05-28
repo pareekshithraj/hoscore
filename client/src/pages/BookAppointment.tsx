@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { Activity, Clock, User, Phone, Mail, CheckCircle, ArrowLeft, ShieldCheck, Ticket, MapPin, Star, Stethoscope, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
 
@@ -9,7 +10,7 @@ export const BookAppointment = () => {
   const { hospitalId } = useParams();
   const { pathname } = useLocation();
   const isDashboardRoute = pathname.startsWith('/patient');
-  const { activeContext } = useAuth();
+  const { user, activeContext } = useAuth();
   
   // Bug fix: activeContext is null during initial mount (async load). 
   // If pathname starts with /patient, we are definitely within the Patient Portal.
@@ -34,6 +35,15 @@ export const BookAppointment = () => {
   });
 
   useEffect(() => {
+    if (!user) return;
+    setFormData((prev) => ({
+      ...prev,
+      patientName: prev.patientName || user.name,
+      email: prev.email || user.email,
+    }));
+  }, [user]);
+
+  useEffect(() => {
     if (!hospitalId) return;
     fetch(`${BASE_URL}/hospitals/${hospitalId}`)
       .then(r => r.json())
@@ -55,20 +65,11 @@ export const BookAppointment = () => {
     try {
       const payload = {
         hospitalId,
-        patientName: formData.patientName,
-        email: formData.email,
-        contact: formData.contact,
         doctorId: formData.doctorId || undefined,
         date: formData.date,
         time: formData.time,
       };
-      const res = await fetch(`${BASE_URL}/appointments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Booking failed');
-      const data = await res.json();
+      const data = await api.post('/patient/appointments', payload);
       setBooked({
         token: data.tokenNumber,
         time: data.time,

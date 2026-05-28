@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, requireFeature, requireHospitalContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
+import { authenticate, requireFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
 import * as authController from '../controllers/authController.js';
 import * as hospitalController from '../controllers/hospitalController.js';
 import * as superAdminController from '../controllers/superAdminController.js';
@@ -29,7 +29,7 @@ import * as prescriptionController from '../controllers/prescriptionController.j
 import * as uploadController from '../controllers/uploadController.js';
 import * as staffTypeController from '../controllers/staffTypeController.js';
 import { upload } from '../controllers/uploadController.js';
-import { validate, loginSchema, registerSchema, hospitalRegisterSchema, appointmentSchema } from '../utils/validators.js';
+import { validate, loginSchema, registerSchema, hospitalRegisterSchema } from '../utils/validators.js';
 import { FEATURES } from '../utils/features.js';
 
 const router = Router();
@@ -40,7 +40,6 @@ router.post('/auth/login', validate(loginSchema), authController.login);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
 router.post('/hospitals/register', validate(hospitalRegisterSchema), hospitalController.registerHospital);
-router.post('/appointments', validate(appointmentSchema), appointmentController.createAppointment);
 
 // ================= AUTHENTICATED ROUTES =================
 router.use(authenticate);
@@ -66,6 +65,7 @@ router.get('/patient/dashboard', patientPortalController.getPatientDashboard);
 router.post('/patient/skip-alert', patientPortalController.skipAlert);
 router.patch('/patient/appointments/:id/close', patientPortalController.closeAppointment);
 router.get('/patient/appointments', patientPortalController.getMyAppointments);
+router.post('/patient/appointments', requirePatientContext, appointmentController.createPatientAppointment);
 router.get('/patient/prescriptions', patientPortalController.getMyPrescriptions);
 router.get('/patient/records', patientPortalController.getMyRecords);
 router.get('/patient/bills', patientPortalController.getMyBills);
@@ -103,6 +103,7 @@ router.get('/analytics', requireFeature(FEATURES.ANALYTICS), statsController.get
 
 // Appointments
 router.get('/appointments', requireFeature(FEATURES.CALENDAR), appointmentController.getAllAppointments);
+router.post('/appointments', requireFeature(FEATURES.CALENDAR), appointmentController.createAppointment);
 router.patch('/appointments/:id/checkin', requireFeature(FEATURES.QUEUE), appointmentController.checkInAppointment);
 router.delete('/appointments/:id', requireFeature(FEATURES.CALENDAR), appointmentController.deleteAppointment);
 

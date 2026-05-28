@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, LogIn, AlertCircle, UserPlus } from 'lucide-react';
 
 export const Login = () => {
   const { user, activeContext, login } = useAuth();
+  const location = useLocation();
+  const nextPath = typeof location.state?.next === 'string' && location.state.next.startsWith('/patient')
+    ? location.state.next
+    : null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,7 +19,7 @@ export const Login = () => {
 
   if (user && activeContext) {
     if (activeContext.type === 'superadmin') return <Navigate to="/super-admin" replace />;
-    if (activeContext.type === 'patient') return <Navigate to="/patient" replace />;
+    if (activeContext.type === 'patient') return <Navigate to={nextPath || '/patient'} replace />;
     return <Navigate to="/dashboard" replace />;
   }
 

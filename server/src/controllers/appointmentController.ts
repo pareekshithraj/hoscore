@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
+import type { AuthRequest } from '../middleware/authMiddleware.js';
+import { logAudit } from '../utils/auditLogger.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -38,6 +40,42 @@ export const createAppointment = async (req: Request, res: Response) => {
     });
     res.status(201).json(appointment);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to create appointment' }); }
+};
+
+export const createPatientAppointment = async (req: AuthRequest, res: Response) => {
+  const { hospitalId, doctorId, time, date } = req.body;
+  const userId = req.user?.userId;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!hospitalId || !date || !time) return res.status(400).json({ error: 'Hospital, date, and time are required' });
+
+  try {
+    const hospital = await prisma.hospital.findFirst({ where: { id: hospitalId, isActive: true } });
+    if (!hospital) return res.status(404).json({ error: 'Hospital not found' });
+
+    const patient = await prisma.patient.findUnique({ where: { userId } });
+    if (!patient || patient.isHoscoreUser === false) {
+      return res.status(403).json({ error: 'A HOSCORE patient profile is required to book appointments online' });
+    }
+
+    const tokenNumber = Math.floor(Math.random() * 50) + 1;
+    const appointment = await prisma.appointment.create({
+      data: {
+        hospitalId,
+        patientId: patient.id,
+        doctorId: doctorId || null,
+        time,
+        date: new Date(date),
+        tokenNumber,
+        status: 'PENDING',
+      },
+    });
+
+    await logAudit(req, 'CREATE', 'Appointment', appointment.id, `Patient booked appointment at ${hospital.name}`);
+    res.status(201).json(appointment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create appointment' });
+  }
 };
 
 export const checkInAppointment = async (req: Request, res: Response) => {

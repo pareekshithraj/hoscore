@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { PatientLayout } from './components/PatientLayout';
 import { SuperAdminLayout } from './components/SuperAdminLayout';
@@ -64,6 +64,11 @@ const PageFallback = () => (
   </div>
 );
 
+const PublicBookRedirect = () => {
+  const { hospitalId } = useParams();
+  return <Navigate to="/login" state={{ next: hospitalId ? `/patient/book/${hospitalId}` : '/patient/find' }} replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -75,7 +80,7 @@ function App() {
           <Route path="/for-hospitals" element={<ForHospitals />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register-hospital" element={<RegisterHospital />} />
-          <Route path="/book/:hospitalId" element={<BookAppointment />} />
+          <Route path="/book/:hospitalId" element={<PublicBookRedirect />} />
 
           {/* ========== HOSPITAL STAFF DASHBOARD ========== */}
           <Route
