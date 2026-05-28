@@ -135,15 +135,16 @@ export const Settings = () => {
   const labelClass = 'text-xs font-bold text-slate-400 uppercase mb-1.5 block';
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+    <div className="space-y-5 sm:space-y-6 max-w-4xl mx-auto pb-10">
       <div>
         <h2 className="text-2xl font-extrabold text-white">Hospital Settings</h2>
         <p className="text-sm text-slate-400">Configure global operational defaults and system security</p>
       </div>
 
-      <div className="flex bg-[#070b16] rounded-2xl border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/30">
+      <div className="flex flex-col md:flex-row bg-[#070b16] rounded-2xl border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/30">
         {/* Sidebar */}
-        <div className="w-1/4 border-r border-white/[0.08] bg-white/[0.03] p-2 space-y-1">
+        <div className="md:w-1/4 border-b md:border-b-0 md:border-r border-white/[0.08] bg-white/[0.03] p-2">
+          <div className="flex md:block gap-2 overflow-x-auto md:overflow-visible md:space-y-1 pb-1 md:pb-0">
           {[
             { id: 'GENERAL', label: 'General', icon: Globe },
             { id: 'HOURS', label: 'Operating Hours', icon: Clock },
@@ -153,7 +154,7 @@ export const Settings = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+              className={`shrink-0 md:w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 activeTab === tab.id ? 'bg-blue-600/15 text-blue-300 shadow-sm border border-blue-500/30' : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200'
               }`}
             >
@@ -161,10 +162,11 @@ export const Settings = () => {
               {tab.label}
             </button>
           ))}
+          </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
           {activeTab === 'GENERAL' && (
             <div className="space-y-6">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -172,7 +174,7 @@ export const Settings = () => {
               </h3>
 
               {/* Logo Upload */}
-              <div className={`flex items-center gap-6 p-6 ${panelClass}`}>
+              <div className={`flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 p-4 sm:p-6 ${panelClass}`}>
                 <div
                   onClick={() => logoFileRef.current?.click()}
                   className="relative w-24 h-24 rounded-2xl bg-blue-500/10 border-2 border-dashed border-blue-400/50 flex items-center justify-center cursor-pointer hover:border-blue-300 transition-all group overflow-hidden"
@@ -205,8 +207,8 @@ export const Settings = () => {
                 </div>
               </div>
 
-              <div className={`p-6 ${panelClass} space-y-4`}>
-                <div className="flex items-center justify-between gap-4">
+              <div className={`p-4 sm:p-6 ${panelClass} space-y-4`}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <p className="text-sm font-bold text-slate-100">Hospital Photos</p>
                     <p className="text-xs text-slate-400 mt-1">Add public profile photos for the building, reception, wards, labs, and facilities.</p>
@@ -215,7 +217,7 @@ export const Settings = () => {
                     type="button"
                     onClick={() => photoFileRef.current?.click()}
                     disabled={uploadingPhoto || hospitalPhotos.length >= 12}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50"
                   >
                     <ImagePlus className="w-4 h-4" />
                     {uploadingPhoto ? 'Uploading...' : 'Add Photo'}
@@ -224,7 +226,7 @@ export const Settings = () => {
                 </div>
 
                 {hospitalPhotos.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 gap-3">
                     {hospitalPhotos.map((photo) => (
                       <div key={photo} className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-950 border border-white/[0.08] group">
                         <img src={photo} alt="Hospital facility" className="w-full h-full object-cover" />
@@ -251,7 +253,7 @@ export const Settings = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className={labelClass}>Hospital Name</label>
                   <input type="text" value={hospitalData.name} onChange={e => setHospitalData({...hospitalData, name: e.target.value})}
@@ -286,12 +288,12 @@ export const Settings = () => {
                     {citiesForRegion(hospitalData.country, hospitalData.state).map(city => <option key={city} value={city} />)}
                   </datalist>
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className={labelClass}>Address</label>
                   <textarea rows={2} value={hospitalData.address || ''} onChange={e => setHospitalData({...hospitalData, address: e.target.value})}
                     className={`${fieldClass} resize-none`} />
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className={labelClass}>Description</label>
                   <textarea rows={3} value={hospitalData.description || ''} onChange={e => setHospitalData({...hospitalData, description: e.target.value})}
                     className={`${fieldClass} resize-none`} />
@@ -309,12 +311,12 @@ export const Settings = () => {
                 {DAYS.map((day, i) => {
                   const hour = hours.find(h => h.dayOfWeek === i) || { isOpen: i !== 0, openTime: '08:00', closeTime: '20:00' };
                   return (
-                    <div key={day} className={`flex items-center justify-between p-4 ${panelClass}`}>
+                    <div key={day} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 ${panelClass}`}>
                       <div className="flex items-center gap-4">
                         <div className={`w-2 h-2 rounded-full ${hour.isOpen ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                         <span className="text-sm font-bold text-slate-200 w-24">{day}</span>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col min-[420px]:flex-row min-[420px]:items-center gap-3 sm:gap-4">
                         {hour.isOpen && (
                           <div className="flex items-center gap-2">
                             <input type="time" defaultValue={hour.openTime} className="bg-[#111827]/80 border border-white/[0.08] rounded-lg px-2 py-1 text-xs font-medium text-white" />
@@ -344,7 +346,7 @@ export const Settings = () => {
                   { label: 'Auto-Audit Logging', desc: 'Automatically log all clinical records changes', enabled: true, locked: true },
                   { label: 'Session Timeout', desc: 'Auto logout after 30 minutes of inactivity', enabled: true },
                 ].map(item => (
-                  <div key={item.label} className={`flex items-center justify-between p-4 ${panelClass}`}>
+                  <div key={item.label} className={`flex items-start justify-between gap-4 p-4 ${panelClass}`}>
                     <div>
                       <p className="text-sm font-bold text-slate-100">{item.label}</p>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>
@@ -370,7 +372,7 @@ export const Settings = () => {
                   { label: 'Low Inventory Warnings', desc: 'Notify when stock drops below reorder level', enabled: true },
                   { label: 'Leave Request Alerts', desc: 'Notify admin when staff requests leave', enabled: false },
                 ].map(item => (
-                  <div key={item.label} className={`flex items-center justify-between p-4 ${panelClass}`}>
+                  <div key={item.label} className={`flex items-start justify-between gap-4 p-4 ${panelClass}`}>
                     <div>
                       <p className="text-sm font-bold text-slate-100">{item.label}</p>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>

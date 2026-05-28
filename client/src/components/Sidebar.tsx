@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Bed, Users, Stethoscope, ClipboardList, Package, Receipt,
   Settings, LogOut, BarChart2, UserCircle, Calendar, Megaphone, CalendarOff,
-  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck,
+  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck, X,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import clsx from "clsx";
@@ -42,7 +42,7 @@ const managementMenuItems = [
   { icon: Settings, label: "Audit Logs", path: "/dashboard/audit-logs", feature: "audit_logs" },
 ];
 
-export const Sidebar = () => {
+export const Sidebar = ({ isMobileOpen = false, onCloseMobile }: { isMobileOpen?: boolean; onCloseMobile?: () => void }) => {
   const location = useLocation();
   const { activeContext, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -57,13 +57,27 @@ export const Sidebar = () => {
   const filteredMain = mainMenuItems.filter((i) => hasFeature(activeContext?.permissions, i.feature, userRole));
   const filteredManagement = managementMenuItems.filter((i) => hasFeature(activeContext?.permissions, i.feature, userRole));
 
+  useEffect(() => {
+    onCloseMobile?.();
+  }, [location.pathname, onCloseMobile]);
+
   return (
-    <div 
-      className={clsx(
-        "flex flex-col h-screen bg-[#070b16] border-r border-white/[0.04] text-slate-100 flex-shrink-0 relative z-50 transition-all duration-300 ease-in-out shadow-2xl",
-        isCollapsed ? "w-[78px]" : "w-[260px]"
-      )}
-    >
+    <>
+      <div
+        onClick={onCloseMobile}
+        className={clsx(
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden",
+          isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      />
+      <div
+        className={clsx(
+          "flex flex-col h-dvh bg-[#070b16] border-r border-white/[0.04] text-slate-100 flex-shrink-0 z-50 transition-all duration-300 ease-in-out shadow-2xl",
+          "fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          isCollapsed ? "lg:w-[78px]" : "w-[82vw] max-w-[300px] lg:w-[260px]"
+        )}
+      >
       {/* Brand Header */}
       <div className="p-4 flex items-center justify-between border-b border-white/[0.04] relative">
         <Link to="/dashboard" className="flex items-center gap-3 overflow-hidden">
@@ -79,9 +93,16 @@ export const Sidebar = () => {
         </Link>
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3.5 top-1/2 -translate-y-1/2 bg-[#0ea5e9] hover:bg-sky-400 text-white rounded-full p-1 border-2 border-[#070b16] shadow-lg transition-transform active:scale-95 cursor-pointer z-50"
+          className="hidden lg:block absolute -right-3.5 top-1/2 -translate-y-1/2 bg-[#0ea5e9] hover:bg-sky-400 text-white rounded-full p-1 border-2 border-[#070b16] shadow-lg transition-transform active:scale-95 cursor-pointer z-50"
         >
           {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </button>
+        <button
+          onClick={onCloseMobile}
+          className="lg:hidden w-9 h-9 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 flex items-center justify-center"
+          aria-label="Close navigation"
+        >
+          <X className="w-4 h-4" />
         </button>
       </div>
 
@@ -182,5 +203,6 @@ export const Sidebar = () => {
         </button>
       </div>
     </div>
+    </>
   );
 };

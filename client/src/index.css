@@ -474,3 +474,39 @@ body:has(.dashboard-theme) {
   box-shadow: 0 0 10px rgba(14, 165, 233, 0.1) !important;
   outline: none !important;
 }
+
+@media (max-width: 640px) {
+  .dashboard-theme main {
+    overflow-x: hidden;
+  }
+
+  .dashboard-theme main h1 {
+    font-size: 1.75rem !important;
+    line-height: 2.125rem !important;
+  }
+
+  .dashboard-theme main h2 {
+    font-size: 1.35rem !important;
+    line-height: 1.8rem !important;
+  }
+
+  .dashboard-theme main table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .dashboard-theme main button,
+  .dashboard-theme main a,
+  .dashboard-theme main input,
+  .dashboard-theme main select,
+  .dashboard-theme main textarea {
+    max-width: 100%;
+  }
+
+  .dashboard-theme main .grid {
+    min-width: 0;
+  }
+}

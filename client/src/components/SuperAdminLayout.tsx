@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Header } from './Header';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Building2, Users, Receipt, LogOut, ChevronLeft, ChevronRight, HardDrive, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Receipt, LogOut, ChevronLeft, ChevronRight, HardDrive, ShieldCheck, X } from 'lucide-react';
 import clsx from 'clsx';
 
 const adminMenuItems = [
@@ -18,19 +18,34 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
   const location = useLocation();
   const { logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
 
   const isActive = (path: string) => {
     if (path === '/super-admin') return location.pathname === '/super-admin';
     return location.pathname.startsWith(path);
   };
 
+  useEffect(() => {
+    closeMobileNav();
+  }, [location.pathname, closeMobileNav]);
+
   return (
     <div className="flex h-screen bg-[#060913] text-[#f8fafc] overflow-hidden dashboard-theme">
+      <div
+        onClick={closeMobileNav}
+        className={clsx(
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden",
+          isMobileNavOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      />
       {/* Super Admin Collapsible Sidebar */}
       <div
         className={clsx(
-          "flex flex-col h-screen bg-[#070b16] border-r border-white/[0.04] text-slate-100 flex-shrink-0 relative z-50 transition-all duration-300 ease-in-out shadow-2xl",
-          isCollapsed ? "w-[78px]" : "w-[260px]"
+          "flex flex-col h-dvh bg-[#070b16] border-r border-white/[0.04] text-slate-100 flex-shrink-0 z-50 transition-all duration-300 ease-in-out shadow-2xl",
+          "fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
+          isMobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          isCollapsed ? "lg:w-[78px]" : "w-[82vw] max-w-[300px] lg:w-[260px]"
         )}
       >
         {/* Brand Header */}
@@ -48,9 +63,16 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
           </Link>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -right-3.5 top-1/2 -translate-y-1/2 bg-rose-500 hover:bg-rose-400 text-white rounded-full p-1 border-2 border-[#070b16] shadow-lg transition-transform active:scale-95 cursor-pointer z-50"
+            className="hidden lg:block absolute -right-3.5 top-1/2 -translate-y-1/2 bg-rose-500 hover:bg-rose-400 text-white rounded-full p-1 border-2 border-[#070b16] shadow-lg transition-transform active:scale-95 cursor-pointer z-50"
           >
             {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={closeMobileNav}
+            className="lg:hidden w-9 h-9 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 flex items-center justify-center"
+            aria-label="Close navigation"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -108,8 +130,8 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 animate-fade-in-up relative z-10">
+        <Header onOpenMenu={() => setIsMobileNavOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-8 animate-fade-in-up relative z-10">
           {children}
         </main>
       </div>
