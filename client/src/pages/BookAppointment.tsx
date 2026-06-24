@@ -26,6 +26,9 @@ export const BookAppointment = () => {
   const [booked, setBooked] = useState<any>(null);
   const availableDoctors = doctors.filter((d: any) => !['OFF_DUTY', 'On Leave', 'Inactive'].includes(d.status));
 
+  const [dependents, setDependents] = useState<any[]>([]);
+  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string>('');
+
   const [formData, setFormData] = useState({
     patientName: '',
     email: '',
@@ -37,12 +40,33 @@ export const BookAppointment = () => {
 
   useEffect(() => {
     if (!user) return;
-    setFormData((prev) => ({
-      ...prev,
-      patientName: prev.patientName || user.name,
-      email: prev.email || user.email,
-    }));
+    api.get('/patient/dependents')
+      .then(setDependents)
+      .catch(console.error);
   }, [user]);
+
+  useEffect(() => {
+    if (!selectedFamilyMemberId) {
+      if (user) {
+        setFormData((prev) => ({
+          ...prev,
+          patientName: user.name,
+          email: user.email,
+          contact: '',
+        }));
+      }
+    } else {
+      const dep = dependents.find(d => d.id === selectedFamilyMemberId);
+      if (dep) {
+        setFormData((prev) => ({
+          ...prev,
+          patientName: dep.name,
+          email: dep.email || '',
+          contact: dep.contact || '',
+        }));
+      }
+    }
+  }, [selectedFamilyMemberId, dependents, user]);
 
   useEffect(() => {
     if (!hospitalId) return;
@@ -69,6 +93,7 @@ export const BookAppointment = () => {
         doctorId: formData.doctorId || undefined,
         date: formData.date,
         time: formData.time,
+        patientId: selectedFamilyMemberId || undefined,
       };
       const data = await api.post('/patient/appointments', payload);
       setBooked({
@@ -229,6 +254,22 @@ export const BookAppointment = () => {
               )}
 
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {isPatient && (
+                  <div className="md:col-span-2 space-y-2 animate-fade-in-up">
+                    <label className="text-sm font-bold text-slate-300">Book Appointment For</label>
+                    <select
+                      value={selectedFamilyMemberId}
+                      onChange={(e) => setSelectedFamilyMemberId(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-black/40 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-rose-500/50 transition-all appearance-none cursor-pointer text-sm font-bold"
+                    >
+                      <option value="" className="bg-[#0a0f1d] text-white">Myself ({user?.name})</option>
+                      {dependents.map((dep) => (
+                        <option key={dep.id} value={dep.id} className="bg-[#0a0f1d] text-white">Dependent: {dep.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-sm font-bold text-slate-300">Patient Full Name</label>
                   <div className="relative">

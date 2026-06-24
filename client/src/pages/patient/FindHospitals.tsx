@@ -9,7 +9,7 @@ export const FindHospitals = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/hospitals').then(r => r.json()).then(d => { if (Array.isArray(d)) setHospitals(d); }).catch(console.error).finally(() => setLoading(false));
+    api.get('/hospitals').then(d => { if (Array.isArray(d)) setHospitals(d); }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const filtered = hospitals.filter(h => h.name.toLowerCase().includes(search.toLowerCase()) || h.city?.toLowerCase().includes(search.toLowerCase()));

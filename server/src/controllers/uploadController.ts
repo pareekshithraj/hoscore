@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import multer from 'multer';
-import { uploadToR2, deleteFromR2 } from '../services/r2.js';
+import { uploadToR2, deleteFromR2, signUrl } from '../services/r2.js';
 
 // Multer config — store in memory, then upload to R2
 const storage = multer.memoryStorage();
@@ -25,10 +25,11 @@ export const uploadImage = async (req: Request, res: Response) => {
 
     const folder = req.body.folder || 'images';
     const result = await uploadToR2(req.file.buffer, req.file.originalname, req.file.mimetype, folder);
+    const signedUrl = await signUrl(result.key);
 
     res.json({
       success: true,
-      url: result.url,
+      url: signedUrl,
       key: result.key,
       size: result.size,
     });
@@ -46,7 +47,14 @@ export const uploadDocuments = async (req: Request, res: Response) => {
 
     const folder = req.body.folder || 'documents';
     const results = await Promise.all(
-      files.map((file) => uploadToR2(file.buffer, file.originalname, file.mimetype, folder))
+      files.map(async (file) => {
+        const res = await uploadToR2(file.buffer, file.originalname, file.mimetype, folder);
+        const signed = await signUrl(res.key);
+        return {
+          ...res,
+          url: signed,
+        };
+      })
     );
 
     res.json({ success: true, files: results });

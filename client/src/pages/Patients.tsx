@@ -13,6 +13,54 @@ export const Patients = () => {
   });
   const [today] = useState(() => new Date());
 
+  // Manual/Walk-in Appointment Booking States
+  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [bookingForm, setBookingForm] = useState({ doctorId: '', date: '', time: '' });
+  const [createdAppointment, setCreatedAppointment] = useState<any>(null);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
+
+  const openBookingModal = (patient: any) => {
+    setSelectedPatient(patient);
+    setBookingSuccess(false);
+    setCreatedAppointment(null);
+    setBookingForm({ doctorId: '', date: '', time: '' });
+    setIsBookModalOpen(true);
+    if (doctors.length === 0) {
+      api.get('/doctors').then(res => {
+        setDoctors(res || []);
+      }).catch(err => console.error(err));
+    }
+  };
+
+  const handleBookAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient) return;
+    setBookingLoading(true);
+    try {
+      const payload = {
+        patientName: selectedPatient.name,
+        email: selectedPatient.email || undefined,
+        contact: selectedPatient.contact || undefined,
+        doctorId: bookingForm.doctorId || undefined,
+        date: new Date(bookingForm.date).toISOString(),
+        time: bookingForm.time,
+        isHoscoreUser: selectedPatient.isHoscoreUser,
+        manualCareNote: selectedPatient.manualCareNote
+      };
+      const res = await api.post('/appointments', payload);
+      setCreatedAppointment(res);
+      setBookingSuccess(true);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to book appointment');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   const fetchPatients = () => {
     setLoading(true);
     api.get('/patients')
@@ -163,6 +211,13 @@ export const Patients = () => {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => openBookingModal(patient)} 
+                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md" 
+                      title="Book Appointment"
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </button>
                     <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md">
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -241,6 +296,116 @@ export const Patients = () => {
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Register</button>
           </div>
         </form>
+      </Modal>
+
+      {/* Manual / Walk-in Booking Modal */}
+      <Modal isOpen={isBookModalOpen} onClose={() => setIsBookModalOpen(false)} title="Book Walk-in / Phone Appointment">
+        {bookingSuccess && createdAppointment ? (
+          <div className="space-y-6 text-center py-4">
+            <div className="mx-auto w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-slate-900">Appointment Booked Successfully!</h3>
+              <p className="text-sm text-slate-500">The manual booking is now active in the OPD queue.</p>
+            </div>
+            
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 max-w-sm mx-auto space-y-3">
+              <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Queue Token Number</div>
+              <div className="text-4xl font-black text-blue-600">#{createdAppointment.tokenNumber}</div>
+              <div className="border-t border-slate-200 pt-3 text-left space-y-1.5 text-sm text-slate-650">
+                <div><span className="font-semibold text-slate-800">Patient:</span> {selectedPatient?.name}</div>
+                <div><span className="font-semibold text-slate-800">Doctor:</span> {doctors.find(d => d.id === bookingForm.doctorId)?.name || 'General OPD'}</div>
+                <div><span className="font-semibold text-slate-800">Date:</span> {new Date(bookingForm.date).toLocaleDateString()}</div>
+                <div><span className="font-semibold text-slate-800">Time Slot:</span> {bookingForm.time}</div>
+                {selectedPatient?.isHoscoreUser === false && (
+                  <div className="mt-2 p-2 bg-slate-900 text-white text-xs rounded font-medium text-center">
+                    ⚠️ Walk-in Manual Care Warning Active
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              onClick={() => setIsBookModalOpen(false)} 
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition-colors cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleBookAppointment} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Patient Name</label>
+              <input 
+                type="text" 
+                readOnly 
+                value={selectedPatient?.name || ''} 
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 focus:outline-none" 
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Assign Doctor</label>
+              <select 
+                value={bookingForm.doctorId} 
+                onChange={e => setBookingForm({...bookingForm, doctorId: e.target.value})} 
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">General OPD / No Assigned Doctor</option>
+                {doctors.map(doc => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.name} ({doc.specialty || 'General Practice'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Appointment Date</label>
+                <input 
+                  type="date" 
+                  required 
+                  value={bookingForm.date} 
+                  onChange={e => setBookingForm({...bookingForm, date: e.target.value})} 
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Time Slot / Schedule</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. 10:30 AM" 
+                  value={bookingForm.time} 
+                  onChange={e => setBookingForm({...bookingForm, time: e.target.value})} 
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button 
+                type="button" 
+                onClick={() => setIsBookModalOpen(false)} 
+                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={bookingLoading} 
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+              >
+                {bookingLoading ? 'Booking...' : 'Book & Generate Token'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
     </div>

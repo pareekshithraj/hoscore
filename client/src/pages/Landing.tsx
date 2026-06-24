@@ -3,13 +3,15 @@ import { ArrowRight, Shield, Heart, Star, MapPin, Clock, FileText, Search, Chevr
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+
 export const Landing = () => {
   const [hospitals, setHospitals] = useState<any[]>([]);
   const { activeContext } = useAuth();
   const isPatient = activeContext?.type === 'patient';
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/hospitals')
+    fetch(`${BASE_URL}/hospitals`)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setHospitals(data); })
       .catch(() => {});
@@ -96,7 +98,7 @@ export const Landing = () => {
         </div>
       </section>
 
-      {/* How It Works — Sovereign Standard Bento Timeline */}
+      {/* How It Works — Universal Standard Bento Timeline */}
       <section id="how-it-works" className="py-24 bg-slate-50/50 relative overflow-hidden">
         {/* Decorative Grid Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(#e11d48_0.5px,transparent_0.5px)] [background-size:24px_24px] opacity-[0.01] pointer-events-none" />
@@ -105,14 +107,14 @@ export const Landing = () => {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center space-y-4 mb-16 max-w-2xl mx-auto">
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-50/80 border border-rose-100 text-rose-700 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" /> Permanent Civic Standard
+              <Sparkles className="w-3.5 h-3.5" /> Modern Health Standard
             </div>
             <h2 className="text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-none">
-              A Lifelong Health Standard.<br />
-              <span className="bg-gradient-to-r from-rose-600 via-red-500 to-orange-500 bg-clip-text text-transparent">Assigned at birth, secured for life.</span>
+              A Lifelong Health Registry.<br />
+              <span className="bg-gradient-to-r from-rose-600 via-red-500 to-orange-500 bg-clip-text text-transparent">Accessible anywhere, secured forever.</span>
             </h2>
             <p className="text-base lg:text-lg text-slate-500 leading-relaxed mt-4 font-medium">
-              Just as a civic identity requires a birth certificate and digital life mandates a secure mailbox like <span className="font-extrabold text-slate-800">Gmail</span>, sovereign healthcare demands <span className="font-extrabold text-rose-600">HOSCORE</span>. A permanent, secure health address owned by you, for your lifetime.
+              Just as digital identity needs a secure profile, modern healthcare demands a unified digital record standard. <span className="font-extrabold text-rose-600">HOSCORE</span> is a permanent, secure health database profile owned by you and connected directly to top hospitals.
             </p>
           </div>
 
@@ -120,28 +122,28 @@ export const Landing = () => {
             {[
               {
                 step: '01',
-                title: 'Permanent Registry',
-                subtitle: 'Lifetime Node Activation',
-                desc: 'Every citizen receives their unique HOSCORE address at birth. A secure, lifetime digital medical vault that never expires, remains completely private, and belongs entirely to you.',
-                highlight: 'The foundational health standard for all citizens.',
+                title: 'Permanent Profile',
+                subtitle: 'Profile Activation',
+                desc: 'Every patient receives their unique HOSCORE digital health profile. A secure, lifelong medical vault that simplifies check-ins, remains completely private, and contains your verified health history.',
+                highlight: 'The foundational health profile standard.',
                 icon: <Fingerprint className="w-6 h-6" />,
                 theme: 'blue'
               },
               {
                 step: '02',
                 title: 'Universal Integration',
-                subtitle: 'Real-Time Telemetry Sync',
-                desc: 'Walk into any emergency room, pharmacy, or specialist clinic globally. Your sovereign health key dynamically shares your medical record and active telemetry instantly—no forms needed.',
-                highlight: 'Zero files to carry. Zero redundant tests.',
+                subtitle: 'Real-Time Sync',
+                desc: 'Walk into any emergency room, specialist clinic, or pharmacy in the network. Your HOSCORE ID instantly shares your medical records and active vitals with authorized practitioners — no paperwork needed.',
+                highlight: 'Zero paperwork to carry. Zero redundant tests.',
                 icon: <RefreshCw className="w-6 h-6 animate-spin-slow" />,
                 theme: 'emerald'
               },
               {
                 step: '03',
-                title: 'Absolute Ownership',
+                title: 'Absolute Privacy',
                 subtitle: 'Dynamic Access Controls',
-                desc: 'You hold the master key. Grant temporary diagnostic access to doctors and revoke permissions at any moment. Your data is encrypted, secure, and entirely under your command.',
-                highlight: 'Military-grade encryption. 100% control.',
+                desc: 'You control the access keys. Grant temporary diagnostic view permissions to clinics and revoke them at any moment. Your personal health records are encrypted, secure, and entirely under your command.',
+                highlight: 'Industry-grade encryption. 100% data ownership.',
                 icon: <KeyRound className="w-6 h-6" />,
                 theme: 'rose'
               }
@@ -157,7 +159,7 @@ export const Landing = () => {
                     }`}>
                       PHASE {item.step}
                     </span>
-                    <span className="text-slate-300 font-extrabold text-xs tracking-widest">HOSCORE STANDARD</span>
+                    <span className="text-slate-300 font-extrabold text-xs tracking-widest">HOSCORE SYSTEM</span>
                   </div>
 
                   {/* Icon and Title */}
@@ -198,11 +200,11 @@ export const Landing = () => {
           <div className="mt-12 bg-slate-900 rounded-[28px] p-8 lg:p-10 border border-slate-800 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl">
             <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/10 blur-[80px] rounded-full pointer-events-none" />
             <div className="space-y-2 relative z-10">
-              <h3 className="text-lg lg:text-xl font-bold text-white tracking-tight">Protecting the Next Generation of Humanity</h3>
-              <p className="text-slate-400 text-sm max-w-xl leading-relaxed">Every child initialized on the HOSCORE registry receives lifetime vaccine schedules, automatic vitals tracking, and pediatric telemetry built right into their sovereign digital footprint.</p>
+              <h3 className="text-lg lg:text-xl font-bold text-white tracking-tight">Protecting the Next Generation of Healthcare</h3>
+              <p className="text-slate-400 text-sm max-w-xl leading-relaxed">Every family member registered on the HOSCORE network receives lifetime vaccine calendars, vitals history tracking, and pediatric check-up reminders directly in their secure profile.</p>
             </div>
             <Link to="/login" className="flex-shrink-0 px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-rose-500/20 hover:from-rose-700 hover:to-red-700 transition-all active:scale-95 z-10">
-              Initialize Free Node
+              Register Free Profile
             </Link>
           </div>
         </div>
@@ -354,25 +356,25 @@ export const Landing = () => {
         <div className="absolute top-0 left-0 w-[300px] h-[300px] bg-blue-500/5 blur-[100px] rounded-full pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          {/* Global Network Telemetry Stat Panel */}
+          {/* Platform Performance Stat Panel */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 rounded-[28px] bg-slate-900/50 border border-slate-900/80 mb-16 shadow-2xl">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global Citizen Nodes</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Patient Profiles</p>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 <p className="text-2xl font-bold text-white tracking-tight">1,420,892,104</p>
               </div>
-              <p className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider">Universal Health Registry Active</p>
+              <p className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider">Verified Medical Identity Active</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sovereign Protocol SLA</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Platform Uptime SLA</p>
               <p className="text-2xl font-bold text-white tracking-tight">99.9999%</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Continuous Encryption Parity</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">HIPAA & GDPR Compliant Security</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Connected Hubs</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Network Hospitals</p>
               <p className="text-2xl font-bold text-white tracking-tight">4,892</p>
-              <p className="text-[10px] text-rose-500/80 font-bold uppercase tracking-wider">Verified Institutions & Labs</p>
+              <p className="text-[10px] text-rose-500/80 font-bold uppercase tracking-wider">Verified Clinics & Labs</p>
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Security Compliance</p>
@@ -380,20 +382,22 @@ export const Landing = () => {
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
                 <p className="text-sm font-extrabold text-white tracking-wider">HIPAA / GDPR / FHIR</p>
               </div>
-              <p className="text-[10px] text-blue-400/80 font-bold uppercase tracking-wider">Full Military-Grade Encryption</p>
+              <p className="text-[10px] text-blue-400/80 font-bold uppercase tracking-wider">End-to-End Encryption</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-10 pb-16 border-b border-slate-900">
             {/* Column 1: Brand & Mission */}
             <div className="col-span-2 space-y-6">
-              <img src="/hoscore-logo.png" alt="HOSCORE" className="h-16 object-contain brightness-0 invert" />
+              <div className="inline-flex items-center rounded-2xl bg-white px-4 py-3 shadow-lg shadow-black/20">
+                <img src="/hoscore-logo.png" alt="HOSCORE" className="h-12 w-auto object-contain" />
+              </div>
               <p className="text-sm text-slate-400 leading-relaxed max-w-sm font-medium">
-                HOSCORE is the global sovereign healthcare registry. A lifelong civic standard ensuring that every human born is provisioned a secure, decentralized health node for lifelong medical tracking and diagnostics telemetry.
+                HOSCORE is the premier digital hospital network. A unified medical record standard ensuring that every patient profile is secure and optimized for seamless scheduling, queue monitoring, and clinical workflows.
               </p>
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Sovereign Protocol Core Active</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">System Core Active</span>
               </div>
             </div>
 
@@ -401,7 +405,7 @@ export const Landing = () => {
             <div className="space-y-4">
               <h4 className="text-xs font-extrabold uppercase tracking-widest text-white">Patient Ecosystem</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><Link to="/login" className="hover:text-rose-400 transition-colors">Lifelong Health Nodes</Link></li>
+                <li><Link to="/login" className="hover:text-rose-400 transition-colors">Digital Health Profile</Link></li>
                 <li><Link to="/patient/find" className="hover:text-rose-400 transition-colors">Find Network Hospitals</Link></li>
                 <li><Link to="/login" className="hover:text-rose-400 transition-colors">Secure Health Timeline</Link></li>
                 <li><Link to="/login" className="hover:text-rose-400 transition-colors">Digital Vitals Tracking</Link></li>
@@ -448,7 +452,9 @@ export const Landing = () => {
 
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-slate-600 font-extrabold uppercase tracking-wider">Powered by</span>
-              <img src="/bluevolt-logo.png" alt="BLUEVOLT GROUPS" className="h-10 object-contain brightness-0 invert opacity-40 hover:opacity-80 transition-opacity" />
+              <div className="inline-flex items-center rounded-xl bg-white px-3 py-2 opacity-70 hover:opacity-100 transition-opacity shadow-lg shadow-black/20">
+                <img src="/bluevolt-logo.png" alt="BLUEVOLT GROUPS" className="h-8 w-auto object-contain" />
+              </div>
             </div>
           </div>
         </div>

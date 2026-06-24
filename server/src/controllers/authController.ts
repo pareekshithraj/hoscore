@@ -1,10 +1,12 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
+import { signUrl } from '../services/r2.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hoscore-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 
 interface ContextItem {
   type: 'hospital' | 'patient' | 'superadmin';
@@ -262,8 +264,114 @@ export const getMe = async (req: Request, res: Response) => {
       select: { id: true, name: true, email: true, phone: true, isSuperAdmin: true, avatar: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    
+    const signedAvatar = user.avatar ? await signUrl(user.avatar) : null;
+    res.json({ ...user, avatar: signedAvatar });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user' });
+  }
+};
+
+export const sendOtp = async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'No user registered with this email' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        otpCode: otp,
+        otpExpiresAt: expires
+      }
+    });
+
+    // Mock Send: log to server console
+    console.log(`\n==================================================`);
+    console.log(`[SMS/Email Gateway Mock] OTP for ${email} is: ${otp}`);
+    console.log(`==================================================\n`);
+
+    res.json({ message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+export const verifyOtp = async (req: Request, res: Response) => {
+  const { email, otpCode } = req.body;
+  if (!email || !otpCode) return res.status(400).json({ error: 'Email and OTP code are required' });
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { patientProfile: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.otpCode || user.otpCode !== otpCode) {
+      return res.status(401).json({ error: 'Invalid OTP code' });
+    }
+
+    if (!user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+      return res.status(401).json({ error: 'OTP code has expired' });
+    }
+
+    // Clear OTP on success
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        otpCode: null,
+        otpExpiresAt: null
+      }
+    });
+
+    const hasPatientProfile = !!user.patientProfile;
+    const contexts = await buildUserContexts(user.id, user.isSuperAdmin, hasPatientProfile);
+    const defaultContext = contexts[0] || { type: 'patient', role: 'PATIENT' };
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        isSuperAdmin: user.isSuperAdmin,
+        contextType: defaultContext.type,
+        hospitalId: defaultContext.hospitalId || null,
+        role: defaultContext.role || 'PATIENT',
+        permissions: defaultContext.permissions || permissionsForRole(defaultContext.role),
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isSuperAdmin: user.isSuperAdmin,
+      },
+      contexts,
+      activeContext: defaultContext,
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Verification failed' });
   }
 };

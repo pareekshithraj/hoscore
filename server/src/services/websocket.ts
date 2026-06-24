@@ -24,7 +24,7 @@ export function initWebSocket(server: Server) {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'hoscore-secret') as any;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars') as any;
       const client: Client = { ws, hospitalId: decoded.hospitalId, userId: decoded.userId };
       clients.push(client);
 
@@ -62,4 +62,16 @@ export function broadcastToHospital(hospitalId: string, channel: string, data: a
     }
   }
   if (sent > 0) console.log(`🔌 Broadcast [${channel}] to ${sent} clients in hospital ${hospitalId.slice(0, 8)}...`);
+}
+
+export function sendToUser(userId: string, channel: string, data: any) {
+  const message = JSON.stringify({ type: channel, data, timestamp: Date.now() });
+  let sent = 0;
+  for (const client of clients) {
+    if (client.userId === userId && client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(message);
+      sent++;
+    }
+  }
+  if (sent > 0) console.log(`🔌 Sent [${channel}] to user ${userId.slice(0, 8)}...`);
 }

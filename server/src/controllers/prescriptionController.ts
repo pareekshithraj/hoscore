@@ -22,6 +22,8 @@ export const create = async (req: Request, res: Response) => {
 
 export const updateStatus = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.prescription.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Prescription not found' });
     // @ts-ignore
     const rx = await prisma.prescription.update({ where: { id: req.params.id! }, data: { status: req.body.status } });
     // @ts-ignore
@@ -32,6 +34,8 @@ export const updateStatus = async (req: Request, res: Response) => {
 
 export const remove = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.prescription.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Prescription not found' });
     await prisma.prescription.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'Prescription', req.params.id);
     res.json({ success: true });

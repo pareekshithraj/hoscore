@@ -596,7 +596,7 @@ export const HospitalProfile = () => {
               </div>
               <h2 className="text-4xl lg:text-5xl font-black leading-tight">A public trust page for every verified hospital.</h2>
               <p className="text-slate-400 leading-relaxed font-medium">
-                Like a company profile on LinkedIn or Crunchbase, HOSCORE hospital profiles give patients a trusted destination for discovery, verification, and care access.
+                HOSCORE hospital profiles give patients a trusted destination for discovery, verification, and care access.
               </p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">

@@ -1,14 +1,31 @@
+# robots.txt for HOSCORE Digital Hospital Network
+
 User-agent: *
 Allow: /
+Allow: /for-hospitals
+Allow: /hospitals
+Allow: /login
+Allow: /register-hospital
 
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
+# Explicitly welcome AI Search Crawlers to read our platform specs
 User-agent: GPTBot
 Allow: /
+Allow: /ai.txt
 
-User-agent: PerplexityBot
+User-agent: ChatGPT-User
 Allow: /
+Allow: /ai.txt
+
+User-agent: Google-Extended
+Allow: /
+Allow: /ai.txt
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /ai.txt
+
+User-agent: Claude-Web
+Allow: /
+Allow: /ai.txt
+
+Sitemap: https://hoscore.com/sitemap.xml

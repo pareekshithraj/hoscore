@@ -31,7 +31,7 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [location.pathname, closeMobileNav]);
 
   return (
-    <div className="flex h-screen bg-[#060913] text-[#f8fafc] overflow-hidden dashboard-theme">
+    <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden dashboard-theme">
       <div
         onClick={closeMobileNav}
         className={clsx(
@@ -42,20 +42,19 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
       {/* Super Admin Collapsible Sidebar */}
       <div
         className={clsx(
-          "flex flex-col h-dvh bg-[#070b16] border-r border-white/[0.04] text-slate-100 flex-shrink-0 z-50 transition-all duration-300 ease-in-out shadow-2xl",
+          "flex flex-col h-dvh bg-white dark:bg-[#070b16] border-r border-slate-200/60 dark:border-white/[0.04] text-slate-800 dark:text-slate-100 flex-shrink-0 z-50 transition-all duration-300 ease-in-out shadow-lg",
           "fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
           isMobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           isCollapsed ? "lg:w-[78px]" : "w-[82vw] max-w-[300px] lg:w-[260px]"
         )}
       >
         {/* Brand Header */}
-        <div className="p-4 flex items-center justify-between border-b border-white/[0.04] relative">
+        <div className="p-4 flex items-center justify-between border-b border-slate-200/60 dark:border-white/[0.04] relative">
           <Link to="/super-admin" className="flex items-center gap-3 overflow-hidden">
             <img src="/hoscore-logo.png" alt="HOSCORE" className="h-10 w-10 min-w-[40px] rounded-xl object-contain" />
             {!isCollapsed && (
               <div className="flex flex-col truncate">
-                <span className="font-extrabold text-sm tracking-tight text-white">HOSCORE</span>
-                <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider truncate">
+                <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white truncate">
                   Super Admin
                 </span>
               </div>
@@ -63,13 +62,13 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
           </Link>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:block absolute -right-3.5 top-1/2 -translate-y-1/2 bg-rose-500 hover:bg-rose-400 text-white rounded-full p-1 border-2 border-[#070b16] shadow-lg transition-transform active:scale-95 cursor-pointer z-50"
+            className="hidden lg:block absolute -right-3.5 top-1/2 -translate-y-1/2 bg-rose-500 hover:bg-rose-400 text-white rounded-full p-1 border-2 border-white dark:border-[#070b16] shadow-lg transition-transform active:scale-95 cursor-pointer z-50"
           >
             {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
           </button>
           <button
             onClick={closeMobileNav}
-            className="lg:hidden w-9 h-9 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 flex items-center justify-center"
+            className="lg:hidden w-9 h-9 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-white/[0.04] text-slate-505 dark:text-slate-300 flex items-center justify-center"
             aria-label="Close navigation"
           >
             <X className="w-4 h-4" />
@@ -80,9 +79,9 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
         <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-6 scrollbar-thin">
           <div>
             {!isCollapsed ? (
-              <p className="px-3 mb-2.5 text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Platform</p>
+              <p className="px-3 mb-2.5 text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Platform</p>
             ) : (
-              <div className="h-px bg-white/[0.04] my-3 mx-1" />
+              <div className="h-px bg-slate-200 dark:bg-white/[0.04] my-3 mx-1" />
             )}
             <div className="space-y-1">
               {adminMenuItems.map((item) => (
@@ -93,17 +92,17 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
                     "group flex items-center rounded-xl transition-all duration-200 text-xs relative",
                     isCollapsed ? "justify-center p-2.5" : "gap-3.5 px-3 py-3",
                     isActive(item.path)
-                      ? "bg-gradient-to-r from-rose-500/15 to-pink-500/5 text-rose-400 font-bold border border-rose-500/20"
-                      : "hover:bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-transparent",
+                      ? "bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 font-extrabold border border-rose-100 dark:border-rose-500/20"
+                      : "hover:bg-slate-50 dark:hover:bg-white/[0.03] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent",
                   )}
                   title={isCollapsed ? item.label : undefined}
                 >
                   {isActive(item.path) && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-rose-500 rounded-r-full shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-rose-500 rounded-r-full shadow-[0_0_10px_rgba(244,63,94,0.4)]" />
                   )}
                   <item.icon className={clsx(
                     "w-[18px] h-[18px] flex-shrink-0 transition-transform duration-200",
-                    isActive(item.path) ? "text-rose-400" : "group-hover:scale-110 text-slate-400 group-hover:text-slate-200"
+                    isActive(item.path) ? "text-rose-600 dark:text-rose-400" : "group-hover:scale-110 text-slate-400 dark:text-slate-550 group-hover:text-slate-700 dark:group-hover:text-slate-200"
                   )} />
                   {!isCollapsed && <span>{item.label}</span>}
                 </Link>
@@ -113,11 +112,11 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-3 border-t border-white/[0.04]">
+        <div className="p-3 border-t border-slate-200/60 dark:border-white/[0.04]">
           <button
             onClick={() => { logout(); window.location.href = '/'; }}
             className={clsx(
-              "flex items-center text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/[0.05] rounded-xl transition-all text-xs border border-transparent w-full",
+              "flex items-center text-rose-500 dark:text-rose-400/80 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/[0.05] rounded-xl transition-all text-xs border border-transparent w-full cursor-pointer",
               isCollapsed ? "justify-center p-2.5" : "gap-3.5 px-3 py-3"
             )}
             title={isCollapsed ? "Logout" : undefined}

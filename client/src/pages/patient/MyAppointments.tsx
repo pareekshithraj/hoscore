@@ -2,20 +2,29 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar } from 'lucide-react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const TIMES = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'];
 
 export const MyAppointments = () => {
+  const { selectedPatientId } = useAuth();
   const [appts, setAppts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [rescheduleId, setRescheduleId] = useState('');
   const [reschedule, setReschedule] = useState({ date: '', time: '09:00 AM' });
 
-  const loadAppointments = () => api.get('/patient/appointments').then(setAppts).catch(console.error).finally(() => setLoading(false));
+  const loadAppointments = () => {
+    setLoading(true);
+    const url = selectedPatientId ? `/patient/appointments?patientId=${selectedPatientId}` : '/patient/appointments';
+    api.get(url)
+      .then(setAppts)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     loadAppointments();
-  }, []);
+  }, [selectedPatientId]);
 
   const cancelAppointment = async (id: string) => {
     if (!window.confirm('Cancel this appointment?')) return;

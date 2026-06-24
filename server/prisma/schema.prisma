@@ -22,6 +22,8 @@ model User {
   phone         String?
   avatar        String?
   isSuperAdmin  Boolean      @default(false)
+  otpCode       String?
+  otpExpiresAt  DateTime?
   memberships   Membership[]
   patientProfile Patient?
   createdAt     DateTime     @default(now())
@@ -209,6 +211,11 @@ model Patient {
   admissions                   Admission[]
   prescriptions                Prescription[]
   appointments                 Appointment[]
+  parentId                     String?
+  parent                       Patient?      @relation("PatientToDependents", fields: [parentId], references: [id], onDelete: SetNull)
+  dependents                   Patient[]     @relation("PatientToDependents")
+  accessGrants                 PatientAccessGrant[]
+  vaccinations                 Vaccination[]
   createdAt                    DateTime      @default(now())
   updatedAt                    DateTime      @updatedAt
 }
@@ -242,6 +249,7 @@ model Doctor {
   patientsCount Int            @default(0)
   prescriptions Prescription[]
   appointments  Appointment[]
+  accessGrants  PatientAccessGrant[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -572,4 +580,31 @@ model Expense {
   status      String   @default("PAID")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model PatientAccessGrant {
+  id          String   @id @default(uuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId    String
+  doctor      Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  status      String   @default("ACTIVE") // ACTIVE, REVOKED
+  grantedAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([patientId, doctorId])
+}
+
+model Vaccination {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name        String    // e.g. "BCG", "Hepatitis B", "Polio", "DPT", "MMR"
+  scheduledAge String    // e.g. "At Birth", "6 Weeks", "9 Months"
+  status      String    @default("PENDING") // PENDING, COMPLETED
+  givenAt     DateTime?
+  givenBy     String?   // Doctor or clinic name
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

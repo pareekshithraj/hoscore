@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Building2, User, Mail, Lock, Phone, MapPin, CheckCircle2, ArrowLeft, ArrowRight, IndianRupee, Sparkles } from 'lucide-react';
 import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations';
 
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+
 export const RegisterHospital = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -21,7 +23,7 @@ export const RegisterHospital = () => {
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:5000/api/hospitals/register', {
+      const res = await fetch(`${BASE_URL}/hospitals/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

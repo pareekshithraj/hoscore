@@ -15,7 +15,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   return (
-    <div className="flex h-screen bg-[#060913] text-[#f8fafc] overflow-hidden dashboard-theme">
+    <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden dashboard-theme">
       {/* Fixed Sidebar */}
       <Sidebar isMobileOpen={isMobileNavOpen} onCloseMobile={closeMobileNav} />
       

@@ -15,22 +15,25 @@ export const getAllAdmissions = async (req: Request, res: Response) => {
 
 export const createAdmission = async (req: Request, res: Response) => {
   const { patientId, patientName, bedId, reason } = req.body;
+  const hospitalId = hid(req);
   try {
     let pid = patientId;
     if (!pid && patientName) {
-      let patient = await prisma.patient.findFirst({ where: { name: patientName } });
-      if (!patient) patient = await prisma.patient.create({ data: { name: patientName } });
+      let patient = await prisma.patient.findFirst({ where: { name: patientName, hospitalId } });
+      if (!patient) patient = await prisma.patient.create({ data: { name: patientName, hospitalId } });
       pid = patient.id;
     }
     const admission = await prisma.admission.create({ data: { patientId: pid, bedId, reason } });
     await prisma.bed.update({ where: { id: bedId }, data: { status: 'OCCUPIED' } });
-    await prisma.billing.create({ data: { admissionId: admission.id, roomCharges: 500, doctorFees: 200, totalAmount: 700 } });
+    await prisma.billing.create({ data: { admissionId: admission.id, roomCharges: 500, doctorFees: 200, totalAmount: 700, hospitalId } });
     res.status(201).json(admission);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to create admission' }); }
 };
 
 export const dischargePatient = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.admission.findFirst({ where: { id: req.params.id, bed: { room: { hospitalId: hid(req) } } } });
+    if (!existing) return res.status(404).json({ error: 'Admission not found' });
     const admission = await prisma.admission.update({ where: { id: req.params.id }, data: { dischargeDate: new Date(), status: 'Discharged' } });
     await prisma.bed.update({ where: { id: admission.bedId }, data: { status: 'CLEANING' } });
     res.json(admission);

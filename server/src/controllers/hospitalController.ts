@@ -5,6 +5,7 @@ import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { ALL_FEATURES, permissionsForRole } from '../utils/features.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { getHospitalUsage } from '../services/usagePricing.js';
+import { signUrl, signHospitalPhotos } from '../services/r2.js';
 
 const normalizePermissions = (permissions: unknown) => {
   if (!Array.isArray(permissions)) return undefined;
@@ -20,7 +21,10 @@ export const getCurrentHospital = async (req: AuthRequest, res: Response) => {
   try {
     const hospital = await prisma.hospital.findUnique({ where: { id: hospitalId } });
     if (!hospital) return res.status(404).json({ error: 'Hospital not found' });
-    res.json(hospital);
+    
+    const signedLogo = hospital.logo ? await signUrl(hospital.logo) : null;
+    const signedPhotos = hospital.photos ? await signHospitalPhotos(hospital.photos) : null;
+    res.json({ ...hospital, logo: signedLogo, photos: signedPhotos });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get hospital' });
   }
@@ -37,7 +41,12 @@ export const listHospitals = async (_req: Request, res: Response) => {
       },
       orderBy: { rating: 'desc' },
     });
-    res.json(hospitals);
+    const signedHospitals = await Promise.all(hospitals.map(async (h) => ({
+      ...h,
+      logo: h.logo ? await signUrl(h.logo) : null,
+      photos: h.photos ? await signHospitalPhotos(h.photos) : null,
+    })));
+    res.json(signedHospitals);
   } catch (error) {
     res.status(500).json({ error: 'Failed to list hospitals' });
   }
@@ -54,7 +63,10 @@ export const getHospital = async (req: Request, res: Response) => {
       },
     });
     if (!hospital) return res.status(404).json({ error: 'Hospital not found' });
-    res.json(hospital);
+    
+    const signedLogo = hospital.logo ? await signUrl(hospital.logo) : null;
+    const signedPhotos = hospital.photos ? await signHospitalPhotos(hospital.photos) : null;
+    res.json({ ...hospital, logo: signedLogo, photos: signedPhotos });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get hospital' });
   }
@@ -155,7 +167,10 @@ export const updateHospital = async (req: AuthRequest, res: Response) => {
       data: req.body,
     });
     await logAudit(req, 'UPDATE', 'Hospital', hospital.id, `Updated hospital ${hospital.name}`);
-    res.json(hospital);
+    
+    const signedLogo = hospital.logo ? await signUrl(hospital.logo) : null;
+    const signedPhotos = hospital.photos ? await signHospitalPhotos(hospital.photos) : null;
+    res.json({ ...hospital, logo: signedLogo, photos: signedPhotos });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update hospital' });
   }
@@ -264,6 +279,16 @@ export const updateStaffMembership = async (req: AuthRequest, res: Response) => 
     });
 
     await logAudit(req, 'UPDATE', 'Membership', membership.id, `Updated portal access for ${existing.user.email}`);
+    if (membership.user && membership.user.avatar) {
+      const signedAvatar = await signUrl(membership.user.avatar);
+      return res.json({
+        ...membership,
+        user: {
+          ...membership.user,
+          avatar: signedAvatar,
+        }
+      });
+    }
     res.json(membership);
   } catch (error) {
     console.error('Update staff membership error:', error);
@@ -281,7 +306,19 @@ export const getHospitalStaff = async (req: AuthRequest, res: Response) => {
       where: { hospitalId, status: 'ACTIVE' },
       include: { user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }, staffType: true },
     });
-    res.json(memberships);
+    const signedMemberships = await Promise.all(memberships.map(async (m) => {
+      if (m.user && m.user.avatar) {
+        return {
+          ...m,
+          user: {
+            ...m.user,
+            avatar: await signUrl(m.user.avatar),
+          }
+        };
+      }
+      return m;
+    }));
+    res.json(signedMemberships);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get staff' });
   }

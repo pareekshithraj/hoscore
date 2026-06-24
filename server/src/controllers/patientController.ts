@@ -16,8 +16,25 @@ async function generateSixDigitId() {
 }
 
 // Helper to check if doctor has an active/past appointment or admission with the patient at their hospital
-async function checkDoctorAccess(patientId: string, hospitalId: string | undefined): Promise<boolean> {
+async function checkDoctorAccess(patientId: string, hospitalId: string | undefined, doctorEmail: string | undefined): Promise<boolean> {
   if (!hospitalId) return false;
+
+  // If we have the doctor's email, check if access has been revoked
+  if (doctorEmail) {
+    const doctor = await prisma.doctor.findFirst({
+      where: { email: doctorEmail, hospitalId }
+    });
+    if (doctor) {
+      const grant = await prisma.patientAccessGrant.findUnique({
+        where: {
+          patientId_doctorId: { patientId, doctorId: doctor.id }
+        }
+      });
+      if (grant && grant.status === 'REVOKED') {
+        return false; // Explicitly revoked!
+      }
+    }
+  }
 
   // Check appointments
   const appt = await prisma.appointment.findFirst({
@@ -34,22 +51,35 @@ async function checkDoctorAccess(patientId: string, hospitalId: string | undefin
   return false;
 }
 
+async function checkHospitalAccess(patientId: string, hospitalId: string | undefined): Promise<boolean> {
+  if (!hospitalId) return false;
+  const isPatientConnected = await prisma.patient.findFirst({
+    where: {
+      id: patientId,
+      OR: [
+        { hospitalId },
+        { appointments: { some: { hospitalId } } },
+        { admissions: { some: { bed: { room: { hospitalId } } } } }
+      ]
+    }
+  });
+  return !!isPatientConnected;
+}
+
 export const getAllPatients = async (req: Request, res: Response) => {
   try {
+    const hospitalId = hid(req);
     const patients = await prisma.patient.findMany({
-      where: { admissions: { some: { bed: { room: { hospitalId: hid(req) } } } } },
+      where: {
+        OR: [
+          { hospitalId },
+          { admissions: { some: { bed: { room: { hospitalId } } } } },
+          { appointments: { some: { hospitalId } } }
+        ]
+      },
       include: { admissions: true },
     });
-    // Also include patients with appointments at this hospital
-    const apptPatients = await prisma.patient.findMany({
-      where: { appointments: { some: { hospitalId: hid(req) } } },
-      include: { admissions: true },
-    });
-    const merged = [...patients];
-    for (const p of apptPatients) {
-      if (!merged.find(m => m.id === p.id)) merged.push(p);
-    }
-    res.json(merged);
+    res.json(patients);
   } catch { res.status(500).json({ error: 'Failed to fetch patients' }); }
 };
 
@@ -93,10 +123,17 @@ export const getPatientById = async (req: Request, res: Response) => {
 
     // Secure boundary for doctors
     if (role === 'DOCTOR') {
-      const hasAccess = await checkDoctorAccess(patientId, hospitalId);
+      const hasAccess = await checkDoctorAccess(patientId, hospitalId, (req as any).user?.email);
       if (!hasAccess) {
         return res.status(403).json({
           error: 'Security Restriction: You do not have an active or past appointment/admission with this patient at your hospital. Access is restricted.'
+        });
+      }
+    } else {
+      const hasAccess = await checkHospitalAccess(patientId, hospitalId);
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'Access denied: Patient is not registered or has no active records at your hospital.'
         });
       }
     }
@@ -110,6 +147,10 @@ export const getPatientById = async (req: Request, res: Response) => {
       },
     });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
+    
+    // Log the read event
+    await logAudit(req, 'READ', 'Patient', patient.id, `Accessed patient chart/medical profile for ${patient.name}`);
+    
     res.json(patient);
   } catch { res.status(500).json({ error: 'Failed to fetch patient' }); }
 };
@@ -133,13 +174,23 @@ export const getPatientBySixDigitId = async (req: Request, res: Response) => {
 
     // Secure boundary for doctors
     if (role === 'DOCTOR') {
-      const hasAccess = await checkDoctorAccess(patient.id, hospitalId);
+      const hasAccess = await checkDoctorAccess(patient.id, hospitalId, (req as any).user?.email);
       if (!hasAccess) {
         return res.status(403).json({
           error: 'Security Restriction: You do not have an active or past appointment/admission with this patient at your hospital. Access is restricted.'
         });
       }
+    } else {
+      const hasAccess = await checkHospitalAccess(patient.id, hospitalId);
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'Access denied: Patient is not registered or has no active records at your hospital.'
+        });
+      }
     }
+
+    // Log the read event
+    await logAudit(req, 'READ', 'Patient', patient.id, `Accessed patient chart/medical profile for ${patient.name}`);
 
     res.json(patient);
   } catch (error) {
@@ -156,10 +207,17 @@ export const updatePatient = async (req: Request, res: Response) => {
 
     // Secure boundary for doctors
     if (role === 'DOCTOR') {
-      const hasAccess = await checkDoctorAccess(patientId, hospitalId);
+      const hasAccess = await checkDoctorAccess(patientId, hospitalId, (req as any).user?.email);
       if (!hasAccess) {
         return res.status(403).json({
           error: 'Security Restriction: You do not have an active or past appointment/admission with this patient at your hospital. Access is restricted.'
+        });
+      }
+    } else {
+      const hasAccess = await checkHospitalAccess(patientId, hospitalId);
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'Access denied: Patient is not registered or has no active records at your hospital.'
         });
       }
     }
@@ -197,8 +255,18 @@ export const convertManualPatientToHoscore = async (req: Request, res: Response)
 
 export const deletePatient = async (req: Request, res: Response) => {
   try {
-    const patient = await prisma.patient.delete({ where: { id: String(req.params.id) } });
+    const patientId = req.params.id;
+    const hospitalId = hid(req);
+
+    const hasAccess = await checkHospitalAccess(patientId, hospitalId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        error: 'Access denied: Patient is not registered or has no active records at your hospital.'
+      });
+    }
+
+    const patient = await prisma.patient.delete({ where: { id: String(patientId) } });
     await logAudit(req, 'DELETE', 'Patient', patient.id, `Deleted patient ${patient.name}`);
     res.json({ message: 'Deleted successfully' });
-  } catch { res.status(500).json({ error: 'Failed to delete' }); }
+  } catch { res.status(500).json({ error: 'Failed to delete patient' }); }
 };

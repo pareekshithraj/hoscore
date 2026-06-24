@@ -37,6 +37,8 @@ const router = Router();
 // ================= PUBLIC ROUTES =================
 router.post('/auth/register', validate(registerSchema), authController.register);
 router.post('/auth/login', validate(loginSchema), authController.login);
+router.post('/auth/send-otp', authController.sendOtp);
+router.post('/auth/verify-otp', authController.verifyOtp);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
 router.post('/hospitals/register', validate(hospitalRegisterSchema), hospitalController.registerHospital);
@@ -63,6 +65,8 @@ router.patch('/hospitals/staff/:id', requireFeature(FEATURES.STAFF), hospitalCon
 // ================= PATIENT PORTAL =================
 router.get('/patient/dashboard', patientPortalController.getPatientDashboard);
 router.post('/patient/skip-alert', patientPortalController.skipAlert);
+router.get('/patient/dependents', patientPortalController.getDependents);
+router.post('/patient/dependents', patientPortalController.createDependent);
 router.patch('/patient/appointments/:id/close', patientPortalController.closeAppointment);
 router.patch('/patient/appointments/:id/cancel', patientPortalController.cancelAppointment);
 router.patch('/patient/appointments/:id/reschedule', patientPortalController.rescheduleAppointment);
@@ -71,6 +75,14 @@ router.post('/patient/appointments', requirePatientContext, appointmentControlle
 router.get('/patient/prescriptions', patientPortalController.getMyPrescriptions);
 router.get('/patient/records', patientPortalController.getMyRecords);
 router.get('/patient/bills', patientPortalController.getMyBills);
+
+// Sovereign Health Features: Vaccinations & Access Controls
+router.get('/patient/vaccinations', patientPortalController.getVaccinations);
+router.post('/patient/vaccinations', patientPortalController.recordVaccination);
+router.get('/patient/access-grants', patientPortalController.getAccessGrants);
+router.get('/patient/access-logs', patientPortalController.getAccessLogs);
+router.post('/patient/access-grants/revoke', patientPortalController.revokeDoctorAccess);
+router.post('/patient/access-grants/restore', patientPortalController.restoreDoctorAccess);
 
 // ================= SUPER ADMIN =================
 router.get('/super-admin/stats', requireSuperAdmin, superAdminController.getDashboardStats);

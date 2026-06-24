@@ -5,13 +5,14 @@ import { FileText, Plus } from 'lucide-react';
 export const Discharges = () => {
   const [docs, setDocs] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ patientName: '', doctorName: '', diagnosis: '', medications: '' });
+  const [form, setForm] = useState({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
 
   useEffect(() => { api.get('/discharges').then(setDocs); }, []);
 
   const handleCreate = async () => {
     await api.post('/discharges', form);
     setShowForm(false);
+    setForm({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
     api.get('/discharges').then(setDocs);
   };
 
@@ -43,13 +44,26 @@ export const Discharges = () => {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowForm(false)}>
-          <div className="bg-white p-6 rounded-2xl w-[400px] space-y-3" onClick={e=>e.stopPropagation()}>
-            <h3 className="font-bold">New Discharge Summary</h3>
-            <input placeholder="Patient Name" onChange={e=>setForm({...form, patientName: e.target.value})} className="w-full border p-2 rounded" />
-            <input placeholder="Doctor Name" onChange={e=>setForm({...form, doctorName: e.target.value})} className="w-full border p-2 rounded" />
-            <input placeholder="Diagnosis" onChange={e=>setForm({...form, diagnosis: e.target.value})} className="w-full border p-2 rounded" />
-            <textarea placeholder="Medications (comma separated)" onChange={e=>setForm({...form, medications: e.target.value})} className="w-full border p-2 rounded h-24 resize-none" />
-            <button onClick={handleCreate} className="w-full bg-blue-600 text-white font-bold p-2 rounded">Save Summary</button>
+          <div className="bg-white p-6 rounded-2xl w-[400px] space-y-3 text-slate-800" onClick={e=>e.stopPropagation()}>
+            <h3 className="font-bold text-slate-900">New Discharge Summary</h3>
+            <input placeholder="Patient Name" onChange={e=>setForm({...form, patientName: e.target.value})} className="w-full border p-2 rounded text-slate-800 bg-white" />
+            <input placeholder="Doctor Name" onChange={e=>setForm({...form, doctorName: e.target.value})} className="w-full border p-2 rounded text-slate-800 bg-white" />
+            <input placeholder="Diagnosis" onChange={e=>setForm({...form, diagnosis: e.target.value})} className="w-full border p-2 rounded text-slate-800 bg-white" />
+            <textarea placeholder="Medications (comma separated)" onChange={e=>setForm({...form, medications: e.target.value})} className="w-full border p-2 rounded h-24 resize-none text-slate-800 bg-white" />
+            
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-600 block">Status Sign Off</label>
+              <select 
+                value={form.status} 
+                onChange={e=>setForm({...form, status: e.target.value})}
+                className="w-full border p-2 rounded text-slate-800 bg-white cursor-pointer text-xs font-semibold"
+              >
+                <option value="SIGNED">Signed & Discharged (Triggers Cleaning)</option>
+                <option value="DRAFT">Draft</option>
+              </select>
+            </div>
+            
+            <button onClick={handleCreate} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-sm transition-all">Save Summary</button>
           </div>
         </div>
       )}

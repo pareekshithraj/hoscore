@@ -18,23 +18,63 @@ const port = process.env.PORT || 5000;
 // Security headers
 app.use(helmet());
 
-// CORS — locked to known frontend
+// CORS — supports configured CLIENT_URL and local dev origin
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'https://hoscore.in',
+  'http://localhost:5173'
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
 // Body parsing with size limits
 app.use(express.json({ limit: '2mb' }));
 
-// Rate limiting on auth routes
+// Rate limiting to prevent auth endpoint abuse
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { error: 'Too many requests, please try again later.' },
+  max: 150, // More generous limit for general session validation/context switching
+  message: { error: 'Too many auth request checks, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // Strict limit for password/register attempts
+  message: { error: 'Too many login attempts, please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const otpSendLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 3, // Prevent SMS/Email OTP spamming
+  message: { error: 'Too many OTP requests. Please wait 10 minutes before requesting a new code.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const otpVerifyLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 5, // Block brute-force verification guesses
+  message: { error: 'Too many failed verification attempts. Please wait 5 minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/register', loginLimiter);
+app.use('/api/auth/send-otp', otpSendLimiter);
+app.use('/api/auth/verify-otp', otpVerifyLimiter);
 app.use('/api/auth', authLimiter);
 
 // API Routes

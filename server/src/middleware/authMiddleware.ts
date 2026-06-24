@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { ADMIN_PERMISSIONS } from '../utils/features.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hoscore-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 
 export interface AuthUser {
   userId: string;

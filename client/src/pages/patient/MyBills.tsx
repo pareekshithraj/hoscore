@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { Receipt, IndianRupee } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const MyBills = () => {
+  const { selectedPatientId } = useAuth();
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { api.get('/patient/bills').then(setBills).catch(console.error).finally(() => setLoading(false)); }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const url = selectedPatientId ? `/patient/bills?patientId=${selectedPatientId}` : '/patient/bills';
+    api.get(url)
+      .then(setBills)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [selectedPatientId]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" /></div>;
 

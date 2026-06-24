@@ -51,6 +51,8 @@ const PatientDashboard = lazy(() => import('./pages/patient/PatientDashboard').t
 const MyAppointments = lazy(() => import('./pages/patient/MyAppointments').then((module) => ({ default: module.MyAppointments })));
 const MyPrescriptions = lazy(() => import('./pages/patient/MyPrescriptions').then((module) => ({ default: module.MyPrescriptions })));
 const MyRecords = lazy(() => import('./pages/patient/MyRecords').then((module) => ({ default: module.MyRecords })));
+const MyVaccinations = lazy(() => import('./pages/patient/MyVaccinations').then((module) => ({ default: module.MyVaccinations })));
+const MyPrivacy = lazy(() => import('./pages/patient/MyPrivacy').then((module) => ({ default: module.MyPrivacy })));
 const MyBills = lazy(() => import('./pages/patient/MyBills').then((module) => ({ default: module.MyBills })));
 const FindHospitals = lazy(() => import('./pages/patient/FindHospitals').then((module) => ({ default: module.FindHospitals })));
 
@@ -149,6 +151,8 @@ function App() {
                     <Route path="/appointments" element={<MyAppointments />} />
                     <Route path="/prescriptions" element={<MyPrescriptions />} />
                     <Route path="/records" element={<MyRecords />} />
+                    <Route path="/vaccinations" element={<MyVaccinations />} />
+                    <Route path="/privacy" element={<MyPrivacy />} />
                     <Route path="/bills" element={<MyBills />} />
                     <Route path="/find" element={<FindHospitals />} />
                     <Route path="/book/:hospitalId" element={<BookAppointment />} />

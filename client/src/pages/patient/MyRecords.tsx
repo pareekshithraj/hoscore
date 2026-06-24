@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { Activity, FlaskConical, Bed } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const MyRecords = () => {
+  const { selectedPatientId } = useAuth();
   const [data, setData] = useState<any>({ vitals: [], labs: [], admissions: [] });
   const [loading, setLoading] = useState(true);
-  useEffect(() => { api.get('/patient/records').then(setData).catch(console.error).finally(() => setLoading(false)); }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const url = selectedPatientId ? `/patient/records?patientId=${selectedPatientId}` : '/patient/records';
+    api.get(url)
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [selectedPatientId]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" /></div>;
 

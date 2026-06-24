@@ -45,7 +45,7 @@ export const getStats = async (req: Request, res: Response) => {
     });
 
     const upcomingAppointments = await prisma.appointment.findMany({
-      where: { hospitalId, date: { gte: new Date() } },
+      where: { hospitalId, date: { gte: new Date() }, status: 'PENDING' },
       take: 5,
       orderBy: { date: "asc" },
       include: { patient: true },
