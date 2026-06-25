@@ -5,6 +5,9 @@ import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { ALL_FEATURES, permissionsForRole } from '../utils/features.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { getHospitalUsage } from '../services/usagePricing.js';
+import {
+  assertCanAddUser,
+} from '../services/subscriptionService.js';
 import { signUrl, signHospitalPhotos } from '../services/r2.js';
 
 const normalizePermissions = (permissions: unknown) => {
@@ -104,16 +107,19 @@ export const registerHospital = async (req: Request, res: Response) => {
       },
     });
 
-    // Create subscription (1 year from now)
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
+    // 30-day trial — add team first, then pay per user on Subscription page
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+    const endDate = new Date(trialEndsAt);
     await prisma.subscription.create({
       data: {
         hospitalId: hospital.id,
         plan: 'STARTER',
         pricePerUser: 150,
         maxUsers: 50,
-        status: 'ACTIVE',
+        billedSeats: 0,
+        status: 'TRIAL',
+        trialEndsAt,
         endDate,
       },
     });
@@ -194,6 +200,8 @@ export const inviteStaff = async (req: AuthRequest, res: Response) => {
   const { email, name, role, department, password, staffTypeId, permissions } = req.body;
 
   try {
+    await assertCanAddUser(hospitalId);
+
     // Find or create user
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -239,7 +247,8 @@ export const inviteStaff = async (req: AuthRequest, res: Response) => {
     res.status(201).json({ message: 'Staff invited', membership });
   } catch (error: any) {
     console.error('Invite staff error:', error);
-    res.status(500).json({ error: 'Failed to invite staff' });
+    const msg = error?.message || 'Failed to invite staff';
+    res.status(error?.message?.includes('subscription') || error?.message?.includes('Trial') || error?.message?.includes('seats') ? 402 : 500).json({ error: msg });
   }
 };
 

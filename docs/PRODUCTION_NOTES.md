@@ -5,6 +5,9 @@
 - `server/.env` must define `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, and any Cloudflare R2 variables used by the deployment.
 - Do not commit local `.env`, SQLite dev databases, screenshots, or generated workbooks.
 - The frontend expects `VITE_API_URL` when the API is not served at `http://localhost:5000/api`.
+- **Vercel client deploys:** set `VITE_API_URL` in Vercel → Project Settings → Environment Variables (e.g. `https://your-api.onrender.com/api`), then redeploy.
+- **Render API deploys:** use `render.yaml` at repo root; set `DATABASE_URL`, `RAZORPAY_*`, and `CLIENT_URL`.
+- **Billing workflow:** hospitals register → 30-day trial → add staff → pay per user/year on `/dashboard/subscription` → optional Razorpay autopay. See `docs/RAZORPAY_SETUP.md`.
 
 ## Database
 

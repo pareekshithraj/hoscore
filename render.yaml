@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: hoscore-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npx prisma generate --schema=prisma/schema.prisma && npm run build
+    startCommand: npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        value: https://client-gamma-snowy-42.vercel.app
+      - key: PUBLIC_APP_URL
+        value: https://hoscore.in
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false

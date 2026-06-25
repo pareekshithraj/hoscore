@@ -45,6 +45,7 @@ const Expenses = lazy(() => import('./pages/Expenses').then((module) => ({ defau
 const AuditLogs = lazy(() => import('./pages/AuditLogs').then((module) => ({ default: module.AuditLogs })));
 const Feedback = lazy(() => import('./pages/Feedback').then((module) => ({ default: module.Feedback })));
 const Settings = lazy(() => import('./pages/Settings').then((module) => ({ default: module.Settings })));
+const SubscriptionBilling = lazy(() => import('./pages/SubscriptionBilling').then((module) => ({ default: module.SubscriptionBilling })));
 
 // Patient portal pages
 const PatientDashboard = lazy(() => import('./pages/patient/PatientDashboard').then((module) => ({ default: module.PatientDashboard })));
@@ -132,6 +133,7 @@ function App() {
                     <Route path="/groups" element={<FeatureGate feature="groups"><Groups /></FeatureGate>} />
                     <Route path="/feedback" element={<FeatureGate feature="feedback"><Feedback /></FeatureGate>} />
                     <Route path="/settings" element={<FeatureGate feature="settings"><Settings /></FeatureGate>} />
+                    <Route path="/subscription" element={<SubscriptionBilling />} />
                     <Route path="/audit-logs" element={<FeatureGate feature="audit_logs"><AuditLogs /></FeatureGate>} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>

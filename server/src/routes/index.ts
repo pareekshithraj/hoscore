@@ -60,8 +60,12 @@ router.post('/auth/switch-context', authController.switchContext);
 // ================= PAYMENTS / SUBSCRIPTIONS =================
 // (webhook is registered separately in index.ts with a raw body parser)
 router.get('/payments/plans', paymentController.getPlans);
+router.get('/payments/subscription', requireHospitalContext, paymentController.getSubscriptionStatus);
 router.post('/payments/order', requireHospitalContext, paymentController.createPaymentOrder);
 router.post('/payments/verify', requireHospitalContext, paymentController.verifyPaymentOrder);
+router.post('/payments/autopay/start', requireHospitalContext, paymentController.startAutopay);
+router.post('/payments/autopay/confirm', requireHospitalContext, paymentController.confirmAutopay);
+router.post('/payments/autopay/cancel', requireHospitalContext, paymentController.cancelAutopay);
 router.get('/payments/history', requireHospitalContext, paymentController.getPaymentHistory);
 
 // Hospital management

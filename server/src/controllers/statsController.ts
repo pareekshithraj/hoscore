@@ -152,7 +152,6 @@ export const getAnalytics = async (req: Request, res: Response) => {
         bed: { room: { hospitalId } },
         status: "Discharged",
         dischargeDate: { not: null },
-        admissionDate: { not: null }
       },
       select: {
         admissionDate: true,

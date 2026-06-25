@@ -4,6 +4,7 @@ import { Building2, User, Mail, Lock, Phone, MapPin, CheckCircle2, ArrowLeft, Ar
 import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations';
 
 import { BASE_URL } from '../utils/apiConfig';
+import { fetchJson } from '../utils/fetchJson';
 
 export const RegisterHospital = () => {
   const navigate = useNavigate();
@@ -23,13 +24,12 @@ export const RegisterHospital = () => {
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch(`${BASE_URL}/hospitals/register`, {
+      const { data, response } = await fetchJson<{ error?: string }>(`${BASE_URL}/hospitals/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
+      if (!response.ok) throw new Error(data.error || 'Registration failed');
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);
@@ -46,10 +46,12 @@ export const RegisterHospital = () => {
             <CheckCircle2 className="w-10 h-10 text-emerald-600" />
           </div>
           <h1 className="text-3xl font-black text-slate-900">Hospital Registered!</h1>
-          <p className="text-slate-500">Your hospital has been added to the HOSCORE network. Log in with your admin credentials to access your dashboard.</p>
-          <button onClick={() => navigate('/login')} className="px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-2xl hover:from-rose-700 hover:to-red-700 transition-all shadow-xl">
-            Go to Login
-          </button>
+          <p className="text-slate-500">Your 30-day trial has started. Log in, add your team under Staff, then go to <strong>Subscription & Billing</strong> to pay ₹150/user/year.</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={() => navigate('/login')} className="px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-2xl hover:from-rose-700 hover:to-red-700 transition-all shadow-xl">
+              Go to Login
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -153,7 +155,16 @@ export const RegisterHospital = () => {
 
           {step === 3 && (
             <div className="space-y-6">
-              <h2 className="text-lg font-bold text-slate-800 mb-2">Confirm Subscription</h2>
+              <h2 className="text-lg font-bold text-slate-800 mb-2">Start Your Free Trial</h2>
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-sm text-emerald-800">
+                <p className="font-bold mb-1">How billing works</p>
+                <ol className="list-decimal list-inside space-y-1 text-emerald-700">
+                  <li>Register your hospital (30-day free trial)</li>
+                  <li>Add your team members under Staff</li>
+                  <li>Pay ₹150 × number of users per year</li>
+                  <li>Optionally enable autopay for yearly renewal</li>
+                </ol>
+              </div>
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-4 h-4 text-rose-400" />
@@ -179,7 +190,7 @@ export const RegisterHospital = () => {
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button onClick={handleSubmit} disabled={isLoading} className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-xl hover:from-rose-700 hover:to-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {isLoading ? 'Registering...' : 'Complete Registration'}
+                  {isLoading ? 'Registering...' : 'Start Free Trial'}
                 </button>
               </div>
             </div>

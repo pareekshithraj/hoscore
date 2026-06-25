@@ -79,8 +79,8 @@ async function main() {
   // Subscriptions
   await prisma.subscription.createMany({
     data: [
-      { hospitalId: h1.id, plan: 'PROFESSIONAL', pricePerUser: 150, maxUsers: 100, status: 'ACTIVE', endDate },
-      { hospitalId: h2.id, plan: 'STARTER', pricePerUser: 150, maxUsers: 50, status: 'ACTIVE', endDate },
+      { hospitalId: h1.id, plan: 'PROFESSIONAL', pricePerUser: 150, maxUsers: 100, billedSeats: 10, status: 'ACTIVE', endDate },
+      { hospitalId: h2.id, plan: 'STARTER', pricePerUser: 150, maxUsers: 50, billedSeats: 5, status: 'ACTIVE', endDate },
     ],
   });
 

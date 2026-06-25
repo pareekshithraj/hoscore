@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Bed, Users, Stethoscope, ClipboardList, Package, Receipt,
   Settings, LogOut, BarChart2, UserCircle, Calendar, Megaphone, CalendarOff,
-  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck, X,
+  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck, X, CreditCard,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import clsx from "clsx";
@@ -34,6 +34,7 @@ const mainMenuItems = [
 ];
 
 const managementMenuItems = [
+  { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription", feature: "settings", adminOnly: true },
   { icon: Calendar, label: "Calendar", path: "/dashboard/calendar", feature: "calendar" },
   { icon: Megaphone, label: "Notice Board", path: "/dashboard/notices", feature: "notices" },
   { icon: CalendarOff, label: "Leave Requests", path: "/dashboard/leaves", feature: "leaves" },
@@ -55,7 +56,10 @@ export const Sidebar = ({ isMobileOpen = false, onCloseMobile }: { isMobileOpen?
   };
 
   const filteredMain = mainMenuItems.filter((i) => hasFeature(activeContext?.permissions, i.feature, userRole));
-  const filteredManagement = managementMenuItems.filter((i) => hasFeature(activeContext?.permissions, i.feature, userRole));
+  const filteredManagement = managementMenuItems.filter((i) => {
+    if ('adminOnly' in i && i.adminOnly && userRole !== 'ADMIN') return false;
+    return hasFeature(activeContext?.permissions, i.feature, userRole);
+  });
 
   useEffect(() => {
     onCloseMobile?.();

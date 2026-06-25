@@ -115,32 +115,40 @@ model Hospital {
 }
 
 model Subscription {
-  id           String   @id @default(uuid())
-  hospitalId   String
-  hospital     Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
-  plan         String   @default("STARTER") // STARTER, PROFESSIONAL, ENTERPRISE
-  pricePerUser Float    @default(150)       // ₹150/user/year
-  maxUsers     Int      @default(50)
-  status       String   @default("ACTIVE")  // ACTIVE, EXPIRED, CANCELLED, TRIAL
-  startDate    DateTime @default(now())
-  endDate      DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                     String   @id @default(uuid())
+  hospitalId             String
+  hospital               Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  plan                   String   @default("STARTER") // STARTER, PROFESSIONAL, ENTERPRISE
+  pricePerUser           Float    @default(150)       // ₹150/user/year
+  maxUsers               Int      @default(50)        // plan tier cap
+  billedSeats            Int      @default(0)         // seats paid for
+  status                 String   @default("TRIAL")   // TRIAL, ACTIVE, EXPIRED, CANCELLED
+  autopayEnabled         Boolean  @default(false)
+  razorpaySubscriptionId String?  @unique
+  razorpayPlanId         String?
+  trialEndsAt            DateTime?
+  startDate              DateTime @default(now())
+  endDate                DateTime
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 model Payment {
-  id          String    @id @default(uuid())
-  hospitalId  String
-  orderId     String    @unique
-  paymentId   String?
-  signature   String?
-  amount      Float
-  currency    String    @default("INR")
-  plan        String
-  status      String    @default("CREATED") // CREATED, PAID, FAILED
-  paidAt      DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                     String    @id @default(uuid())
+  hospitalId             String
+  orderId                String    @unique
+  paymentId              String?
+  signature              String?
+  amount                 Float
+  currency               String    @default("INR")
+  plan                   String
+  userCount              Int       @default(1)
+  paymentType            String    @default("ONE_TIME") // ONE_TIME, SUBSCRIPTION, RENEWAL
+  razorpaySubscriptionId String?
+  status                 String    @default("CREATED") // CREATED, PAID, FAILED
+  paidAt                 DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 }
 
 // ============== CLINICAL CORE MODELS ==============

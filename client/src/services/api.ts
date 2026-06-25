@@ -1,77 +1,39 @@
 import { BASE_URL } from '../utils/apiConfig';
 
-export const api = {
-  get: async (endpoint: string) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!response.ok) {
-      if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-      throw new Error(`API Error: ${response.status}`);
+async function parseError(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+    return data.error || data.message || `Request failed (${response.status})`;
+  } catch {
+    return `Request failed (${response.status})`;
+  }
+}
+
+async function request(method: string, endpoint: string, data?: unknown) {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
-    return response.json();
-  },
+    throw new Error(await parseError(response));
+  }
+  return response.json();
+}
 
-  post: async (endpoint: string, data: any) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(`API Error: ${response.status}`);
-    return response.json();
-  },
-
-  patch: async (endpoint: string, data: any) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(`API Error: ${response.status}`);
-    return response.json();
-  },
-
-  put: async (endpoint: string, data: any) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(`API Error: ${response.status}`);
-    return response.json();
-  },
-
-  delete: async (endpoint: string) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!response.ok) throw new Error(`API Error: ${response.status}`);
-    return response.json();
-  },
+export const api = {
+  get: (endpoint: string) => request('GET', endpoint),
+  post: (endpoint: string, data: any) => request('POST', endpoint, data),
+  patch: (endpoint: string, data: any) => request('PATCH', endpoint, data),
+  put: (endpoint: string, data: any) => request('PUT', endpoint, data),
+  delete: (endpoint: string) => request('DELETE', endpoint),
 };
