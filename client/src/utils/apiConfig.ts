@@ -1,5 +1,5 @@
-// Production API host (Render). Vercel rewrites /api/* → this service.
-export const PRODUCTION_API_ORIGIN = 'https://hoscore-api.onrender.com';
+// Production API host (Vercel). Client rewrites /api/* → this service.
+export const PRODUCTION_API_ORIGIN = 'https://hoscore-api.vercel.app';
 
 export const getBaseUrl = (): string => {
   if (import.meta.env.VITE_API_URL) {

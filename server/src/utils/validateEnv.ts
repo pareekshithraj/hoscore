@@ -14,13 +14,13 @@ const REQUIRED: string[] = ['DATABASE_URL', 'JWT_SECRET'];
 const REQUIRED_IN_PROD: string[] = [
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET',
-  'MSG91_AUTHKEY',
 ];
 
 // Nice-to-have; warn only.
 const OPTIONAL: string[] = [
   'CLIENT_URL',
   'R2_BUCKET_NAME',
+  'MSG91_AUTHKEY',
   'MSG91_TEMPLATE_ID',
   'MSG91_FROM_EMAIL',
   'RAZORPAY_WEBHOOK_SECRET',

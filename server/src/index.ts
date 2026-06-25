@@ -2,8 +2,8 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import helmetPkg from 'helmet';
+import rateLimitPkg from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { createServer } from 'http';
 import { initWebSocket } from './services/websocket.js';
@@ -19,7 +19,7 @@ const prisma = new PrismaClient();
 const port = process.env.PORT || 5000;
 
 // Security headers
-app.use(helmet());
+app.use((helmetPkg as unknown as () => import('express').RequestHandler)());
 
 // CORS — supports configured CLIENT_URL and local dev origin
 const allowedOrigins = [
@@ -58,6 +58,14 @@ app.post(
 app.use(express.json({ limit: '2mb' }));
 
 // Rate limiting to prevent auth endpoint abuse
+const rateLimit = rateLimitPkg as unknown as (options: {
+  windowMs: number;
+  max: number;
+  message: { error: string };
+  standardHeaders: boolean;
+  legacyHeaders: boolean;
+}) => import('express').RequestHandler;
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 150, // More generous limit for general session validation/context switching
@@ -203,7 +211,11 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 
 // HTTP + WebSocket server
 const server = createServer(app);
-initWebSocket(server);
+const isServerless = process.env.VERCEL === '1';
+
+if (!isServerless) {
+  initWebSocket(server);
+}
 
 async function ensurePatientSixDigitIds() {
   try {
@@ -227,10 +239,13 @@ async function ensurePatientSixDigitIds() {
   }
 }
 
-server.listen(port, () => {
-  console.log(`🏥 HOSCORE API running on port ${port} (${process.env.NODE_ENV || 'development'})`);
-  console.log(`🔌 WebSocket available at ws://localhost:${port}/ws`);
-  ensurePatientSixDigitIds();
-});
+if (!isServerless) {
+  server.listen(port, () => {
+    console.log(`🏥 HOSCORE API running on port ${port} (${process.env.NODE_ENV || 'development'})`);
+    console.log(`🔌 WebSocket available at ws://localhost:${port}/ws`);
+    ensurePatientSixDigitIds();
+  });
+}
 
 export { app, prisma };
+export default app;
