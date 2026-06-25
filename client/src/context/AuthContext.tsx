@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+import { BASE_URL } from '../utils/apiConfig';
 
 interface ContextItem {
   type: 'hospital' | 'patient' | 'superadmin';
@@ -161,6 +161,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    const bridge = (window as any).AndroidBridge;
+    if (bridge) {
+      if (user && activeContext) {
+        try {
+          if (typeof bridge.syncUser === 'function') {
+            bridge.syncUser(user.name, activeContext.role || 'STAFF', activeContext.type);
+          }
+        } catch (e) {
+          console.error("Failed to sync user via AndroidBridge", e);
+        }
+      } else {
+        try {
+          if (typeof bridge.clearUser === 'function') {
+            bridge.clearUser();
+          }
+        } catch (e) {
+          console.error("Failed to clear user via AndroidBridge", e);
+        }
+      }
+    }
+  }, [user, activeContext]);
+
 
   const login = (userData: User, newToken: string, ctxs: ContextItem[], active: ContextItem) => {
     setUser(userData);

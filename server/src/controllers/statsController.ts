@@ -86,39 +86,167 @@ export const getAnalytics = async (req: Request, res: Response) => {
       { name: "Maintenance", value: maintenanceBeds },
     ];
 
+    // Compute actual total revenue from Billing table
     const totalBilling = await prisma.billing.aggregate({
-      where: { admission: { bed: { room: { hospitalId } } } },
+      where: { hospitalId },
       _sum: { totalAmount: true },
     });
-    const baseRevenue = (totalBilling._sum.totalAmount || 0) / 6;
+    const totalRevenueSum = totalBilling._sum.totalAmount || 0;
 
-    const months = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
-    const admissionsMonthly = months.map((m) => ({ month: m, admissions: 40 + Math.floor(Math.random() * 40), discharges: 35 + Math.floor(Math.random() * 40) }));
-    const revenueData = months.map((m) => ({ month: m, revenue: Math.round(baseRevenue * (0.8 + Math.random() * 0.4)) }));
+    // Fetch admissions in the last 6 months to construct actual monthly trends
+    const now = new Date();
+    const monthsData = [];
+    
+    // Generate the last 6 calendar months
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+      const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+      
+      const monthLabel = d.toLocaleString("en-US", { month: "short" });
+
+      const admissionsCount = await prisma.admission.count({
+        where: {
+          bed: { room: { hospitalId } },
+          admissionDate: { gte: startOfMonth, lte: endOfMonth }
+        }
+      });
+
+      const dischargesCount = await prisma.admission.count({
+        where: {
+          bed: { room: { hospitalId } },
+          dischargeDate: { gte: startOfMonth, lte: endOfMonth }
+        }
+      });
+
+      const monthlyBilling = await prisma.billing.aggregate({
+        where: {
+          hospitalId,
+          createdAt: { gte: startOfMonth, lte: endOfMonth }
+        },
+        _sum: { totalAmount: true }
+      });
+
+      monthsData.push({
+        label: monthLabel,
+        admissions: admissionsCount,
+        discharges: dischargesCount,
+        revenue: monthlyBilling._sum.totalAmount || 0
+      });
+    }
+
+    const admissionsMonthly = monthsData.map(m => ({
+      month: m.label,
+      admissions: m.admissions,
+      discharges: m.discharges
+    }));
+
+    const revenueData = monthsData.map(m => ({
+      month: m.label,
+      revenue: m.revenue
+    }));
+
+    // Calculate real stay durations for discharged patients
+    const dischargedAdmissions = await prisma.admission.findMany({
+      where: {
+        bed: { room: { hospitalId } },
+        status: "Discharged",
+        dischargeDate: { not: null },
+        admissionDate: { not: null }
+      },
+      select: {
+        admissionDate: true,
+        dischargeDate: true
+      }
+    });
+
+    let oneDay = 0;
+    let twoToThree = 0;
+    let fourToSeven = 0;
+    let eightToFourteen = 0;
+    let fifteenPlus = 0;
+    let totalStayDays = 0;
+
+    dischargedAdmissions.forEach(adm => {
+      if (adm.admissionDate && adm.dischargeDate) {
+        const diffTime = Math.abs(adm.dischargeDate.getTime() - adm.admissionDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+        
+        totalStayDays += diffDays;
+        
+        if (diffDays <= 1) {
+          oneDay++;
+        } else if (diffDays <= 3) {
+          twoToThree++;
+        } else if (diffDays <= 7) {
+          fourToSeven++;
+        } else if (diffDays <= 14) {
+          eightToFourteen++;
+        } else {
+          fifteenPlus++;
+        }
+      }
+    });
 
     const stayDurationData = [
-      { range: "1 Day", count: (await prisma.admission.count({ where: { status: "Discharged", bed: { room: { hospitalId } } } })) || 20 },
-      { range: "2-3 Days", count: 35 }, { range: "4-7 Days", count: 28 },
-      { range: "8-14 Days", count: 12 }, { range: "15+ Days", count: 5 },
+      { range: "1 Day", count: oneDay },
+      { range: "2-3 Days", count: twoToThree },
+      { range: "4-7 Days", count: fourToSeven },
+      { range: "8-14 Days", count: eightToFourteen },
+      { range: "15+ Days", count: fifteenPlus },
     ];
 
-    const departmentRevenue = [
-      { dept: "Cardiology", revenue: Math.round(baseRevenue * 0.37 * 6), pct: 37 },
-      { dept: "Neurosurgery", revenue: Math.round(baseRevenue * 0.29 * 6), pct: 29 },
-      { dept: "Orthopedics", revenue: Math.round(baseRevenue * 0.22 * 6), pct: 22 },
-      { dept: "Pulmonology", revenue: Math.round(baseRevenue * 0.08 * 6), pct: 8 },
-      { dept: "Pediatrics", revenue: Math.round(baseRevenue * 0.035 * 6), pct: 3.5 },
-      { dept: "General", revenue: Math.round(baseRevenue * 0.005 * 6), pct: 0.5 },
-    ];
+    // Compute department wise revenues
+    // Since department is associated with rooms/memberships, let's group billing by Room types dynamically
+    const billingsWithRooms = await prisma.billing.findMany({
+      where: { hospitalId },
+      include: {
+        admission: {
+          include: {
+            bed: {
+              include: {
+                room: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const deptMap: Record<string, number> = {};
+    billingsWithRooms.forEach(b => {
+      const roomType = b.admission?.bed?.room?.type || "General";
+      deptMap[roomType] = (deptMap[roomType] || 0) + b.totalAmount;
+    });
+
+    const departmentRevenue = Object.entries(deptMap).map(([dept, revenue]) => {
+      const pct = totalRevenueSum > 0 ? Math.round((revenue / totalRevenueSum) * 100) : 0;
+      return { dept, revenue, pct };
+    });
+
+    // Handle fallback if empty
+    if (departmentRevenue.length === 0) {
+      departmentRevenue.push({ dept: "General", revenue: 0, pct: 0 });
+    }
 
     const totalAll = availableBeds + occupiedBedsCount + maintenanceBeds || 1;
+    const avgStayStr = dischargedAdmissions.length > 0 
+      ? `${(totalStayDays / dischargedAdmissions.length).toFixed(1)} Days`
+      : "0 Days";
+
+    const totalPatients = await prisma.patient.count({ where: { appointments: { some: { hospitalId } } } });
+
     const kpis = [
-      { label: "Total Revenue", value: `$${(totalBilling._sum.totalAmount || 0).toLocaleString()}`, change: "+18%", up: true },
-      { label: "Total Patients", value: `${await prisma.patient.count({ where: { appointments: { some: { hospitalId } } } })}`, change: "+12%", up: true },
-      { label: "Avg Occupancy", value: `${Math.round((occupiedBedsCount / totalAll) * 100)}%`, change: "+5%", up: true },
-      { label: "Avg Stay Duration", value: "4.2 Days", change: "-3%", up: false },
+      { label: "Total Revenue", value: `₹${totalRevenueSum.toLocaleString()}`, change: "+0%", up: true },
+      { label: "Total Patients", value: `${totalPatients}`, change: "+0%", up: true },
+      { label: "Avg Occupancy", value: `${Math.round((occupiedBedsCount / totalAll) * 100)}%`, change: "+0%", up: true },
+      { label: "Avg Stay Duration", value: avgStayStr, change: "+0%", up: true },
     ];
 
     res.json({ occupancyData, admissionsMonthly, revenueData, stayDurationData, departmentRevenue, kpis });
-  } catch (error) { console.error("Analytics Error", error); res.status(500).json({ error: "Failed to generate analytics" }); }
+  } catch (error) {
+    console.error("Analytics Error", error);
+    res.status(500).json({ error: "Failed to generate analytics" });
+  }
 };
+

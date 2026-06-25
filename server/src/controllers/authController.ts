@@ -5,8 +5,10 @@ import crypto from 'crypto';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
 import { signUrl } from '../services/r2.js';
+import { sendSmsOtp, sendMsg91Email } from '../services/msg91.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
+// No fallback — validateEnv() guarantees a strong JWT_SECRET is present at boot.
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
 interface ContextItem {
   type: 'hospital' | 'patient' | 'superadmin';
@@ -297,10 +299,32 @@ export const sendOtp = async (req: Request, res: Response) => {
       }
     });
 
-    // Mock Send: log to server console
-    console.log(`\n==================================================`);
-    console.log(`[SMS/Email Gateway Mock] OTP for ${email} is: ${otp}`);
-    console.log(`==================================================\n`);
+    // Deliver OTP via SMS (if a phone is on file) and email, in parallel.
+    const normalizedPhone = (user.phone || '').replace(/[^\d]/g, '');
+    const smsTarget = normalizedPhone.length === 10 ? `91${normalizedPhone}` : normalizedPhone;
+
+    const deliveries: Promise<boolean>[] = [];
+    if (smsTarget) deliveries.push(sendSmsOtp(smsTarget, otp));
+    deliveries.push(
+      sendMsg91Email({
+        to: email,
+        toName: user.name,
+        subject: `Your HOSCORE verification code: ${otp}`,
+        html: `
+          <div style="font-family:system-ui;max-width:480px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">
+            <h2 style="color:#1e293b;text-align:center;margin:0 0 8px">Verification Code</h2>
+            <p style="color:#64748b;text-align:center;margin:0 0 20px">Use this code to sign in to HOSCORE. It expires in 5 minutes.</p>
+            <div style="background:#2563eb;color:white;border-radius:16px;padding:20px;text-align:center;letter-spacing:8px;font-size:36px;font-weight:900">${otp}</div>
+            <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px">If you didn't request this, you can ignore this email.<br/>Powered by HOSCORE</p>
+          </div>`,
+      })
+    );
+
+    const results = await Promise.allSettled(deliveries);
+    const anyDelivered = results.some((r) => r.status === 'fulfilled' && r.value === true);
+    if (!anyDelivered) {
+      return res.status(502).json({ error: 'Failed to deliver OTP. Please try again.' });
+    }
 
     res.json({ message: 'OTP sent successfully' });
   } catch (error) {

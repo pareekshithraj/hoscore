@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Building2, User, Mail, Lock, Phone, MapPin, CheckCircle2, ArrowLeft, ArrowRight, IndianRupee, Sparkles } from 'lucide-react';
 import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+import { BASE_URL } from '../utils/apiConfig';
 
 export const RegisterHospital = () => {
   const navigate = useNavigate();

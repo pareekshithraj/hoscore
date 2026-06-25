@@ -3,7 +3,7 @@ import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+import { BASE_URL } from '../utils/apiConfig';
 
 const bgImages = ['/login-bg.png', '/login-bg2.png', '/login-bg3.png'];
 const slideContent = [

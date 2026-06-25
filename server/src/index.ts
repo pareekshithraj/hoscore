@@ -8,8 +8,11 @@ import { PrismaClient } from '@prisma/client';
 import { createServer } from 'http';
 import { initWebSocket } from './services/websocket.js';
 import routes from './routes/index.js';
+import { handlePaymentWebhook } from './controllers/paymentController.js';
+import { validateEnv } from './utils/validateEnv.js';
 
 dotenv.config();
+validateEnv();
 
 const app = express();
 const prisma = new PrismaClient();
@@ -34,6 +37,18 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// Razorpay webhook — MUST receive the raw body so the HMAC signature can be
+// verified against the exact bytes. Registered before express.json().
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: '*/*', limit: '1mb' }),
+  (req, res, next) => {
+    (req as any).rawBody = req.body; // Buffer from express.raw
+    next();
+  },
+  handlePaymentWebhook
+);
 
 // Body parsing with size limits
 app.use(express.json({ limit: '2mb' }));

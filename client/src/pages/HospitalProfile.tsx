@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+import { BASE_URL } from '../utils/apiConfig';
 
 type HospitalProfileData = {
   id: string;

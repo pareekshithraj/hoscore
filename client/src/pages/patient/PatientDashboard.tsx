@@ -7,8 +7,9 @@ import { useAnimatedCounter } from '../../hooks/useAnimatedCounter';
 import { WayfindingModal } from '../../components/WayfindingModal';
 import { Modal } from '../../components/Modal';
 
+import { BASE_URL } from '../../utils/apiConfig';
 const getWsUrl = (token: string) => {
-  const apiBase = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+  const apiBase = BASE_URL;
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   let host = window.location.host;
   if (apiBase.startsWith('http')) {
@@ -189,22 +190,24 @@ export const PatientDashboard = () => {
     <div className="space-y-8 animate-fade-in-up">
       {/* Live Queue Alerts */}
       {liveQueueAlert && (
-        <div className={`p-6 rounded-2xl bg-gradient-to-r ${
-          liveQueueAlert.type === 'called' 
-            ? 'from-rose-500/10 to-red-500/10 border-rose-500/30 shadow-[0_4px_30px_rgba(239,68,68,0.15)]' 
-            : 'from-sky-500/10 to-blue-500/10 border-sky-500/30 shadow-[0_4px_30px_rgba(14,165,233,0.15)]'
-        } border flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden animate-fade-in-up backdrop-blur-xl`}>
+        <div className={`p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden animate-fade-in-up ${
+          liveQueueAlert.type === 'called'
+            ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/25'
+            : 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/25'
+        }`}>
           <div className="relative z-10 flex items-center gap-4">
-            <div className={`w-12 h-12 ${
-              liveQueueAlert.type === 'called' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-            } rounded-xl flex items-center justify-center flex-shrink-0 animate-bounce`}>
-              <Navigation className="w-6 h-6 animate-pulse" />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              liveQueueAlert.type === 'called'
+                ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30'
+                : 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30'
+            }`}>
+              <Navigation className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-black text-white tracking-tight uppercase">
-                {liveQueueAlert.type === 'called' ? '🔴 Live consultation room call alert' : '🔵 Live Queue Position Alert'}
+              <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                {liveQueueAlert.type === 'called' ? 'Consultation Room Call' : 'Live Queue Position'}
               </h3>
-              <p className="text-xs text-slate-300 font-bold mt-1">
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-bold mt-1">
                 {liveQueueAlert.message}
               </p>
             </div>
@@ -215,17 +218,17 @@ export const PatientDashboard = () => {
                 setWayfindingDest(liveQueueAlert.roomName);
                 setIsWayfindingOpen(true);
               }}
-              className={`px-4 py-2 text-xs font-extrabold rounded-lg shadow-md transition-all active:scale-95 cursor-pointer text-white ${
+              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all active:scale-95 cursor-pointer text-white ${
                 liveQueueAlert.type === 'called'
-                  ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
-                  : 'bg-sky-600 hover:bg-sky-700 shadow-sky-600/30'
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : 'bg-sky-600 hover:bg-sky-700'
               }`}
             >
               Open Indoor Walkway Map
             </button>
             <button
               onClick={() => setLiveQueueAlert(null)}
-              className="px-3 py-2 border border-white/10 hover:border-white/20 bg-white/[0.02] text-slate-300 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
+              className="px-3 py-2 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.02] text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
             >
               Dismiss
             </button>
@@ -235,14 +238,14 @@ export const PatientDashboard = () => {
 
       {/* Follow-up Appointment Recommendation Alert */}
       {showAppointmentAlert && (
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/25 flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden animate-pulse shadow-[0_4px_30px_rgba(245,158,11,0.1)]">
+        <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/25 flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
           <div className="relative z-10 flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 flex-shrink-0">
+            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-400 flex-shrink-0">
               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-white tracking-tight uppercase">Recommended Follow-up Visit</h3>
-              <p className="text-xs text-slate-300 font-semibold mt-1">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Recommended Follow-up Visit</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-semibold mt-1">
                 Your doctor set a check-up alert for {alertDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ({data.profile?.nextAppointmentAlertInterval} interval reached).
               </p>
             </div>
@@ -250,13 +253,13 @@ export const PatientDashboard = () => {
           <div className="flex items-center gap-3 relative z-10">
             <button
               onClick={handleSkipAlert}
-              className="px-4 py-2 border border-white/10 hover:border-white/20 bg-white/[0.02] text-slate-300 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.02] text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
             >
               Skip Alert
             </button>
             <Link
               to="/patient/find"
-              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-orange-500/20 transition-all active:scale-95 text-center"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-all active:scale-95 text-center"
             >
               Book Appointment
             </Link>
@@ -378,14 +381,14 @@ export const PatientDashboard = () => {
 
               <button
                 onClick={() => setShowFamilyModal(true)}
-                className="px-3.5 py-2 border border-white/10 hover:border-white/20 bg-white/[0.02] text-slate-300 text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer"
+                className="px-3.5 py-2 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.02] text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer"
               >
                 Manage Family
               </button>
 
               <Link
                 to="/patient/find"
-                className="btn-premium px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-md hover:shadow-sky-500/20 active:scale-95 transition-all text-center"
+                className="btn-premium px-5 py-2.5 rounded-xl text-xs font-extrabold active:scale-95 transition-all text-center"
               >
                 Book Appointment
               </Link>
@@ -395,59 +398,57 @@ export const PatientDashboard = () => {
           {/* Asymmetric Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* Metric Tile 1: Consultations */}
-            <div className="md:col-span-7 glass-card rounded-2xl p-5 border border-white/[0.04] bg-gradient-to-r from-sky-500/[0.02] to-transparent relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="md:col-span-7 glass-card rounded-2xl p-5 border border-slate-200/60 dark:border-white/[0.04] relative overflow-hidden group">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest block mb-1">Scheduled Consultations</span>
-                  <p className="text-4xl font-black text-white tracking-tight tabular-nums mt-1">{upcomingCount}</p>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-500 font-extrabold uppercase tracking-widest block mb-1">Scheduled Consultations</span>
+                  <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tight tabular-nums mt-1">{upcomingCount}</p>
                 </div>
-                <div className="w-10 h-10 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-center justify-center text-sky-400">
-                  <Calendar className="w-5 h-5 animate-float" />
+                <div className="w-10 h-10 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-center justify-center text-sky-600 dark:text-sky-400">
+                  <Calendar className="w-5 h-5" />
                 </div>
               </div>
-              
+
               {/* Live Next Appointment Info */}
-              <div className="mt-6 pt-4 border-t border-white/[0.04] flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
                 {data.upcoming && data.upcoming.length > 0 ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping" />
-                    <p className="text-xs text-slate-300 font-bold truncate max-w-[280px]">
-                      Next: <span className="text-white">{data.upcoming[0].doctor?.name}</span> ({data.upcoming[0].time})
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                    <p className="text-xs text-slate-600 dark:text-slate-300 font-bold truncate max-w-[280px]">
+                      Next: <span className="text-slate-900 dark:text-white">{data.upcoming[0].doctor?.name}</span> ({data.upcoming[0].time})
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 font-semibold">No upcoming appointments scheduled</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold">No upcoming appointments scheduled</p>
                 )}
-                <Link to="/patient/appointments" className="text-[10px] font-black text-sky-400 hover:text-sky-300 uppercase tracking-wider flex items-center gap-1 transition-colors">
+                <Link to="/patient/appointments" className="text-[10px] font-black text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 uppercase tracking-wider flex items-center gap-1 transition-colors">
                   Manage Slots <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>
 
             {/* Metric Tile 2: Rx prescriptions */}
-            <div className="md:col-span-5 glass-card rounded-2xl p-5 border border-white/[0.04] bg-gradient-to-r from-emerald-500/[0.02] to-transparent relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="md:col-span-5 glass-card rounded-2xl p-5 border border-slate-200/60 dark:border-white/[0.04] relative overflow-hidden group">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest block mb-1">Active Prescriptions</span>
-                  <p className="text-4xl font-black text-white tracking-tight tabular-nums mt-1">{prescriptionsCount}</p>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-500 font-extrabold uppercase tracking-widest block mb-1">Active Prescriptions</span>
+                  <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tight tabular-nums mt-1">{prescriptionsCount}</p>
                 </div>
-                <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400">
+                <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                   <FileText className="w-5 h-5" />
                 </div>
               </div>
 
               {/* Latest prescription update */}
-              <div className="mt-6 pt-4 border-t border-white/[0.04] flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
                 {data.recentRx && data.recentRx.length > 0 ? (
-                  <p className="text-xs text-slate-300 font-bold truncate max-w-[180px]">
-                    Latest Rx: <span className="text-white">{data.recentRx[0].diagnosis}</span>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-bold truncate max-w-[180px]">
+                    Latest Rx: <span className="text-slate-900 dark:text-white">{data.recentRx[0].diagnosis}</span>
                   </p>
                 ) : (
-                  <p className="text-xs text-slate-500 font-semibold">No active prescriptions</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold">No active prescriptions</p>
                 )}
-                <Link to="/patient/prescriptions" className="text-[10px] font-black text-emerald-400 hover:text-emerald-300 uppercase tracking-wider flex items-center gap-1 transition-colors">
+                <Link to="/patient/prescriptions" className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 uppercase tracking-wider flex items-center gap-1 transition-colors">
                   View Rx <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -459,47 +460,47 @@ export const PatientDashboard = () => {
       {/* Content Columns (Appointments & Prescriptions) */}
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Upcoming Appointments */}
-        <div className="glass-card rounded-2xl border border-white/[0.04] p-6 bg-gradient-to-b from-[#0b0f19]/80 to-transparent">
-          <div className="flex items-center justify-between mb-6 border-b border-white/[0.04] pb-4">
+        <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-white/[0.04] p-6">
+          <div className="flex items-center justify-between mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4">
             <div className="flex items-center gap-2.5">
-              <Calendar className="w-4 h-4 text-sky-400" />
-              <h2 className="text-base font-extrabold text-white tracking-tight uppercase">Upcoming Consultation Slots</h2>
+              <Calendar className="w-4 h-4 text-sky-500" />
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Upcoming Consultation Slots</h2>
             </div>
-            <Link to="/patient/appointments" className="text-xs text-sky-400 font-bold flex items-center gap-1 hover:text-sky-300 transition-colors">
+            <Link to="/patient/appointments" className="text-xs text-sky-600 dark:text-sky-400 font-bold flex items-center gap-1 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">
               View All <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          
+
           {data.upcoming?.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="w-12 h-12 bg-white/[0.02] border border-white/[0.06] rounded-xl flex items-center justify-center mx-auto mb-4 text-slate-600">
+              <div className="w-12 h-12 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/[0.06] rounded-xl flex items-center justify-center mx-auto mb-4 text-slate-400 dark:text-slate-600">
                 <Calendar className="w-6 h-6" />
               </div>
-              <p className="text-xs text-slate-400 font-bold tracking-tight">No upcoming consultations found</p>
-              <p className="text-[10px] text-slate-500 mt-1">Book an appointment online above to schedule a visit.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold tracking-tight">No upcoming consultations found</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Book an appointment online above to schedule a visit.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {data.upcoming?.map((a: any) => (
-                <div key={a.id} className="flex items-center gap-4 p-4 rounded-xl border border-white/[0.04] bg-slate-950/20 hover:bg-slate-950/40 hover:border-sky-500/20 hover:-translate-y-0.5 transition-all duration-200 shadow-sm">
-                  <div className="w-10 h-10 bg-sky-500/10 border border-sky-500/25 rounded-xl flex items-center justify-center text-sky-400 flex-shrink-0">
+                <div key={a.id} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200/60 dark:border-white/[0.04] bg-slate-50/50 dark:bg-slate-950/20 hover:bg-slate-50 dark:hover:bg-slate-950/40 hover:border-sky-300 dark:hover:border-sky-500/20 hover:-translate-y-0.5 transition-all duration-200">
+                  <div className="w-10 h-10 bg-sky-500/10 border border-sky-500/25 rounded-xl flex items-center justify-center text-sky-600 dark:text-sky-400 flex-shrink-0">
                     <Clock className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-extrabold text-white truncate">{a.doctor?.name || 'Medical Specialist'}</p>
-                    <p className="text-xs text-slate-400 font-medium truncate mt-0.5">{a.hospital?.name} · {a.time}</p>
+                    <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{a.doctor?.name || 'Medical Specialist'}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">{a.hospital?.name} · {a.time}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border tracking-wider ${
-                      a.status === 'CONFIRMED' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      a.status === 'CONFIRMED'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
+                        : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
                     }`}>
                       {a.status}
                     </span>
                     <button
                       onClick={() => handleCloseAppointment(a.id)}
-                      className="px-2.5 py-1 text-[9px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/25 rounded-md tracking-wider hover:bg-rose-500/25 hover:border-rose-500/40 transition-all cursor-pointer"
+                      className="px-2.5 py-1 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 rounded-md tracking-wider hover:bg-rose-100 dark:hover:bg-rose-500/25 hover:border-rose-300 dark:hover:border-rose-500/40 transition-all cursor-pointer"
                       title="Close Consultation Slot"
                     >
                       Close Slot
@@ -512,40 +513,40 @@ export const PatientDashboard = () => {
         </div>
 
         {/* Recent Prescriptions */}
-        <div className="glass-card rounded-2xl border border-white/[0.04] p-6 bg-gradient-to-b from-[#0b0f19]/80 to-transparent">
-          <div className="flex items-center justify-between mb-6 border-b border-white/[0.04] pb-4">
+        <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-white/[0.04] p-6">
+          <div className="flex items-center justify-between mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4">
             <div className="flex items-center gap-2.5">
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-base font-extrabold text-white tracking-tight uppercase">Recent Prescriptions & Rx</h2>
+              <FileText className="w-4 h-4 text-emerald-500" />
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Recent Prescriptions & Rx</h2>
             </div>
-            <Link to="/patient/prescriptions" className="text-xs text-sky-400 font-bold flex items-center gap-1 hover:text-sky-300 transition-colors">
+            <Link to="/patient/prescriptions" className="text-xs text-sky-600 dark:text-sky-400 font-bold flex items-center gap-1 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">
               View All <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {data.recentRx?.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="w-12 h-12 bg-white/[0.02] border border-white/[0.06] rounded-xl flex items-center justify-center mx-auto mb-4 text-slate-600">
+              <div className="w-12 h-12 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/[0.06] rounded-xl flex items-center justify-center mx-auto mb-4 text-slate-400 dark:text-slate-600">
                 <FileText className="w-6 h-6" />
               </div>
-              <p className="text-xs text-slate-400 font-bold tracking-tight">No active prescriptions yet</p>
-              <p className="text-[10px] text-slate-500 mt-1">Issued prescriptions will appear here automatically.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold tracking-tight">No active prescriptions yet</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Issued prescriptions will appear here automatically.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {data.recentRx?.map((rx: any) => (
-                <div key={rx.id} className="flex items-center gap-4 p-4 rounded-xl border border-white/[0.04] bg-slate-950/20 hover:bg-slate-950/40 hover:border-emerald-500/20 hover:-translate-y-0.5 transition-all duration-200 shadow-sm">
-                  <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <div key={rx.id} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200/60 dark:border-white/[0.04] bg-slate-50/50 dark:bg-slate-950/20 hover:bg-slate-50 dark:hover:bg-slate-950/40 hover:border-emerald-300 dark:hover:border-emerald-500/20 hover:-translate-y-0.5 transition-all duration-200">
+                  <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-extrabold text-white truncate">{rx.diagnosis}</p>
-                    <p className="text-xs text-slate-400 font-medium truncate mt-0.5">{rx.doctor?.name} · {rx.hospital?.name}</p>
+                    <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{rx.diagnosis}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">{rx.doctor?.name} · {rx.hospital?.name}</p>
                   </div>
                   <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md tracking-wider border ${
-                    rx.status === 'ISSUED' 
-                      ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' 
-                      : 'bg-white/[0.03] text-slate-400 border-white/[0.08]'
+                    rx.status === 'ISSUED'
+                      ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20'
+                      : 'bg-slate-50 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]'
                   }`}>
                     {rx.status}
                   </span>
@@ -574,19 +575,19 @@ export const PatientDashboard = () => {
             ) : (
               <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
                 {dependents.map((dep) => (
-                  <div key={dep.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-white/[0.04]">
+                  <div key={dep.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-white/[0.04]">
                     <div>
-                      <p className="text-xs font-bold text-white">{dep.name}</p>
-                      <p className="text-[10px] text-slate-400">HSC-{dep.sixDigitId} · {dep.bloodGroup}</p>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">{dep.name}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">HSC-{dep.sixDigitId} · {dep.bloodGroup}</p>
                     </div>
-                    <span className="text-[9px] font-black text-sky-400 bg-sky-500/10 border border-sky-500/25 px-2 py-0.5 rounded">DEPENDENT</span>
+                    <span className="text-[9px] font-black text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/25 px-2 py-0.5 rounded">DEPENDENT</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="border-t border-white/[0.04] pt-4">
+          <div className="border-t border-slate-200/60 dark:border-white/[0.04] pt-4">
             <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest block mb-3">Add Dependents</span>
             <form onSubmit={handleAddDependent} className="space-y-3.5">
               <input

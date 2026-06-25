@@ -503,13 +503,16 @@ export const Dashboard = () => {
       }`}>
         <div className="relative z-10 space-y-1.5">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-blue-500/60 animate-ping opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-500" />
+            </span>
             <h2 className={`text-xl lg:text-2xl font-black tracking-tight flex items-center gap-2 ${
               theme === 'dark' ? "text-white" : "text-slate-900"
             }`}>
               Clinical Operations Command Center
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border border-red-500/25 bg-red-500/10 text-red-500">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400">
               Live System Active
             </span>
           </div>
@@ -545,7 +548,7 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/dashboard/simulator"
-            className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-indigo-600 text-white rounded-xl text-xs font-black tracking-wider uppercase shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+            className="px-5 py-2.5 btn-premium rounded-xl text-xs font-black tracking-wider uppercase active:scale-95 transition-all flex items-center gap-2"
           >
             <Activity className="w-4 h-4" />
             Simulation Control
@@ -575,14 +578,14 @@ export const Dashboard = () => {
                     value={rxSearchId}
                     onChange={(e) => setRxSearchId(e.target.value.replace(/\D/g, ""))}
                     placeholder="Enter 6-digit Patient ID (e.g. 123456)"
-                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-11 pr-4 py-3.5 text-slate-900 dark:text-white placeholder-slate-500 font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 font-mono tracking-widest text-center text-lg shadow-inner"
+                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-11 pr-4 py-3.5 text-slate-900 dark:text-white placeholder-slate-500 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono tracking-widest text-center text-lg shadow-inner"
                   />
                   <Search className="absolute left-4 top-4.5 w-5 h-5 text-slate-500" />
                 </div>
                 <button
                   type="submit"
                   disabled={rxLoading}
-                  className="px-6 py-3.5 bg-gradient-to-r from-red-600 to-indigo-600 text-white font-black tracking-wider uppercase rounded-xl hover:shadow-lg hover:shadow-red-950/30 active:scale-95 transition-all text-xs cursor-pointer disabled:opacity-55"
+                  className="px-6 py-3.5 btn-premium font-black tracking-wider uppercase rounded-xl active:scale-95 transition-all text-xs cursor-pointer disabled:opacity-55"
                 >
                   {rxLoading ? "Retrieving..." : "Retrieve Patient Rx"}
                 </button>
@@ -640,7 +643,7 @@ export const Dashboard = () => {
                             {rx.status === "ISSUED" && (
                               <button
                                 onClick={() => handleDispense(rx.id)}
-                                className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black tracking-wider uppercase rounded-lg text-[10px] hover:shadow-lg hover:shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer flex-shrink-0"
+                                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black tracking-wider uppercase rounded-lg text-[10px] transition-all active:scale-95 cursor-pointer flex-shrink-0"
                               >
                                 Dispense Medicines
                               </button>
@@ -685,7 +688,7 @@ export const Dashboard = () => {
               <div>
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/[0.04] pb-3 mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
                       Live Triage Alerts Rail
                     </h3>
@@ -722,7 +725,7 @@ export const Dashboard = () => {
                 <div className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500">
                   CODE RED: NORMAL
                 </div>
-                <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 animate-pulse">
+                <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
                   CODE BLUE: 1 ACT
                 </div>
                 <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500">
@@ -859,9 +862,9 @@ export const Dashboard = () => {
 
               {/* Consultation Calendar Roster (Denser layout) */}
               <div className="bg-white dark:bg-[#0b0f1a]/80 rounded-2xl border border-slate-200/60 dark:border-white/[0.06] overflow-hidden shadow-sm dark:shadow-xl">
-                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/[0.04] flex items-center justify-between bg-gradient-to-r from-red-500/[0.02] to-transparent">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <CalendarClock className="w-4 h-4 text-red-500" />
+                    <CalendarClock className="w-4 h-4 text-blue-500" />
                     <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">
                       Active consultations Queue & appointments
                     </h3>
@@ -934,7 +937,7 @@ export const Dashboard = () => {
                       Recent Active Admissions
                     </h3>
                   </div>
-                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
                 </div>
 
                 <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
@@ -964,12 +967,12 @@ export const Dashboard = () => {
                 
                 <div className="flex items-center gap-2 border-b border-slate-100 dark:border-white/[0.04] pb-3 mb-4 justify-between">
                   <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-500 animate-pulse" />
+                    <Activity className="w-4 h-4 text-emerald-500" />
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
                       Live Hospital Operations Log
                     </h3>
                   </div>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 </div>
 
                 <div className="space-y-3 max-h-[170px] overflow-y-auto pr-1">
@@ -1015,11 +1018,11 @@ export const Dashboard = () => {
                 </div>
                 <div className="flex gap-4 text-[10px] font-black font-mono">
                   <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />{" "}
+                    <span className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
                     Admissions
                   </span>
                   <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />{" "}
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full" />{" "}
                     Discharges
                   </span>
                 </div>
@@ -1108,14 +1111,14 @@ export const Dashboard = () => {
       {/* 1. Modal: Register Patient */}
       <Modal isOpen={activeModal === "PATIENT"} onClose={() => { setActiveModal(null); setRegisteredPatientInfo(null); }} title="Register Walk-in Patient">
         <form onSubmit={handleRegisterPatient} className="space-y-4">
-          {formError && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
+          {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
           {formSuccess && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold space-y-2">
               <p>{formSuccess}</p>
               {registeredPatientInfo && (
-                <div className="mt-2 p-3 bg-slate-950/60 rounded-lg border border-white/[0.06] space-y-1 font-mono text-[10px]">
-                  <p className="text-white font-black text-xs font-sans">Patient Identity Card</p>
-                  <p className="text-red-400 mt-1 font-black">Patient ID: HSC-{registeredPatientInfo.sixDigitId}</p>
+                <div className="mt-2 p-3 bg-white dark:bg-slate-950/60 rounded-lg border border-slate-200 dark:border-white/[0.06] space-y-1 font-mono text-[10px] text-slate-600 dark:text-slate-300">
+                  <p className="text-slate-900 dark:text-white font-black text-xs font-sans">Patient Identity Card</p>
+                  <p className="text-red-600 dark:text-red-400 mt-1 font-black">Patient ID: HSC-{registeredPatientInfo.sixDigitId}</p>
                   <p>Name: {registeredPatientInfo.name}</p>
                   <p>Blood Group: {registeredPatientInfo.bloodGroup}</p>
                   <div className="pt-2">
@@ -1128,7 +1131,7 @@ export const Dashboard = () => {
                         setRegisteredPatientInfo(null);
                         setActiveModal("APPOINTMENT");
                       }}
-                      className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded font-extrabold text-[9px] hover:scale-102 active:scale-95 transition-all cursor-pointer font-sans"
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-extrabold text-[9px] active:scale-95 transition-all cursor-pointer font-sans"
                     >
                       Process Queue Booking Now
                     </button>
@@ -1220,7 +1223,7 @@ export const Dashboard = () => {
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="flex-1 p-2.5 font-bold text-slate-400 bg-slate-900 border border-white/10 rounded-xl text-xs"
+                  className="flex-1 p-2.5 font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-xs transition-colors"
                 >
                   Cancel
                 </button>
@@ -1240,8 +1243,8 @@ export const Dashboard = () => {
       {/* 2. Modal: Book Slot */}
       <Modal isOpen={activeModal === "APPOINTMENT"} onClose={() => setActiveModal(null)} title="Book Consultation Queue Slot">
         <form onSubmit={handleBookAppointment} className="space-y-4">
-          {formError && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
-          {formSuccess && <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold">{formSuccess}</div>}
+          {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
+          {formSuccess && <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold">{formSuccess}</div>}
 
           <div>
             <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Select Patient</label>
@@ -1301,7 +1304,7 @@ export const Dashboard = () => {
             <button
               type="button"
               onClick={() => setActiveModal(null)}
-              className="flex-1 p-2.5 font-bold text-slate-400 bg-slate-900 border border-white/10 rounded-xl text-xs"
+              className="flex-1 p-2.5 font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-xs transition-colors"
             >
               Cancel
             </button>
@@ -1319,7 +1322,7 @@ export const Dashboard = () => {
       {/* 3. Modal: Record Vitals */}
       <Modal isOpen={activeModal === "VITALS"} onClose={() => setActiveModal(null)} title="Record Vitals Log">
         <form onSubmit={handleRecordVitals} className="space-y-4">
-          {formError && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
+          {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
           
           <div>
             <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Patient Name</label>
@@ -1388,7 +1391,7 @@ export const Dashboard = () => {
             <button
               type="button"
               onClick={() => setActiveModal(null)}
-              className="flex-1 p-2.5 font-bold text-slate-400 bg-slate-900 border border-white/10 rounded-xl text-xs"
+              className="flex-1 p-2.5 font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-xs transition-colors"
             >
               Cancel
             </button>
@@ -1406,7 +1409,7 @@ export const Dashboard = () => {
       {/* 4. Modal: E-Prescription */}
       <Modal isOpen={activeModal === "PRESCRIPTION"} onClose={() => setActiveModal(null)} title="Write E-Prescription Formulation">
         <form onSubmit={handleWritePrescription} className="space-y-4">
-          {formError && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
+          {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
           
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1478,7 +1481,7 @@ export const Dashboard = () => {
             <button
               type="button"
               onClick={() => setActiveModal(null)}
-              className="flex-1 p-2.5 font-bold text-slate-400 bg-slate-900 border border-white/10 rounded-xl text-xs"
+              className="flex-1 p-2.5 font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-xs transition-colors"
             >
               Cancel
             </button>

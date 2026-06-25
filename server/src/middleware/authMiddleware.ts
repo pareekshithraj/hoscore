@@ -2,7 +2,8 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { ADMIN_PERMISSIONS } from '../utils/features.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
+// No fallback — validateEnv() guarantees a strong JWT_SECRET is present at boot.
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
 export interface AuthUser {
   userId: string;

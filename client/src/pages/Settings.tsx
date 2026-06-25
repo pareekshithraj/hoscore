@@ -3,7 +3,7 @@ import { Activity, Clock, Shield, Bell, Save, Globe, Hospital, Upload, Camera, C
 import { api } from '../services/api';
 import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+import { BASE_URL } from '../utils/apiConfig';
 
 type HospitalPhoto = {
   id: string;

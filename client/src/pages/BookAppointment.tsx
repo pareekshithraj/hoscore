@@ -4,7 +4,7 @@ import { Activity, Clock, User, Phone, Mail, CheckCircle, ArrowLeft, ShieldCheck
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+import { BASE_URL } from '../utils/apiConfig';
 
 export const BookAppointment = () => {
   const { hospitalId } = useParams();

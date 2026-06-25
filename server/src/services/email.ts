@@ -1,5 +1,6 @@
-// Email Service — Mocked for now, swap with Resend when API key is available
-// To enable: set RESEND_API_KEY in .env
+// Email Service — delivers via MSG91 (primary). Falls back to Resend if configured,
+// then to console logging in dev. All providers are env-driven.
+import { sendMsg91Email, isMsg91Live } from './msg91.js';
 
 interface EmailOptions {
   to: string;
@@ -8,11 +9,15 @@ interface EmailOptions {
 }
 
 const RESEND_KEY = process.env.RESEND_API_KEY;
-const FROM = process.env.FROM_EMAIL || 'HOSCORE <noreply@hoscore.com>';
+const FROM = process.env.FROM_EMAIL || 'HOSCORE <noreply@hoscore.in>';
 
 async function sendEmail(options: EmailOptions): Promise<boolean> {
+  // Primary: MSG91
+  if (isMsg91Live) {
+    return sendMsg91Email({ to: options.to, subject: options.subject, html: options.html });
+  }
+  // Fallback: Resend
   if (RESEND_KEY) {
-    // Real Resend integration
     try {
       const { Resend } = await import('resend');
       const resend = new Resend(RESEND_KEY);
@@ -23,11 +28,10 @@ async function sendEmail(options: EmailOptions): Promise<boolean> {
       console.error('Email send failed:', err);
       return false;
     }
-  } else {
-    // Mock mode — log to console
-    console.log(`📧 [MOCK EMAIL] To: ${options.to} | Subject: ${options.subject}`);
-    return true;
   }
+  // Dev mock
+  console.log(`📧 [MOCK EMAIL] To: ${options.to} | Subject: ${options.subject}`);
+  return true;
 }
 
 export async function sendAppointmentConfirmation(

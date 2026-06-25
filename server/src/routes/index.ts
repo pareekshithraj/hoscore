@@ -28,6 +28,7 @@ import * as expenseController from '../controllers/expenseController.js';
 import * as prescriptionController from '../controllers/prescriptionController.js';
 import * as uploadController from '../controllers/uploadController.js';
 import * as staffTypeController from '../controllers/staffTypeController.js';
+import * as paymentController from '../controllers/paymentController.js';
 import { upload } from '../controllers/uploadController.js';
 import { validate, loginSchema, registerSchema, hospitalRegisterSchema } from '../utils/validators.js';
 import { FEATURES } from '../utils/features.js';
@@ -55,6 +56,13 @@ router.delete('/upload/file', requireFeature(FEATURES.PATIENTS), uploadControlle
 router.get('/auth/me', authController.getMe);
 router.get('/auth/contexts', authController.getMyContexts);
 router.post('/auth/switch-context', authController.switchContext);
+
+// ================= PAYMENTS / SUBSCRIPTIONS =================
+// (webhook is registered separately in index.ts with a raw body parser)
+router.get('/payments/plans', paymentController.getPlans);
+router.post('/payments/order', requireHospitalContext, paymentController.createPaymentOrder);
+router.post('/payments/verify', requireHospitalContext, paymentController.verifyPaymentOrder);
+router.get('/payments/history', requireHospitalContext, paymentController.getPaymentHistory);
 
 // Hospital management
 router.put('/hospitals/current', requireFeature(FEATURES.SETTINGS), hospitalController.updateHospital);
