@@ -23,6 +23,12 @@ export const verifyOtpSchema = z.object({
   otpCode: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
 });
 
+export const msg91AccessTokenSchema = z.object({
+  accessToken: z.string().min(10, 'Access token is required'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  identifier: z.string().min(3, 'Identifier must be at least 3 characters').optional().or(z.literal('')),
+});
+
 // Hospital Registration — the admin is the authenticated user, so no admin account
 // fields are accepted here. Any legacy admin* fields in the body are ignored.
 export const hospitalRegisterSchema = z.object({

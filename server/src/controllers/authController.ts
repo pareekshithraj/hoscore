@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
 import { signUrl } from '../services/r2.js';
-import { sendSmsOtp, sendMsg91Email } from '../services/msg91.js';
+import { sendSmsOtp, sendMsg91Email, verifyMsg91AccessToken as verifyMsg91WidgetAccessToken } from '../services/msg91.js';
 import {
   generateOtp,
   hashOtp,
@@ -370,6 +370,51 @@ export const sendOtp = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Send OTP error:', error);
     res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
+  const accessToken = String(req.body.accessToken || '').trim();
+  const email = normalizeEmail(String(req.body.email || ''));
+  const identifier = String(req.body.identifier || '').trim();
+
+  if (!accessToken) {
+    return res.status(400).json({ error: 'Access token is required' });
+  }
+
+  try {
+    const verification = await verifyMsg91WidgetAccessToken(accessToken);
+    if (!verification.verified) {
+      return res.status(401).json({ error: verification.error || 'OTP verification failed' });
+    }
+
+    let user = null;
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } });
+    } else if (identifier) {
+      const isEmail = identifier.includes('@');
+      user = isEmail
+        ? await prisma.user.findUnique({ where: { email: identifier.toLowerCase() } })
+        : await findUserByPhone(identifier);
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    if (!user.isVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true, otpCode: null, otpExpiresAt: null, otpAttempts: 0 },
+      });
+      await ensurePatientProfile(user);
+    }
+
+    const session = await buildSession(user.id);
+    res.json({ message: 'OTP verified successfully', ...session });
+  } catch (error) {
+    console.error('MSG91 widget verification error:', error);
+    res.status(500).json({ error: 'Failed to verify OTP widget access token' });
   }
 };
 
