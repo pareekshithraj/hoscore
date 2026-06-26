@@ -19,11 +19,14 @@ model User {
   email         String       @unique
   password      String
   name          String
-  phone         String?
+  phone         String?      @unique
   avatar        String?
   isSuperAdmin  Boolean      @default(false)
-  otpCode       String?
+  isVerified    Boolean      @default(false)
+  otpCode       String?      // stores SHA256(otp + OTP_SECRET), never the plaintext OTP
   otpExpiresAt  DateTime?
+  otpAttempts   Int          @default(0)  // failed verify attempts for the current OTP
+  otpLastSentAt DateTime?                  // last time an OTP was issued (resend cooldown)
   memberships   Membership[]
   patientProfile Patient?
   createdAt     DateTime     @default(now())

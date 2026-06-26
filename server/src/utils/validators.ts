@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 // Authentication
+// ONE login page: identifier may be an email OR a phone number.
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  identifier: z.string().min(3, 'Enter your email or phone number'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -10,10 +11,20 @@ export const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone: z.string().optional(),
+  phone: z.string().min(10, 'Valid phone number required'),
 });
 
-// Hospital Registration
+export const sendOtpSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+export const verifyOtpSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  otpCode: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+});
+
+// Hospital Registration — the admin is the authenticated user, so no admin account
+// fields are accepted here. Any legacy admin* fields in the body are ignored.
 export const hospitalRegisterSchema = z.object({
   hospitalName: z.string().min(3, 'Hospital name must be at least 3 characters'),
   address: z.string().optional(),
@@ -22,11 +33,7 @@ export const hospitalRegisterSchema = z.object({
   state: z.string().optional(),
   contact: z.string().optional(),
   description: z.string().optional(),
-  adminName: z.string().min(2, 'Admin name required'),
-  adminEmail: z.string().email('Invalid admin email'),
-  adminPassword: z.string().min(6, 'Password must be at least 6 characters'),
-  adminPhone: z.string().optional(),
-});
+}).passthrough();
 
 // Appointment Booking
 export const appointmentSchema = z.object({

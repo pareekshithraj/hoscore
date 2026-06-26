@@ -30,7 +30,7 @@ import * as uploadController from '../controllers/uploadController.js';
 import * as staffTypeController from '../controllers/staffTypeController.js';
 import * as paymentController from '../controllers/paymentController.js';
 import { upload } from '../controllers/uploadController.js';
-import { validate, loginSchema, registerSchema, hospitalRegisterSchema } from '../utils/validators.js';
+import { validate, loginSchema, registerSchema, hospitalRegisterSchema, sendOtpSchema, verifyOtpSchema } from '../utils/validators.js';
 import { FEATURES } from '../utils/features.js';
 
 const router = Router();
@@ -38,11 +38,10 @@ const router = Router();
 // ================= PUBLIC ROUTES =================
 router.post('/auth/register', validate(registerSchema), authController.register);
 router.post('/auth/login', validate(loginSchema), authController.login);
-router.post('/auth/send-otp', authController.sendOtp);
-router.post('/auth/verify-otp', authController.verifyOtp);
+router.post('/auth/send-otp', validate(sendOtpSchema), authController.sendOtp);
+router.post('/auth/verify-otp', validate(verifyOtpSchema), authController.verifyOtp);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
-router.post('/hospitals/register', validate(hospitalRegisterSchema), hospitalController.registerHospital);
 
 // ================= AUTHENTICATED ROUTES =================
 router.use(authenticate);
@@ -56,6 +55,10 @@ router.delete('/upload/file', requireFeature(FEATURES.PATIENTS), uploadControlle
 router.get('/auth/me', authController.getMe);
 router.get('/auth/contexts', authController.getMyContexts);
 router.post('/auth/switch-context', authController.switchContext);
+
+// Hospital registration — attaches an ADMIN membership to the LOGGED-IN identity.
+// Never creates a separate account (requires authentication).
+router.post('/hospitals/register', validate(hospitalRegisterSchema), hospitalController.registerHospital);
 
 // ================= PAYMENTS / SUBSCRIPTIONS =================
 // (webhook is registered separately in index.ts with a raw body parser)

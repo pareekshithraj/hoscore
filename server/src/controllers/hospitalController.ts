@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { ALL_FEATURES, permissionsForRole } from '../utils/features.js';
@@ -76,22 +77,26 @@ export const getHospital = async (req: Request, res: Response) => {
 };
 
 // Register a new hospital (self-service)
-export const registerHospital = async (req: Request, res: Response) => {
-  const { hospitalName, address, country, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
+// Register a hospital under the CURRENTLY AUTHENTICATED identity.
+// Never creates a new account — it attaches an ADMIN membership to req.user.
+export const registerHospital = async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) return res.status(401).json({ error: 'You must be logged in to register a hospital.' });
+
+  const { hospitalName, address, country, city, state, contact, description } = req.body;
 
   try {
-    // Check if admin email exists
-    const existingUser = await prisma.user.findUnique({ where: { email: adminEmail } });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Generate slug from hospital name
+    // Generate a unique slug from the hospital name.
     const baseSlug = hospitalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    let slug = baseSlug;
+    let slug = baseSlug || 'hospital';
     let counter = 1;
     while (await prisma.hospital.findUnique({ where: { slug } })) {
       slug = `${baseSlug}-${counter++}`;
     }
 
-    // Create hospital
     const hospital = await prisma.hospital.create({
       data: {
         name: hospitalName,
@@ -107,10 +112,9 @@ export const registerHospital = async (req: Request, res: Response) => {
       },
     });
 
-    // 30-day trial — add team first, then pay per user on Subscription page
+    // 30-day trial — add team first, then pay per user on the Subscription page.
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 30);
-    const endDate = new Date(trialEndsAt);
     await prisma.subscription.create({
       data: {
         hospitalId: hospital.id,
@@ -120,37 +124,30 @@ export const registerHospital = async (req: Request, res: Response) => {
         billedSeats: 0,
         status: 'TRIAL',
         trialEndsAt,
-        endDate,
+        endDate: new Date(trialEndsAt),
       },
     });
 
-    // Create or reuse user account for hospital admin
-    let user;
-    if (existingUser) {
-      user = existingUser;
-    } else {
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
-      user = await prisma.user.create({
+    // Attach the ADMIN membership to the existing identity; avoid duplicates if the
+    // hospital was registered already by the same user.
+    const existingMembership = await prisma.membership.findFirst({
+      where: { userId: user.id, hospitalId: hospital.id },
+    });
+
+    if (!existingMembership) {
+      await prisma.membership.create({
         data: {
-          name: adminName,
-          email: adminEmail,
-          password: hashedPassword,
-          phone: adminPhone,
+          userId: user.id,
+          hospitalId: hospital.id,
+          role: 'ADMIN',
+          department: 'Administration',
+          permissions: permissionsForRole('ADMIN'),
+          status: 'ACTIVE',
         },
       });
     }
 
-    // Create admin membership
-    await prisma.membership.create({
-      data: {
-        userId: user.id,
-        hospitalId: hospital.id,
-        role: 'ADMIN',
-        department: 'Administration',
-        permissions: permissionsForRole('ADMIN'),
-        status: 'ACTIVE',
-      },
-    });
+    await logAudit(req, 'CREATE', 'Hospital', hospital.id, `Registered hospital ${hospital.name}`);
 
     res.status(201).json({
       message: 'Hospital registered successfully',
@@ -197,17 +194,30 @@ export const inviteStaff = async (req: AuthRequest, res: Response) => {
   const hospitalId = req.user?.hospitalId;
   if (!hospitalId) return res.status(403).json({ error: 'Hospital context required' });
 
-  const { email, name, role, department, password, staffTypeId, permissions } = req.body;
+  const { name, role, department, password, staffTypeId, permissions, phone } = req.body;
+  const email = String(req.body.email || '').trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: 'Staff email is required' });
 
   try {
     await assertCanAddUser(hospitalId);
 
-    // Find or create user
+    // Attach the role to the existing identity if the email is already known,
+    // never creating a duplicate account.
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      const hashedPassword = await bcrypt.hash(password || 'changeme123', 10);
+      // New invitee: ensure phone (if provided) isn't taken, then create an
+      // admin-vouched identity with a random password. They sign in via OTP /
+      // password reset — we never store a shared default password.
+      if (phone) {
+        const phoneClash = await prisma.user.findUnique({ where: { phone } });
+        if (phoneClash) return res.status(400).json({ error: 'Phone number already registered to another user.' });
+      }
+      const initialPassword = password && password.length >= 6
+        ? password
+        : crypto.randomBytes(24).toString('hex');
+      const hashedPassword = await bcrypt.hash(initialPassword, 10);
       user = await prisma.user.create({
-        data: { name, email, password: hashedPassword },
+        data: { name, email, password: hashedPassword, phone: phone || null, isVerified: true },
       });
     }
 

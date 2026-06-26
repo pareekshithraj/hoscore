@@ -42,7 +42,7 @@ async function main() {
 
   // ======== SUPER ADMIN ========
   const superAdmin = await prisma.user.create({
-    data: { email: 'admin@hoscore.com', password: pw, name: 'HOSCORE Admin', isSuperAdmin: true },
+    data: { email: 'admin@hoscore.com', password: pw, name: 'HOSCORE Admin', isSuperAdmin: true, isVerified: true },
   });
 
   // ======== HOSPITALS ========
@@ -87,7 +87,7 @@ async function main() {
   // ======== USERS & MEMBERSHIPS ========
   // Hospital 1 admin
   const drSarah = await prisma.user.create({
-    data: { email: 'sarah@hoscore.com', password: pw, name: 'Dr. Sarah Johnson', phone: '+91 98765 43210' },
+    data: { email: 'sarah@hoscore.com', password: pw, name: 'Dr. Sarah Johnson', phone: '+91 98765 43210', isVerified: true },
   });
   await prisma.membership.create({
     data: { userId: drSarah.id, hospitalId: h1.id, role: 'ADMIN', department: 'Administration', permissions: permissionsForRole('ADMIN') },
@@ -95,7 +95,7 @@ async function main() {
 
   // A doctor at H1 who is ALSO a patient (for testing multi-dashboard)
   const drMark = await prisma.user.create({
-    data: { email: 'mark@hoscore.com', password: pw, name: 'Dr. Mark Williams', phone: '+91 98765 43211' },
+    data: { email: 'mark@hoscore.com', password: pw, name: 'Dr. Mark Williams', phone: '+91 98765 43211', isVerified: true },
   });
   await prisma.membership.create({
     data: { userId: drMark.id, hospitalId: h1.id, role: 'DOCTOR', department: 'Neurosurgery', permissions: permissionsForRole('DOCTOR') },
@@ -111,7 +111,7 @@ async function main() {
 
   // Hospital 2 admin
   const adminH2 = await prisma.user.create({
-    data: { email: 'admin@apollo.com', password: pw, name: 'Dr. Priya Sharma', phone: '+91 98765 43212' },
+    data: { email: 'admin@apollo.com', password: pw, name: 'Dr. Priya Sharma', phone: '+91 98765 43212', isVerified: true },
   });
   await prisma.membership.create({
     data: { userId: adminH2.id, hospitalId: h2.id, role: 'ADMIN', department: 'Administration', permissions: permissionsForRole('ADMIN') },
@@ -119,7 +119,7 @@ async function main() {
 
   // Nurse at H1
   const nurse1 = await prisma.user.create({
-    data: { email: 'nurse@hoscore.com', password: pw, name: 'Anita Kumar', phone: '+91 98765 43213' },
+    data: { email: 'nurse@hoscore.com', password: pw, name: 'Anita Kumar', phone: '+91 98765 43213', isVerified: true },
   });
   await prisma.membership.create({
     data: { userId: nurse1.id, hospitalId: h1.id, role: 'NURSE', department: 'General', permissions: permissionsForRole('NURSE') },
@@ -127,7 +127,7 @@ async function main() {
 
   // Patient-only user
   const patientUser = await prisma.user.create({
-    data: { email: 'patient@hoscore.com', password: pw, name: 'Rahul Verma', phone: '+91 98765 43214' },
+    data: { email: 'patient@hoscore.com', password: pw, name: 'Rahul Verma', phone: '+91 98765 43214', isVerified: true },
   });
   await prisma.patient.create({
     data: { userId: patientUser.id, hospitalId: h1.id, name: 'Rahul Verma', email: 'patient@hoscore.com', contact: '+91 98765 43214', gender: 'Male', bloodGroup: 'O+', status: 'Out-Patient' },

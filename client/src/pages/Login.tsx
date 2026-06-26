@@ -78,10 +78,18 @@ export const Login = () => {
       const response = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: email, password }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Login failed');
+      if (!response.ok) {
+        if (data.isUnverified) {
+           setMode('login');
+           setLoginMethod('otp');
+           setError(data.error);
+           return;
+        }
+        throw new Error(data.error || 'Login failed');
+      }
       login(data.user, data.token, data.contexts, data.activeContext);
     } catch (err: any) {
       setError(err.message);
@@ -137,6 +145,10 @@ export const Login = () => {
       setError('Please agree to the Terms & Conditions');
       return;
     }
+    if (!regPhone || regPhone.length < 10) {
+      setError('Please provide a valid phone number');
+      return;
+    }
     setIsLoading(true);
     setError('');
     try {
@@ -148,7 +160,16 @@ export const Login = () => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Registration failed');
-      login(data.user, data.token, data.contexts, data.activeContext);
+      
+      if (data.requiresOtp) {
+        setMode('login');
+        setLoginMethod('otp');
+        setOtpSent(true);
+        setCountdown(60);
+        setError('Registration successful! Please check your email/phone for the OTP to verify your account.');
+      } else {
+        login(data.user, data.token, data.contexts, data.activeContext);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -266,9 +287,9 @@ export const Login = () => {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="relative">
                   <input 
-                    type="email" 
+                    type="text" 
                     required 
-                    placeholder="Email" 
+                    placeholder="Email or phone number" 
                     className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
