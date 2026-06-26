@@ -14,11 +14,24 @@ import {
   OTP_RESEND_COOLDOWN_MS,
   OTP_MAX_ATTEMPTS,
 } from '../utils/otp.js';
+import { normalizePhone } from '../utils/phone.js';
 
 // No fallback — validateEnv() guarantees a strong JWT_SECRET is present at boot.
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+async function findUserByPhone(phone: string | null | undefined) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+
+  const users = await prisma.user.findMany({
+    where: { phone: { not: null } },
+    select: { id: true, name: true, email: true, phone: true, password: true, isVerified: true },
+  });
+
+  return users.find((user) => normalizePhone(user.phone) === normalized) || null;
+}
 
 // Build a signed session token + response payload for a fully-verified user.
 async function buildSession(userId: string) {
@@ -134,6 +147,9 @@ async function buildUserContexts(userId: string, isSuperAdmin: boolean, hasPatie
 export const register = async (req: Request, res: Response) => {
   const { name, password, phone } = req.body;
   const email = normalizeEmail(req.body.email);
+  const normalizedPhone = normalizePhone(phone);
+  const phoneValue = normalizedPhone || null;
+
   try {
     // Email collision: block only if already verified. An unverified record is
     // updated in place (never deleted) so a re-registration just refreshes it.
@@ -142,15 +158,12 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email already registered. Please log in instead.' });
     }
 
-    // Phone must be globally unique. It may only be reused by the SAME unverified
-    // record we're about to refresh; otherwise it's a collision.
-    if (phone) {
-      const existingPhone = await prisma.user.findUnique({ where: { phone } });
-      if (existingPhone && existingPhone.id !== existingEmail?.id) {
-        if (existingPhone.isVerified) {
-          return res.status(400).json({ error: 'Phone number already registered. Please log in instead.' });
-        }
-        return res.status(400).json({ error: 'Phone number is pending verification on another account.' });
+    // Phone must be globally unique, but we also support reusing an unverified
+    // account that already owns the same phone number so retrying signup works.
+    const existingPhone = phoneValue ? await findUserByPhone(phoneValue) : null;
+    if (existingPhone && existingPhone.id !== existingEmail?.id) {
+      if (existingPhone.isVerified) {
+        return res.status(400).json({ error: 'Phone number already registered. Please log in instead.' });
       }
     }
 
@@ -160,11 +173,16 @@ export const register = async (req: Request, res: Response) => {
     const user = existingEmail
       ? await prisma.user.update({
           where: { id: existingEmail.id },
-          data: { name, password: hashedPassword, phone },
+          data: { name, email, password: hashedPassword, phone: phoneValue },
         })
-      : await prisma.user.create({
-          data: { name, email, password: hashedPassword, phone, isVerified: false },
-        });
+      : existingPhone && !existingPhone.isVerified
+        ? await prisma.user.update({
+            where: { id: existingPhone.id },
+            data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
+          })
+        : await prisma.user.create({
+            data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
+          });
 
     // Patient profile is created only AFTER verification (see verifyOtp), never here.
     const delivered = await issueOtp(user);
@@ -205,9 +223,9 @@ export const login = async (req: Request, res: Response) => {
     // ONE login page: accept either an email or a phone number.
     const raw = String(identifier || '').trim();
     const isEmail = raw.includes('@');
-    const user = await prisma.user.findUnique({
-      where: isEmail ? { email: raw.toLowerCase() } : { phone: raw },
-    });
+    const user = isEmail
+      ? await prisma.user.findUnique({ where: { email: raw.toLowerCase() } })
+      : await findUserByPhone(raw);
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
