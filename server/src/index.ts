@@ -28,6 +28,8 @@ app.use((helmetPkg as unknown as () => import('express').RequestHandler)());
 
 // CORS — supports configured CLIENT_URL and local dev origin
 const allowedOrigins = [
+  'https://hoscore.in',
+  'https://www.hoscore.in',
   process.env.CLIENT_URL || 'https://hoscore.in',
   'http://localhost:5173',
   'http://localhost:5174',
