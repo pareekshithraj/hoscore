@@ -396,7 +396,7 @@ export const register = async (req: Request, res: Response) => {
 
     // email: false — MSG91 email domain not configured yet, skip email OTP
     // phone: true  — widget will send the SMS; backend stores the hash for verifyMsg91AccessToken
-    const issued = await createChallenge(user, 'register', { email: true, phone: false });
+    const issued = await createChallenge(user, 'register', { email: false, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
