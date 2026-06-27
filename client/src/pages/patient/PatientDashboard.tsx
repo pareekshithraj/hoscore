@@ -32,7 +32,7 @@ export const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dependents, setDependents] = useState<any[]>([]);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
-  
+
   // Live Queue state
   const [liveQueueAlert, setLiveQueueAlert] = useState<any>(null);
   const [wayfindingDest, setWayfindingDest] = useState<string>('');
@@ -76,9 +76,17 @@ export const PatientDashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    // WebSocket is not supported on Vercel serverless — skip silently
+    const hostname = window.location.hostname;
+    const isServerless =
+      hostname.endsWith('.vercel.app') ||
+      hostname === 'hoscore.in' ||
+      hostname === 'www.hoscore.in';
+    if (isServerless) return;
+
     const wsUrl = getWsUrl(token);
     let ws: WebSocket;
-    
+
     try {
       ws = new WebSocket(wsUrl);
 
@@ -111,7 +119,7 @@ export const PatientDashboard = () => {
         console.log('🔌 Dashboard WebSocket closed');
       };
     } catch (error) {
-      console.error('WebSocket connection failed:', error);
+      // Silently ignore WebSocket errors on unsupported environments
     }
 
     return () => {
@@ -190,17 +198,15 @@ export const PatientDashboard = () => {
     <div className="space-y-8 animate-fade-in-up">
       {/* Live Queue Alerts */}
       {liveQueueAlert && (
-        <div className={`p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden animate-fade-in-up ${
-          liveQueueAlert.type === 'called'
-            ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/25'
-            : 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/25'
-        }`}>
+        <div className={`p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden animate-fade-in-up ${liveQueueAlert.type === 'called'
+          ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/25'
+          : 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/25'
+          }`}>
           <div className="relative z-10 flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              liveQueueAlert.type === 'called'
-                ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30'
-                : 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30'
-            }`}>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${liveQueueAlert.type === 'called'
+              ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30'
+              : 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30'
+              }`}>
               <Navigation className="w-6 h-6" />
             </div>
             <div>
@@ -218,11 +224,10 @@ export const PatientDashboard = () => {
                 setWayfindingDest(liveQueueAlert.roomName);
                 setIsWayfindingOpen(true);
               }}
-              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all active:scale-95 cursor-pointer text-white ${
-                liveQueueAlert.type === 'called'
-                  ? 'bg-rose-600 hover:bg-rose-700'
-                  : 'bg-sky-600 hover:bg-sky-700'
-              }`}
+              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all active:scale-95 cursor-pointer text-white ${liveQueueAlert.type === 'called'
+                ? 'bg-rose-600 hover:bg-rose-700'
+                : 'bg-sky-600 hover:bg-sky-700'
+                }`}
             >
               Open Indoor Walkway Map
             </button>
@@ -270,14 +275,12 @@ export const PatientDashboard = () => {
       {/* Hero Header & Identity Section (Asymmetric layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: HOSCORE digital healthcare card (4 columns) */}
-        <div className={`lg:col-span-4 glass-card rounded-2xl p-6 relative overflow-hidden border transition-all duration-300 group ${
-          theme === 'dark'
-            ? "bg-slate-900 border-slate-800 shadow-2xl hover:border-blue-500/20"
-            : "bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-slate-50/50 border-blue-200/50 hover:border-blue-400/40"
-        }`}>
-          {/* Card Tech Design Elements */}
+        <div className={`lg:col-span-4 glass-card rounded-2xl p-6 relative overflow-hidden border transition-all duration-300 group ${theme === 'dark'
+          ? "bg-slate-900 border-slate-800 shadow-2xl hover:border-blue-500/20"
+          : "bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-slate-50/50 border-blue-200/50 hover:border-blue-400/40"
+          }`}>
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
-          
+
           <div className={`flex items-center justify-between mb-8 border-b pb-4 ${theme === 'dark' ? 'border-white/[0.04]' : 'border-slate-200/60'}`}>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
@@ -287,11 +290,10 @@ export const PatientDashboard = () => {
           </div>
 
           <div className="flex items-start gap-4 mb-6">
-            <div className={`w-14 h-14 border rounded-xl flex items-center justify-center shadow-inner transition-colors ${
-              theme === 'dark' 
-                ? 'bg-slate-800 border-slate-700 text-slate-300' 
-                : 'bg-gradient-to-tr from-slate-200 to-slate-300 border-slate-300 text-slate-700'
-            }`}>
+            <div className={`w-14 h-14 border rounded-xl flex items-center justify-center shadow-inner transition-colors ${theme === 'dark'
+              ? 'bg-slate-800 border-slate-700 text-slate-300'
+              : 'bg-gradient-to-tr from-slate-200 to-slate-300 border-slate-300 text-slate-700'
+              }`}>
               <User className="w-7 h-7" />
             </div>
             <div>
@@ -347,9 +349,8 @@ export const PatientDashboard = () => {
 
         {/* Right: Greetings and Asymmetric KPIs (8 columns) */}
         <div className="lg:col-span-8 flex flex-col justify-between self-stretch gap-6">
-          <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 glass-card rounded-2xl relative overflow-hidden bg-gradient-to-r from-sky-500/[0.02] to-transparent border flex-1 ${
-            theme === 'dark' ? 'border-white/[0.04]' : 'border-slate-200/60 shadow-sm'
-          }`}>
+          <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 glass-card rounded-2xl relative overflow-hidden bg-gradient-to-r from-sky-500/[0.02] to-transparent border flex-1 ${theme === 'dark' ? 'border-white/[0.04]' : 'border-slate-200/60 shadow-sm'
+            }`}>
             <div>
               <h1 className={`text-2xl lg:text-3xl font-black tracking-tight leading-none ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 Welcome back, {(data.profile?.name || user?.name || 'Patient').split(' ')[0]} 👋
@@ -358,19 +359,17 @@ export const PatientDashboard = () => {
                 Monitor your scheduled treatments, consultation timeline, and active prescriptions below.
               </p>
             </div>
-            
+
             {/* Switcher & Book Appointments */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl ${
-                theme === 'dark' ? 'bg-slate-950/60 border-white/[0.08]' : 'bg-slate-50 border-slate-200'
-              }`}>
+              <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl ${theme === 'dark' ? 'bg-slate-950/60 border-white/[0.08]' : 'bg-slate-50 border-slate-200'
+                }`}>
                 <Users className="w-3.5 h-3.5 text-sky-400" />
                 <select
                   value={selectedPatientId || ''}
                   onChange={(e) => setSelectedPatientId(e.target.value || null)}
-                  className={`bg-transparent border-0 text-xs font-bold outline-none cursor-pointer p-0 pr-6 ${
-                    theme === 'dark' ? 'text-white' : 'text-slate-800'
-                  }`}
+                  className={`bg-transparent border-0 text-xs font-bold outline-none cursor-pointer p-0 pr-6 ${theme === 'dark' ? 'text-white' : 'text-slate-800'
+                    }`}
                 >
                   <option value="" className="text-slate-800 dark:text-white dark:bg-[#0a0f1d]">{user?.name} (Primary Profile)</option>
                   {dependents.map((dep) => (
@@ -408,8 +407,6 @@ export const PatientDashboard = () => {
                   <Calendar className="w-5 h-5" />
                 </div>
               </div>
-
-              {/* Live Next Appointment Info */}
               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
                 {data.upcoming && data.upcoming.length > 0 ? (
                   <div className="flex items-center gap-2.5">
@@ -438,8 +435,6 @@ export const PatientDashboard = () => {
                   <FileText className="w-5 h-5" />
                 </div>
               </div>
-
-              {/* Latest prescription update */}
               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
                 {data.recentRx && data.recentRx.length > 0 ? (
                   <p className="text-xs text-slate-600 dark:text-slate-300 font-bold truncate max-w-[180px]">
@@ -491,11 +486,10 @@ export const PatientDashboard = () => {
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">{a.hospital?.name} · {a.time}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border tracking-wider ${
-                      a.status === 'CONFIRMED'
-                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
-                        : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
-                    }`}>
+                    <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border tracking-wider ${a.status === 'CONFIRMED'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
+                      : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
+                      }`}>
                       {a.status}
                     </span>
                     <button
@@ -543,11 +537,10 @@ export const PatientDashboard = () => {
                     <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{rx.diagnosis}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">{rx.doctor?.name} · {rx.hospital?.name}</p>
                   </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md tracking-wider border ${
-                    rx.status === 'ISSUED'
-                      ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20'
-                      : 'bg-slate-50 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]'
-                  }`}>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md tracking-wider border ${rx.status === 'ISSUED'
+                    ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20'
+                    : 'bg-slate-50 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]'
+                    }`}>
                     {rx.status}
                   </span>
                 </div>
@@ -567,7 +560,6 @@ export const PatientDashboard = () => {
       {/* Family dependents management modal */}
       <Modal isOpen={showFamilyModal} onClose={() => setShowFamilyModal(false)} title="Manage Family Members">
         <div className="space-y-6">
-          {/* List of dependents */}
           <div>
             <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest block mb-3">Registered Dependents</span>
             {dependents.length === 0 ? (
@@ -618,11 +610,11 @@ export const PatientDashboard = () => {
                 <div className="space-y-1">
                   <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Date of Birth</span>
                   <input
-                     type="date"
-                     value={newDependent.dateOfBirth}
-                     onChange={(e) => setNewDependent({ ...newDependent, dateOfBirth: e.target.value })}
-                     required
-                     className="w-full text-xs"
+                    type="date"
+                    value={newDependent.dateOfBirth}
+                    onChange={(e) => setNewDependent({ ...newDependent, dateOfBirth: e.target.value })}
+                    required
+                    className="w-full text-xs"
                   />
                 </div>
                 <div className="space-y-1">
