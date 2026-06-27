@@ -145,4 +145,1678 @@ warning: in the working copy of 'server/src/utils/validators.ts', LF will be rep
        {/* Navigation */}[m
 [36m@@ -529,6 +599,29 @@[m [mexport const ForHospitals = () => {[m
                <a href="#" className="hover:text-blue-600 transition-colors">Terms</a>[m
-             </d
+             </div>[m
+           </div>[m
+[32m+[m[32m          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="button"[m
+[32m+[m[32m              onClick={() => handleDemoPayment(5000)}[m
+[32m+[m[32m              disabled={demoPaymentState === 'processing'}[m
+[32m+[m[32m              className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-70"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              Try ₹5,000 demo payment[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="button"[m
+[32m+[m[32m              onClick={() => handleDemoPayment(50000)}[m
+[32m+[m[32m              disabled={demoPaymentState === 'processing'}[m
+[32m+[m[32m              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              Try ₹50,000 demo payment[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m          {demoMessage ? ([m
+[32m+[m[32m            <p className={`text-center text-sm font-semibold ${demoPaymentState === 'success' ? 'text-emerald-600' : demoPaymentState === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>[m
+[32m+[m[32m              {demoMessage}[m
+[32m+[m[32m            </p>[m
+[32m+[m[32m          ) : null}[m
+           <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col items-center gap-4">[m
+             <div className="flex items-center gap-3">[m
+               <span className="text-xs text-slate-400 font-semibold">Powered by</span>[m
+[1mdiff --git a/client/src/pages/Login.tsx b/client/src/pages/Login.tsx[m
+[1mindex 04c5e95..a52746a 100644[m
+[1m--- a/client/src/pages/Login.tsx[m
+[1m+++ b/client/src/pages/Login.tsx[m
+[36m@@ -1,54 +1,81 @@[m
+[31m-import { useState, useEffect } from 'react';[m
+[31m-import { Navigate, Link, useLocation } from 'react-router-dom';[m
+[32m+[m[32mimport { useEffect, useState } from 'react';[m
+[32m+[m[32mimport { Link, Navigate, useLocation } from 'react-router-dom';[m
+[32m+[m[32mimport { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff } from 'lucide-react';[m
+ import { useAuth } from '../context/AuthContext';[m
+[31m-import { AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';[m
+[31m-[m
+ import { BASE_URL } from '../utils/apiConfig';[m
+ [m
+ const bgImages = ['/login-bg.png', '/login-bg2.png', '/login-bg3.png'];[m
+ const slideContent = [[m
+[31m-  { [m
+[31m-    title: "Capturing Moments, Creating Memories", [m
+[31m-    desc: "Take absolute control of your clinical charts, vaccination timelines, and doctor permissions." [m
+[32m+[m[32m  {[m
+[32m+[m[32m    title: 'Capturing Moments, Creating Memories',[m
+[32m+[m[32m    desc: 'Take absolute control of your clinical charts, vaccination timelines, and doctor permissions.',[m
+   },[m
+[31m-  { [m
+[31m-    title: "Real-time Access Audits & Consent Controls", [m
+[31m-    desc: "Enforce strict consent controls and monitor physician access trails in real-time." [m
+[32m+[m[32m  {[m
+[32m+[m[32m    title: 'Real-time Access Audits & Consent Controls',[m
+[32m+[m[32m    desc: 'Enforce strict consent controls and monitor physician access trails in real-time.',[m
+[32m+[m[32m  },[m
+[32m+[m[32m  {[m
+[32m+[m[32m    title: 'Lifetime Vaccine & Immunization Schedules',[m
+[32m+[m[32m    desc: 'Keep track of age-based clinical milestones with verification and self-reporting controls.',[m
+   },[m
+[31m-  { [m
+[31m-    title: "Lifetime Vaccine & Immunization Schedules", [m
+[31m-    desc: "Keep track of age-based clinical milestones with verification and self-reporting controls." [m
+[31m-  }[m
+ ];[m
+ [m
+[32m+[m[32mtype Mode = 'login' | 'register' | 'forgot';[m
+[32m+[m[32mtype LoginMethod = 'password' | 'otp';[m
+[32m+[m
+[32m+[m[32m// MSG91 OTP widget methods (exposed on window via index.html, exposeMethods: true)[m
+[32m+[m[32mdeclare global {[m
+[32m+[m[32m  interface Window {[m
+[32m+[m[32m    sendOtp?: (identifier: string, success?: (data: any) => void, failure?: (err: any) => void) => void;[m
+[32m+[m[32m    verifyOtp?: (otp: string, success?: (data: any) => void, failure?: (err: any) => void) => void;[m
+[32m+[m[32m    retryOtp?: (channel: string | null, success?: (data: any) => void, failure?: (err: any) => void) => void;[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// The OTP was sent via the widget; remember how to exchange it for a session.[m
+[32m+[m[32minterface ChallengeState {[m
+[32m+[m[32m  target: string; // shown to the user (phone/email the OTP went to)[m
+[32m+[m[32m  email: string; // passed to verify endpoint (empty for phone-only)[m
+[32m+[m[32m  identifier: string; // passed to verify endpoint[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// MSG91 wants country code without '+'. Default Indian 10-digit numbers to 91.[m
+[32m+[m[32mconst toMsgIdentifier = (value: string): string => {[m
+[32m+[m[32m  const raw = value.trim();[m
+[32m+[m[32m  if (raw.includes('@')) return raw.toLowerCase();[m
+[32m+[m[32m  const digits = raw.replace(/\D/g, '');[m
+[32m+[m[32m  if (digits.length === 10) return `91${digits}`;[m
+[32m+[m[32m  return digits;[m
+[32m+[m[32m};[m
+[32m+[m
+ export const Login = () => {[m
+   const { user, activeContext, login } = useAuth();[m
+   const location = useLocation();[m
+   const nextPath = typeof location.state?.next === 'string' && location.state.next.startsWith('/patient')[m
+     ? location.state.next[m
+     : null;[m
+[31m-  [m
+[32m+[m
+[32m+[m[32m  const [mode, setMode] = useState<Mode>(location.state?.mode === 'register' ? 'register' : 'login');[m
+[32m+[m[32m  const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');[m
+[32m+[m[32m  const [identifier, setIdentifier] = useState('');[m
+   const [email, setEmail] = useState('');[m
+   const [password, setPassword] = useState('');[m
+[31m-  const [showPassword, setShowPassword] = useState(false);[m
+[31m-  const [error, setError] = useState('');[m
+[31m-  const [isLoading, setIsLoading] = useState(false);[m
+[31m-  const [mode, setMode] = useState<'login' | 'register'>(location.state?.mode === 'register' ? 'register' : 'login');[m
+[31m-  [m
+[31m-  // Registration specific states[m
+[32m+[m[32m  const [regPhone, setRegPhone] = useState('');[m
+   const [firstName, setFirstName] = useState('');[m
+   const [lastName, setLastName] = useState('');[m
+[31m-  const [regPhone, setRegPhone] = useState('');[m
+   const [agreeTerms, setAgreeTerms] = useState(false);[m
+[31m-[m
+[31m-  // OTP Login States[m
+[31m-  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');[m
+[31m-  const [otpCode, setOtpCode] = useState('');[m
+[31m-  const [otpSent, setOtpSent] = useState(false);[m
+[32m+[m[32m  const [showPassword, setShowPassword] = useState(false);[m
+[32m+[m[32m  const [showResetPassword, setShowResetPassword] = useState(false);[m
+[32m+[m[32m  const [challenge, setChallenge] = useState<ChallengeState | null>(null);[m
+[32m+[m[32m  const [otp, setOtp] = useState('');[m
+[32m+[m[32m  const [resetToken, setResetToken] = useState('');[m
+[32m+[m[32m  const [resetPasswordValue, setResetPasswordValue] = useState('');[m
+[32m+[m[32m  const [confirmResetPassword, setConfirmResetPassword] = useState('');[m
+   const [countdown, setCountdown] = useState(0);[m
+[31m-[m
+[31m-  // Background Slideshow State[m
+   const [currentSlide, setCurrentSlide] = useState(0);[m
+[32m+[m[32m  const [error, setError] = useState('');[m
+[32m+[m[32m  const [info, setInfo] = useState('');[m
+[32m+[m[32m  const [isLoading, setIsLoading] = useState(false);[m
+ [m
+   useEffect(() => {[m
+     const timer = setInterval(() => {[m
+[36m@@ -58,10 +85,9 @@[m [mexport const Login = () => {[m
+   }, []);[m
+ [m
+   useEffect(() => {[m
+[31m-    if (countdown > 0) {[m
+[31m-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);[m
+[31m-      return () => clearTimeout(timer);[m
+[31m-    }[m
+[32m+[m[32m    if (countdown <= 0) return;[m
+[32m+[m[32m    const timer = setTimeout(() => setCountdown((prev) => prev - 1), 1000);[m
+[32m+[m[32m    return () => clearTimeout(timer);[m
+   }, [countdown]);[m
+ [m
+   if (user && activeContext) {[m
+[36m@@ -70,27 +96,73 @@[m [mexport const Login = () => {[m
+     return <Navigate to="/dashboard" replace />;[m
+   }[m
+ [m
+[31m-  const handleLogin = async (e: React.FormEvent) => {[m
+[32m+[m[32m  const resetFlowState = (nextMode?: Mode) => {[m
+[32m+[m[32m    if (nextMode) setMode(nextMode);[m
+[32m+[m[32m    setChallenge(null);[m
+[32m+[m[32m    setResetToken('');[m
+[32m+[m[32m    setOtp('');[m
+[32m+[m[32m    setResetPasswordValue('');[m
+[32m+[m[32m    setConfirmResetPassword('');[m
+[32m+[m[32m    setCountdown(0);[m
+[32m+[m[32m    setError('');[m
+[32m+[m[32m    setInfo('');[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Send an OTP via the MSG91 widget, then show the single OTP input.[m
+[32m+[m[32m  const sendWidgetOtp = (target: string, verifyPayload: { email: string; identifier: string }, message?: string) => {[m
+[32m+[m[32m    if (typeof window === 'undefined' || !window.sendOtp) {[m
+[32m+[m[32m      setError('OTP service is still loading. Please try again in a moment.');[m
+[32m+[m[32m      setIsLoading(false);[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    window.sendOtp([m
+[32m+[m[32m      toMsgIdentifier(target),[m
+[32m+[m[32m      () => {[m
+[32m+[m[32m        setChallenge({ target, email: verifyPayload.email, identifier: verifyPayload.identifier });[m
+[32m+[m[32m        setOtp('');[m
+[32m+[m[32m        setCountdown(60);[m
+[32m+[m[32m        setError('');[m
+[32m+[m[32m        setInfo(message || `Enter the OTP sent to ${target}.`);[m
+[32m+[m[32m        setIsLoading(false);[m
+[32m+[m[32m      },[m
+[32m+[m[32m      (err: any) => {[m
+[32m+[m[32m        setError(err?.message || 'Could not send OTP. Please try again.');[m
+[32m+[m[32m        setIsLoading(false);[m
+[32m+[m[32m      }[m
+[32m+[m[32m    );[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const finishAuthResponse = (data: any) => {[m
+[32m+[m[32m    if (data?.token && data?.user && data?.contexts && data?.activeContext) {[m
+[32m+[m[32m      login(data.user, data.token, data.contexts, data.activeContext);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const postJson = async (path: string, body: Record<string, unknown>) => {[m
+[32m+[m[32m    const response = await fetch(`${BASE_URL}${path}`, {[m
+[32m+[m[32m      method: 'POST',[m
+[32m+[m[32m      headers: { 'Content-Type': 'application/json' },[m
+[32m+[m[32m      body: JSON.stringify(body),[m
+[32m+[m[32m    });[m
+[32m+[m[32m    const data = await response.json();[m
+[32m+[m[32m    if (!response.ok) {[m
+[32m+[m[32m      throw new Error(data.error || 'Request failed');[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return data;[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const handlePasswordLogin = async (e: React.FormEvent) => {[m
+     e.preventDefault();[m
+     setIsLoading(true);[m
+     setError('');[m
+[32m+[m[32m    setInfo('');[m
+     try {[m
+[31m-      const response = await fetch(`${BASE_URL}/auth/login`, {[m
+[31m-        method: 'POST',[m
+[31m-        headers: { 'Content-Type': 'application/json' },[m
+[31m-        body: JSON.stringify({ identifier: email, password }),[m
+[31m-      });[m
+[31m-      const data = await response.json();[m
+[31m-      if (!response.ok) {[m
+[31m-        if (data.isUnverified) {[m
+[31m-           setMode('login');[m
+[31m-           setLoginMethod('otp');[m
+[31m-           setError(data.error);[m
+[31m-           return;[m
+[31m-        }[m
+[31m-        throw new Error(data.error || 'Login failed');[m
+[32m+[m[32m      const data = await postJson('/auth/login', { identifier, password });[m
+[32m+[m[32m      if (data.requiresOtp) {[m
+[32m+[m[32m        sendWidgetOtp(identifier, { email: identifier.includes('@') ? identifier : '', identifier });[m
+[32m+[m[32m        return;[m
+       }[m
+[31m-      login(data.user, data.token, data.contexts, data.activeContext);[m
+[32m+[m[32m      finishAuthResponse(data);[m
+     } catch (err: any) {[m
+       setError(err.message);[m
+     } finally {[m
+[36m@@ -98,78 +170,127 @@[m [mexport const Login = () => {[m
+     }[m
+   };[m
+ [m
+[31m-  const handleSendOtp = async (e: React.FormEvent) => {[m
+[32m+[m[32m  const handleOtpLoginStart = (e: React.FormEvent) => {[m
+     e.preventDefault();[m
+     setIsLoading(true);[m
+     setError('');[m
+[32m+[m[32m    setInfo('');[m
+[32m+[m[32m    sendWidgetOtp(identifier, { email: identifier.includes('@') ? identifier : '', identifier });[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const handleRegister = async (e: React.FormEvent) => {[m
+[32m+[m[32m    e.preventDefault();[m
+[32m+[m[32m    if (!agreeTerms) {[m
+[32m+[m[32m      setError('Please agree to the Terms & Conditions');[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    setIsLoading(true);[m
+[32m+[m[32m    setError('');[m
+[32m+[m[32m    setInfo('');[m
+     try {[m
+[31m-      const response = await fetch(`${BASE_URL}/auth/send-otp`, {[m
+[31m-        method: 'POST',[m
+[31m-        headers: { 'Content-Type': 'application/json' },[m
+[31m-        body: JSON.stringify({ email }),[m
+[32m+[m[32m      const fullName = `${firstName} ${lastName}`.trim();[m
+[32m+[m[32m      await postJson('/auth/register', {[m
+[32m+[m[32m        name: fullName,[m
+[32m+[m[32m        email,[m
+[32m+[m[32m        password,[m
+[32m+[m[32m        phone: regPhone,[m
+       });[m
+[31m-      const data = await response.json();[m
+[31m-      if (!response.ok) throw new Error(data.error || 'Failed to send OTP');[m
+[31m-      setOtpSent(true);[m
+[31m-      setCountdown(60);[m
+[32m+[m[32m      setIdentifier(email);[m
+[32m+[m[32m      // Verify the phone via the widget; the email is passed so the account is matched on verify.[m
+[32m+[m[32m      sendWidgetOtp(regPhone, { email, identifier: email }, `Enter the OTP sent to ${regPhone}.`);[m
+     } catch (err: any) {[m
+       setError(err.message);[m
+[31m-    } finally {[m
+       setIsLoading(false);[m
+     }[m
+   };[m
+ [m
+[31m-  const handleVerifyOtp = async (e: React.FormEvent) => {[m
+[32m+[m[32m  const handleForgotPasswordStart = (e: React.FormEvent) => {[m
+     e.preventDefault();[m
+     setIsLoading(true);[m
+     setError('');[m
+[31m-    try {[m
+[31m-      const response = await fetch(`${BASE_URL}/auth/verify-otp`, {[m
+[31m-        method: 'POST',[m
+[31m-        headers: { 'Content-Type': 'application/json' },[m
+[31m-        body: JSON.stringify({ email, otpCode }),[m
+[31m-      });[m
+[31m-      const data = await response.json();[m
+[31m-      if (!response.ok) throw new Error(data.error || 'Verification failed');[m
+[31m-      login(data.user, data.token, data.contexts, data.activeContext);[m
+[31m-    } catch (err: any) {[m
+[31m-      setError(err.message);[m
+[31m-    } finally {[m
+[31m-      setIsLoading(false);[m
+[32m+[m[32m    setInfo('');[m
+[32m+[m[32m    sendWidgetOtp(identifier, { email: identifier.includes('@') ? identifier : '', identifier });[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const verifyOtpCode = () => {[m
+[32m+[m[32m    if (!challenge) return;[m
+[32m+[m[32m    if (otp.length !== 6) {[m
+[32m+[m[32m      setError('Enter the 6-digit OTP.');[m
+[32m+[m[32m      return;[m
+     }[m
+[32m+[m[32m    if (typeof window === 'undefined' || !window.verifyOtp) {[m
+[32m+[m[32m      setError('OTP service is still loading. Please try again in a moment.');[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    setIsLoading(true);[m
+[32m+[m[32m    setError('');[m
+[32m+[m[32m    // Step 1: verify the OTP with the MSG91 widget → returns an access token.[m
+[32m+[m[32m    window.verifyOtp([m
+[32m+[m[32m      otp,[m
+[32m+[m[32m      async (widgetData: any) => {[m
+[32m+[m[32m        const accessToken = widgetData?.message || widgetData?.token || widgetData?.['access-token'] || widgetData;[m
+[32m+[m[32m        try {[m
+[32m+[m[32m          // Step 2: exchange the widget access token for a HOSCORE session.[m
+[32m+[m[32m          const data = await postJson('/auth/verify-msg91-access-token', {[m
+[32m+[m[32m            accessToken: String(accessToken),[m
+[32m+[m[32m            email: challenge.email,[m
+[32m+[m[32m            identifier: challenge.identifier,[m
+[32m+[m[32m          });[m
+[32m+[m[32m          finishAuthResponse(data);[m
+[32m+[m[32m        } catch (err: any) {[m
+[32m+[m[32m          setError(err.message);[m
+[32m+[m[32m        } finally {[m
+[32m+[m[32m          setIsLoading(false);[m
+[32m+[m[32m        }[m
+[32m+[m[32m      },[m
+[32m+[m[32m      (err: any) => {[m
+[32m+[m[32m        setError(err?.message || 'Invalid OTP code.');[m
+[32m+[m[32m        setIsLoading(false);[m
+[32m+[m[32m      }[m
+[32m+[m[32m    );[m
+   };[m
+ [m
+[31m-  const handleRegister = async (e: React.FormEvent) => {[m
+[32m+[m[32m  const handleResend = () => {[m
+[32m+[m[32m    if (!challenge) return;[m
+[32m+[m[32m    if (typeof window === 'undefined' || !window.retryOtp) return;[m
+[32m+[m[32m    setError('');[m
+[32m+[m[32m    window.retryOtp([m
+[32m+[m[32m      null,[m
+[32m+[m[32m      () => {[m
+[32m+[m[32m        setOtp('');[m
+[32m+[m[32m        setCountdown(60);[m
+[32m+[m[32m        setInfo('OTP resent.');[m
+[32m+[m[32m      },[m
+[32m+[m[32m      (err: any) => setError(err?.message || 'Could not resend OTP.')[m
+[32m+[m[32m    );[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const handleResetPassword = async (e: React.FormEvent) => {[m
+     e.preventDefault();[m
+[31m-    if (!agreeTerms) {[m
+[31m-      setError('Please agree to the Terms & Conditions');[m
+[32m+[m[32m    if (resetPasswordValue.length < 6) {[m
+[32m+[m[32m      setError('Password must be at least 6 characters.');[m
+       return;[m
+     }[m
+[31m-    if (!regPhone || regPhone.length < 10) {[m
+[31m-      setError('Please provide a valid phone number');[m
+[32m+[m[32m    if (resetPasswordValue !== confirmResetPassword) {[m
+[32m+[m[32m      setError('Passwords do not match.');[m
+       return;[m
+     }[m
+[32m+[m
+     setIsLoading(true);[m
+     setError('');[m
+     try {[m
+[31m-      const fullName = `${firstName} ${lastName}`.trim();[m
+[31m-      const response = await fetch(`${BASE_URL}/auth/register`, {[m
+[31m-        method: 'POST',[m
+[31m-        headers: { 'Content-Type': 'application/json' },[m
+[31m-        body: JSON.stringify({ name: fullName, email, password, phone: regPhone, registerAs: 'patient' }),[m
+[32m+[m[32m      const data = await postJson('/auth/reset-password', {[m
+[32m+[m[32m        resetToken,[m
+[32m+[m[32m        password: resetPasswordValue,[m
+       });[m
+[31m-      const data = await response.json();[m
+[31m-      if (!response.ok) throw new Error(data.error || 'Registration failed');[m
+[31m-      [m
+[31m-      if (data.requiresOtp) {[m
+[31m-        setMode('login');[m
+[31m-        setLoginMethod('otp');[m
+[31m-        setOtpSent(true);[m
+[31m-        setCountdown(60);[m
+[31m-        setError('Registration successful! Please check your email/phone for the OTP to verify your account.');[m
+[31m-      } else {[m
+[31m-        login(data.user, data.token, data.contexts, data.activeContext);[m
+[31m-      }[m
+[32m+[m[32m      setInfo(data.message || 'Password updated successfully.');[m
+[32m+[m[32m      setResetToken('');[m
+[32m+[m[32m      setMode('login');[m
+[32m+[m[32m      setLoginMethod('password');[m
+[32m+[m[32m      setPassword('');[m
+[32m+[m[32m      setResetPasswordValue('');[m
+[32m+[m[32m      setConfirmResetPassword('');[m
+     } catch (err: any) {[m
+       setError(err.message);[m
+     } finally {[m
+[36m@@ -177,13 +298,239 @@[m [mexport const Login = () => {[m
+     }[m
+   };[m
+ [m
+[32m+[m[32m  const renderChallengeCard = () => ([m
+[32m+[m[32m    <div className="space-y-4">[m
+[32m+[m[32m      <div className="bg-[#23202E] border border-white/[0.05] rounded-2xl p-4 space-y-3">[m
+[32m+[m[32m        <div className="flex items-center justify-between">[m
+[32m+[m[32m          <div>[m
+[32m+[m[32m            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 font-bold">Verification</p>[m
+[32m+[m[32m            <h3 className="text-lg font-bold text-white">Enter OTP</h3>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            type="button"[m
+[32m+[m[32m            onClick={() => resetFlowState(mode === 'register' ? 'register' : 'login')}[m
+[32m+[m[32m            className="text-xs font-semibold text-slate-400 hover:text-white"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            Start over[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <div className="space-y-2">[m
+[32m+[m[32m          <span className="text-xs text-slate-500">Sent to {challenge?.target}</span>[m
+[32m+[m[32m          <div className="flex gap-2">[m
+[32m+[m[32m            <input[m
+[32m+[m[32m              type="text"[m
+[32m+[m[32m              maxLength={6}[m
+[32m+[m[32m              value={otp}[m
+[32m+[m[32m              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}[m
+[32m+[m[32m              placeholder="Enter OTP"[m
+[32m+[m[32m              className="flex-1 px-4 py-3.5 bg-[#1B1824] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 text-center tracking-[0.25em] font-mono font-bold"[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="button"[m
+[32m+[m[32m              disabled={isLoading || otp.length !== 6}[m
+[32m+[m[32m              onClick={verifyOtpCode}[m
+[32m+[m[32m              className="px-4 py-3.5 bg-red-600 hover:bg-red-700 rounded-xl text-sm font-semibold disabled:opacity-50"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              Verify[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m      </div>[m
+[32m+[m
+[32m+[m[32m      <div className="flex justify-between items-center text-xs">[m
+[32m+[m[32m        <span className="text-slate-400 font-medium">Didn&apos;t receive a code?</span>[m
+[32m+[m[32m        {countdown > 0 ? ([m
+[32m+[m[32m          <span className="text-slate-500 font-semibold">Resend in {countdown}s</span>[m
+[32m+[m[32m        ) : ([m
+[32m+[m[32m          <button type="button" onClick={handleResend} className="text-red-500 hover:text-red-400 font-bold">[m
+[32m+[m[32m            Resend code[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m        )}[m
+[32m+[m[32m      </div>[m
+[32m+[m[32m    </div>[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  const renderLoginForm = () => {[m
+[32m+[m[32m    if (resetToken) {[m
+[32m+[m[32m      return ([m
+[32m+[m[32m        <form onSubmit={handleResetPassword} className="space-y-4">[m
+[32m+[m[32m          <div className="relative">[m
+[32m+[m[32m            <input[m
+[32m+[m[32m              type={showResetPassword ? 'text' : 'password'}[m
+[32m+[m[32m              required[m
+[32m+[m[32m              placeholder="New password"[m
+[32m+[m[32m              value={resetPasswordValue}[m
+[32m+[m[32m              onChange={(e) => setResetPasswordValue(e.target.value)}[m
+[32m+[m[32m              className="w-full pl-4 pr-11 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="button"[m
+[32m+[m[32m              onClick={() => setShowResetPassword((prev) => !prev)}[m
+[32m+[m[32m              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m          <input[m
+[32m+[m[32m            type="password"[m
+[32m+[m[32m            required[m
+[32m+[m[32m            placeholder="Confirm new password"[m
+[32m+[m[32m            value={confirmResetPassword}[m
+[32m+[m[32m            onChange={(e) => setConfirmResetPassword(e.target.value)}[m
+[32m+[m[32m            className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m          />[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            type="submit"[m
+[32m+[m[32m            disabled={isLoading}[m
+[32m+[m[32m            className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            {isLoading ? 'Updating password...' : 'Set New Password'}[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m        </form>[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (challenge) {[m
+[32m+[m[32m      return renderChallengeCard();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (mode === 'forgot') {[m
+[32m+[m[32m      return ([m
+[32m+[m[32m        <form onSubmit={handleForgotPasswordStart} className="space-y-4">[m
+[32m+[m[32m          <input[m
+[32m+[m[32m            type="text"[m
+[32m+[m[32m            required[m
+[32m+[m[32m            placeholder="Email or phone number"[m
+[32m+[m[32m            value={identifier}[m
+[32m+[m[32m            onChange={(e) => setIdentifier(e.target.value)}[m
+[32m+[m[32m            className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m          />[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            type="submit"[m
+[32m+[m[32m            disabled={isLoading}[m
+[32m+[m[32m            className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            {isLoading ? 'Sending codes...' : 'Send Reset OTPs'}[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m          <div className="text-center pt-2">[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="button"[m
+[32m+[m[32m              onClick={() => resetFlowState('login')}[m
+[32m+[m[32m              className="text-xs text-slate-400 hover:text-white font-semibold"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              Back to login[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m        </form>[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (loginMethod === 'otp') {[m
+[32m+[m[32m      return ([m
+[32m+[m[32m        <form onSubmit={handleOtpLoginStart} className="space-y-4">[m
+[32m+[m[32m          <input[m
+[32m+[m[32m            type="text"[m
+[32m+[m[32m            required[m
+[32m+[m[32m            placeholder="Email or phone number"[m
+[32m+[m[32m            value={identifier}[m
+[32m+[m[32m            onChange={(e) => setIdentifier(e.target.value)}[m
+[32m+[m[32m            className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m          />[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            type="submit"[m
+[32m+[m[32m            disabled={isLoading}[m
+[32m+[m[32m            className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            {isLoading ? 'Sending codes...' : 'Send OTPs'}[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m          <div className="text-center pt-2 border-t border-white/[0.04]">[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="button"[m
+[32m+[m[32m              onClick={() => { setLoginMethod('password'); setError(''); setInfo(''); }}[m
+[32m+[m[32m              className="text-xs text-slate-400 hover:text-white font-semibold"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              Login with password instead[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m        </form>[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return ([m
+[32m+[m[32m      <form onSubmit={handlePasswordLogin} className="space-y-4">[m
+[32m+[m[32m        <input[m
+[32m+[m[32m          type="text"[m
+[32m+[m[32m          required[m
+[32m+[m[32m          placeholder="Email or phone number"[m
+[32m+[m[32m          value={identifier}[m
+[32m+[m[32m          onChange={(e) => setIdentifier(e.target.value)}[m
+[32m+[m[32m          className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m        />[m
+[32m+[m[32m        <div className="relative">[m
+[32m+[m[32m          <input[m
+[32m+[m[32m            type={showPassword ? 'text' : 'password'}[m
+[32m+[m[32m            required[m
+[32m+[m[32m            placeholder="Enter your password"[m
+[32m+[m[32m            value={password}[m
+[32m+[m[32m            onChange={(e) => setPassword(e.target.value)}[m
+[32m+[m[32m            className="w-full pl-4 pr-11 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m          />[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            type="button"[m
+[32m+[m[32m            onClick={() => setShowPassword((prev) => !prev)}[m
+[32m+[m[32m            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <div className="flex items-center justify-between text-xs font-semibold py-1">[m
+[32m+[m[32m          <label className="flex items-center gap-2.5 cursor-pointer select-none">[m
+[32m+[m[32m            <input[m
+[32m+[m[32m              type="checkbox"[m
+[32m+[m[32m              className="w-4 h-4 rounded border-white/10 bg-[#23202E] text-red-650 focus:ring-red-600 focus:ring-offset-0 cursor-pointer"[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <span className="text-slate-400 font-medium">Remember me</span>[m
+[32m+[m[32m          </label>[m
+[32m+[m[32m          <button type="button" onClick={() => resetFlowState('forgot')} className="text-red-500 hover:text-red-400">[m
+[32m+[m[32m            Forgot password?[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <button[m
+[32m+[m[32m          type="submit"[m
+[32m+[m[32m          disabled={isLoading}[m
+[32m+[m[32m          className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[32m+[m[32m        >[m
+[32m+[m[32m          {isLoading ? 'Signing in...' : 'Sign In'}[m
+[32m+[m[32m        </button>[m
+[32m+[m
+[32m+[m[32m        <div className="relative flex items-center justify-center my-6">[m
+[32m+[m[32m          <div className="absolute inset-0 flex items-center">[m
+[32m+[m[32m            <div className="w-full border-t border-white/[0.08]"></div>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m          <span className="relative px-3 bg-[#1C1924] text-xs text-slate-500 uppercase tracking-wider font-semibold">[m
+[32m+[m[32m            Or use[m
+[32m+[m[32m          </span>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <div className="text-center">[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            type="button"[m
+[32m+[m[32m            onClick={() => { setLoginMethod('otp'); setError(''); setInfo(''); }}[m
+[32m+[m[32m            className="text-xs text-slate-400 hover:text-white font-semibold"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            Login with OTP instead[m
+[32m+[m[32m          </button>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m      </form>[m
+[32m+[m[32m    );[m
+[32m+[m[32m  };[m
+[32m+[m
+   return ([m
+     <div className="min-h-screen bg-[#1C1924] flex flex-col md:flex-row w-full overflow-hidden text-white selection:bg-red-500/30 selection:text-red-200">[m
+[31m-      [m
+[31m-      {/* Left Side: Floating Rounded Editorial Slideshow Pane */}[m
+       <div className="md:w-[42%] lg:w-[36%] xl:w-[32%] relative p-10 flex flex-col justify-between hidden md:flex min-h-[calc(100vh-2rem)] m-4 rounded-[32px] overflow-hidden border border-white/[0.03]">[m
+[31m-        [m
+[31m-        {/* Background Images Overlay with smooth transitions */}[m
+         {bgImages.map((src, idx) => ([m
+           <div[m
+             key={src}[m
+[36m@@ -194,43 +541,33 @@[m [mexport const Login = () => {[m
+           />[m
+         ))}[m
+ [m
+[31m-        {/* Logo Brand (Overlayed on top of background) */}[m
+         <div className="flex items-center gap-2.5 relative z-10">[m
+           <img src="/hoscore-logo.png" alt="HOSCORE" className="h-14 w-auto object-contain rounded-xl" />[m
+         </div>[m
+ [m
+[31m-        {/* Top Right Quick Exit */}[m
+[31m-        <Link [m
+[31m-          to="/" [m
+[32m+[m[32m        <Link[m
+[32m+[m[32m          to="/"[m
+           className="absolute top-10 right-8 text-[11px] font-bold text-white/95 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1 z-10"[m
+         >[m
+           Back to website <ArrowRight className="w-3 h-3" />[m
+         </Link>[m
+ [m
+[31m-        {/* Slogan Slideshow Content */}[m
+         <div className="space-y-4 pr-4 relative z-10">[m
+           {slideContent.map((slide, idx) => ([m
+[31m-            <div [m
+[31m-              key={idx} [m
+[32m+[m[32m            <div[m
+[32m+[m[32m              key={slide.title}[m
+               className={`transition-all duration-700 ease-in-out ${[m
+[31m-                currentSlide === idx [m
+[31m-                  ? 'opacity-100 translate-y-0 relative' [m
+[31m-                  : 'opacity-0 translate-y-4 absolute pointer-events-none'[m
+[32m+[m[32m                currentSlide === idx ? 'opacity-100 translate-y-0 relative' : 'opacity-0 translate-y-4 absolute pointer-events-none'[m
+               }`}[m
+             >[m
+[31m-              <h3 className="text-2xl font-bold tracking-tight text-white leading-snug">[m
+[31m-                {slide.title}[m
+[31m-              </h3>[m
+[31m-              <p className="text-xs text-white/70 leading-relaxed max-w-xs mt-2">[m
+[31m-                {slide.desc}[m
+[31m-              </p>[m
+[32m+[m[32m              <h3 className="text-2xl font-bold tracking-tight text-white leading-snug">{slide.title}</h3>[m
+[32m+[m[32m              <p className="text-xs text-white/70 leading-relaxed max-w-xs mt-2">{slide.desc}</p>[m
+             </div>[m
+           ))}[m
+[31m-          [m
+[31m-          {/* Split Slider Dot Indicators */}[m
+[32m+[m
+           <div className="flex gap-1.5 pt-4">[m
+             {bgImages.map((_, idx) => ([m
+[31m-              <span [m
+[32m+[m[32m              <span[m
+                 key={idx}[m
+                 className={`h-1.5 rounded-full transition-all duration-300 ${[m
+                   currentSlide === idx ? 'w-8 bg-white' : 'w-2 bg-white/30'[m
+[36m@@ -241,34 +578,29 @@[m [mexport const Login = () => {[m
+         </div>[m
+       </div>[m
+ [m
+[31m-      {/* Right Side: Full-Height Form Interaction Pane */}[m
+       <div className="flex-1 min-h-screen flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-20 bg-[#1C1924]">[m
+         <div className="max-w-md w-full mx-auto space-y-6">[m
+[31m-          [m
+[31m-          {/* Header Text & Toggle Switch */}[m
+           <div className="space-y-1.5">[m
+             <h2 className="text-3xl font-bold tracking-tight text-white">[m
+[31m-              {mode === 'login' ? 'Sign in to HOSCORE' : 'Create an account'}[m
+[32m+[m[32m              {mode === 'register'[m
+[32m+[m[32m                ? 'Create an account'[m
+[32m+[m[32m                : mode === 'forgot'[m
+[32m+[m[32m                  ? 'Reset your password'[m
+[32m+[m[32m                  : 'Sign in to HOSCORE'}[m
+             </h2>[m
+             <p className="text-sm text-slate-400 font-medium">[m
+[31m-              {mode === 'login' ? ([m
+[32m+[m[32m              {mode === 'register' ? ([m
+                 <>[m
+[31m-                  Don't have an account?{' '}[m
+[31m-                  <button [m
+[31m-                    onClick={() => { setMode('register'); setError(''); }} [m
+[31m-                    className="text-red-500 hover:text-red-400 font-semibold transition-all hover:underline"[m
+[31m-                  >[m
+[31m-                    Sign up[m
+[32m+[m[32m                  Already have an account?{' '}[m
+[32m+[m[32m                  <button onClick={() => resetFlowState('login')} className="text-red-500 hover:text-red-400 font-semibold transition-all hover:underline">[m
+[32m+[m[32m                    Log in[m
+                   </button>[m
+                 </>[m
+               ) : ([m
+                 <>[m
+[31m-                  Already have an account?{' '}[m
+[31m-                  <button [m
+[31m-                    onClick={() => { setMode('login'); setOtpSent(false); setError(''); }} [m
+[31m-                    className="text-red-500 hover:text-red-400 font-semibold transition-all hover:underline"[m
+[31m-                  >[m
+[31m-                    Log in[m
+[32m+[m[32m                  Don&apos;t have an account?{' '}[m
+[32m+[m[32m                  <button onClick={() => resetFlowState('register')} className="text-red-500 hover:text-red-400 font-semibold transition-all hover:underline">[m
+[32m+[m[32m                    Sign up[m
+                   </button>[m
+                 </>[m
+               )}[m
+[36m@@ -282,234 +614,60 @@[m [mexport const Login = () => {[m
+             </div>[m
+           )}[m
+ [m
+[31m-          {mode === 'login' ? ([m
+[31m-            loginMethod === 'password' ? ([m
+[31m-              <form onSubmit={handleLogin} className="space-y-4">[m
+[31m-                <div className="relative">[m
+[31m-                  <input [m
+[31m-                    type="text" [m
+[31m-                    required [m
+[31m-                    placeholder="Email or phone number" [m
+[31m-                    className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                    value={email} [m
+[31m-                    onChange={(e) => setEmail(e.target.value)} [m
+[31m-                  />[m
+[31m-                </div>[m
+[31m-                [m
+[31m-                <div className="relative">[m
+[31m-                  <input [m
+[31m-                    type={showPassword ? 'text' : 'password'} [m
+[31m-                    required [m
+[31m-                    placeholder="Enter your password" [m
+[31m-                    className="w-full pl-4 pr-11 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                    value={password} [m
+[31m-                    onChange={(e) => setPassword(e.target.value)} [m
+[31m-                  />[m
+[31m-                  <button [m
+[31m-                    type="button"[m
+[31m-                    onClick={() => setShowPassword(!showPassword)}[m
+[31m-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400 transition-colors"[m
+[31m-                  >[m
+[31m-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}[m
+[31m-                  </button>[m
+[31m-                </div>[m
+[31m-[m
+[31m-                <div className="flex items-center justify-between text-xs font-semibold py-1">[m
+[31m-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">[m
+[31m-                    <input [m
+[31m-                      type="checkbox" [m
+[31m-                      className="w-4 h-4 rounded border-white/10 bg-[#23202E] text-red-650 focus:ring-red-600 focus:ring-offset-0 cursor-pointer"[m
+[31m-                    />[m
+[31m-                    <span className="text-slate-400 font-medium">Remember me</span>[m
+[31m-                  </label>[m
+[31m-                  <a href="#" className="text-red-500 hover:text-red-400">Forgot password?</a>[m
+[31m-                </div>[m
+[31m-[m
+[31m-                <button [m
+[31m-                  type="submit" [m
+[31m-                  disabled={isLoading} [m
+[31m-                  className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[31m-                >[m
+[31m-                  {isLoading ? 'Signing in...' : 'Sign In'}[m
+[31m-                </button>[m
+[31m-[m
+[31m-                {/* Or Register with Divider */}[m
+[31m-                <div className="relative flex items-center justify-center my-6">[m
+[31m-                  <div className="absolute inset-0 flex items-center">[m
+[31m-                    <div className="w-full border-t border-white/[0.08]"></div>[m
+[31m-                  </div>[m
+[31m-                  <span className="relative px-3 bg-[#1C1924] text-xs text-slate-500 uppercase tracking-wider font-semibold">[m
+[31m-                    Or register with[m
+[31m-                  </span>[m
+[31m-                </div>[m
+[31m-[m
+[31m-                {/* Social Auth Buttons */}[m
+[31m-                <div>[m
+[31m-                  <button [m
+[31m-                    type="button"[m
+[31m-                    onClick={() => alert("Google login is disabled for this environment.")}[m
+[31m-                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#1C1924] border border-white/[0.08] hover:bg-white/[0.02] rounded-xl text-sm text-white font-semibold transition-all cursor-pointer"[m
+[31m-                  >[m
+[31m-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">[m
+[31m-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />[m
+[31m-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />[m
+[31m-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />[m
+[31m-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />[m
+[31m-                    </svg>[m
+[31m-                    Google[m
+[31m-                  </button>[m
+[31m-                </div>[m
+[31m-[m
+[31m-                <div className="text-center pt-2">[m
+[31m-                  <button [m
+[31m-                    type="button" [m
+[31m-                    onClick={() => { setLoginMethod('otp'); setError(''); }} [m
+[31m-                    className="text-xs text-slate-450 hover:text-white font-semibold transition-all hover:underline"[m
+[31m-                  >[m
+[31m-                    Login with OTP instead[m
+[31m-                  </button>[m
+[31m-                </div>[m
+[31m-              </form>[m
+[31m-            ) : ([m
+[31m-              /* OTP Login Step Flow */[m
+[31m-              <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp} className="space-y-4">[m
+[31m-                {!otpSent ? ([m
+[31m-                  <>[m
+[31m-                    <div className="relative">[m
+[31m-                      <input [m
+[31m-                        type="email" [m
+[31m-                        required [m
+[31m-                        placeholder="Email" [m
+[31m-                        className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                        value={email} [m
+[31m-                        onChange={(e) => setEmail(e.target.value)} [m
+[31m-                      />[m
+[31m-                    </div>[m
+[31m-                    <button [m
+[31m-                      type="submit" [m
+[31m-                      disabled={isLoading} [m
+[31m-                      className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[31m-                    >[m
+[31m-                      {isLoading ? 'Requesting OTP...' : 'Send Verification Code'}[m
+[31m-                    </button>[m
+[31m-                  </>[m
+[31m-                ) : ([m
+[31m-                  <>[m
+[31m-                    <div className="bg-[#23202E] border border-white/[0.03] p-3.5 rounded-xl flex flex-col gap-1">[m
+[31m-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Sending OTP to</span>[m
+[31m-                      <div className="flex justify-between items-center">[m
+[31m-                        <span className="text-xs font-bold text-slate-200">{email}</span>[m
+[31m-                        <button [m
+[31m-                          type="button" [m
+[31m-                          onClick={() => setOtpSent(false)} [m
+[31m-                          className="text-[10px] text-red-500 hover:text-red-400 font-bold"[m
+[31m-                        >[m
+[31m-                          Change[m
+[31m-                        </button>[m
+[31m-                      </div>[m
+[31m-                    </div>[m
+[31m-[m
+[31m-                    <div className="relative">[m
+[31m-                      <input [m
+[31m-                        type="text" [m
+[31m-                        required [m
+[31m-                        maxLength={6} [m
+[31m-                        placeholder="Enter 6-digit OTP" [m
+[31m-                        className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 text-center tracking-[0.3em] font-mono font-bold transition-all" [m
+[31m-                        value={otpCode} [m
+[31m-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} [m
+[31m-                      />[m
+[31m-                    </div>[m
+[31m-[m
+[31m-                    <button [m
+[31m-                      type="submit" [m
+[31m-                      disabled={isLoading || otpCode.length !== 6} [m
+[31m-                      className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+[31m-                    >[m
+[31m-                      {isLoading ? 'Verifying...' : 'Verify & Sign In'}[m
+[31m-                    </button>[m
+[31m-[m
+[31m-                    <div className="flex justify-between items-center text-xs pt-1">[m
+[31m-                      <span className="text-slate-400 font-medium">Didn't receive code?</span>[m
+[31m-                      {countdown > 0 ? ([m
+[31m-                        <span className="text-slate-500 font-semibold">Resend in {countdown}s</span>[m
+[31m-                      ) : ([m
+[31m-                        <button [m
+[31m-                          type="button" [m
+[31m-                          onClick={handleSendOtp} [m
+[31m-                          className="text-red-500 hover:text-red-400 font-bold transition-all"[m
+[31m-                        >[m
+[31m-                          Resend code[m
+[31m-                        </button>[m
+[31m-                      )}[m
+[31m-                    </div>[m
+[31m-                  </>[m
+[31m-                )}[m
+[31m-[m
+[31m-                <div className="text-center pt-2 border-t border-white/[0.04]">[m
+[31m-                  <button [m
+[31m-                    type="button" [m
+[31m-                    onClick={() => { setLoginMethod('password'); setError(''); }} [m
+[31m-                    className="text-xs text-slate-450 hover:text-white font-semibold transition-all hover:underline"[m
+[31m-                  >[m
+[31m-                    Login with password instead[m
+[31m-                  </button>[m
+[31m-                </div>[m
+[31m-              </form>[m
+[31m-            )[m
+[31m-          ) : ([m
+[32m+[m[32m          {!error && info && ([m
+[32m+[m[32m            <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-2.5 text-xs text-blue-100 leading-normal font-semibold">[m
+[32m+[m[32m              <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-300" />[m
+[32m+[m[32m              <span>{info}</span>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m          )}[m
+[32m+[m
+[32m+[m[32m          {mode === 'register' && !challenge ? ([m
+             <form onSubmit={handleRegister} className="space-y-4">[m
+               <div className="grid grid-cols-2 gap-4">[m
+[31m-                <input [m
+[31m-                  type="text" [m
+[31m-                  required [m
+[31m-                  placeholder="First name" [m
+[31m-                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                  value={firstName} [m
+[31m-                  onChange={(e) => setFirstName(e.target.value)} [m
+[31m-                />[m
+[31m-                <input [m
+[31m-                  type="text" [m
+[31m-                  required [m
+[31m-                  placeholder="Last name" [m
+[31m-                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                  value={lastName} [m
+[31m-                  onChange={(e) => setLastName(e.target.value)} [m
+[31m-                />[m
+[31m-              </div>[m
+[31m-              <div className="relative">[m
+[31m-                <input [m
+[31m-                  type="email" [m
+[31m-                  required [m
+[31m-                  placeholder="Email" [m
+[31m-                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                  value={email} [m
+[31m-                  onChange={(e) => setEmail(e.target.value)} [m
+[31m-                />[m
+[31m-              </div>[m
+[31m-              <div className="relative">[m
+[31m-                <input [m
+[31m-                  type="tel" [m
+[31m-                  placeholder="Phone number" [m
+[31m-                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                  value={regPhone} [m
+[31m-                  onChange={(e) => setRegPhone(e.target.value)} [m
+[32m+[m[32m                <input[m
+[32m+[m[32m                  type="text"[m
+[32m+[m[32m                  required[m
+[32m+[m[32m                  placeholder="First name"[m
+[32m+[m[32m                  value={firstName}[m
+[32m+[m[32m                  onChange={(e) => setFirstName(e.target.value)}[m
+[32m+[m[32m                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+                 />[m
+[31m-              </div>[m
+[31m-              <div className="relative">[m
+[31m-                <input [m
+[31m-                  type="password" [m
+[31m-                  required [m
+[31m-                  placeholder="Create password" [m
+[31m-                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all" [m
+[31m-                  value={password} [m
+[31m-                  onChange={(e) => setPassword(e.target.value)} [m
+[32m+[m[32m                <input[m
+[32m+[m[32m                  type="text"[m
+[32m+[m[32m                  required[m
+[32m+[m[32m                  placeholder="Last name"[m
+[32m+[m[32m                  value={lastName}[m
+[32m+[m[32m                  onChange={(e) => setLastName(e.target.value)}[m
+[32m+[m[32m                  className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+                 />[m
+               </div>[m
+[31m-              [m
+[31m-              <div className="flex items-center gap-2.5 cursor-pointer py-1 select-none">[m
+[31m-                <input [m
+[31m-                  type="checkbox" [m
+[32m+[m[32m              <input[m
+[32m+[m[32m                type="email"[m
+[32m+[m[32m                required[m
+[32m+[m[32m                placeholder="Email"[m
+[32m+[m[32m                value={email}[m
+[32m+[m[32m                onChange={(e) => setEmail(e.target.value)}[m
+[32m+[m[32m                className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m              />[m
+[32m+[m[32m              <input[m
+[32m+[m[32m                type="tel"[m
+[32m+[m[32m                required[m
+[32m+[m[32m                placeholder="Phone number"[m
+[32m+[m[32m                value={regPhone}[m
+[32m+[m[32m                onChange={(e) => setRegPhone(e.target.value)}[m
+[32m+[m[32m                className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m              />[m
+[32m+[m[32m              <input[m
+[32m+[m[32m                type="password"[m
+[32m+[m[32m                required[m
+[32m+[m[32m                placeholder="Create password"[m
+[32m+[m[32m                value={password}[m
+[32m+[m[32m                onChange={(e) => setPassword(e.target.value)}[m
+[32m+[m[32m                className="w-full px-4 py-3.5 bg-[#23202E] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition-all"[m
+[32m+[m[32m              />[m
+[32m+[m[32m              <label className="flex items-center gap-2.5 cursor-pointer py-1 select-none">[m
+[32m+[m[32m                <input[m
+[32m+[m[32m                  type="checkbox"[m
+                   required[m
+                   checked={agreeTerms}[m
+                   onChange={(e) => setAgreeTerms(e.target.checked)}[m
+[36m@@ -518,48 +676,20 @@[m [mexport const Login = () => {[m
+                 <span className="text-xs text-slate-400 font-medium">[m
+                   I agree to the <a href="#" className="text-red-500 hover:underline">Terms & Conditions</a>[m
+                 </span>[m
+[31m-              </div>[m
+[31m-[m
+[31m-              <button [m
+[31m-                type="submit" [m
+[31m-                disabled={isLoading || !agreeTerms} [m
+[32m+[m[32m              </label>[m
+[32m+[m[32m              <button[m
+[32m+[m[32m                type="submit"[m
+[32m+[m[32m                disabled={isLoading}[m
+                 className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md active:scale-[0.98] disabled:opacity-50"[m
+               >[m
+                 {isLoading ? 'Creating account...' : 'Create account'}[m
+               </button>[m
+[31m-[m
+[31m-              {/* Or Register with Divider */}[m
+[31m-              <div className="relative flex items-center justify-center my-6">[m
+[31m-                <div className="absolute inset-0 flex items-center">[m
+[31m-                  <div className="w-full border-t border-white/[0.08]"></div>[m
+[31m-                </div>[m
+[31m-                <span className="relative px-3 bg-[#1C1924] text-xs text-slate-500 uppercase tracking-wider font-semibold">[m
+[31m-                  Or register with[m
+[31m-                </span>[m
+[31m-              </div>[m
+[31m-[m
+[31m-              {/* Social Auth Buttons */}[m
+[31m-              <div>[m
+[31m-                <button [m
+[31m-                  type="button"[m
+[31m-                  onClick={() => alert("Google signup is disabled for this environment.")}[m
+[31m-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#1C1924] border border-white/[0.08] hover:bg-white/[0.02] rounded-xl text-sm text-white font-semibold transition-all cursor-pointer"[m
+[31m-                >[m
+[31m-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">[m
+[31m-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />[m
+[31m-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />[m
+[31m-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />[m
+[31m-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />[m
+[31m-                  </svg>[m
+[31m-                  Google[m
+[31m-                </button>[m
+[31m-              </div>[m
+             </form>[m
+[32m+[m[32m          ) : ([m
+[32m+[m[32m            renderLoginForm()[m
+           )}[m
+[31m-[m
+         </div>[m
+       </div>[m
+[31m-[m
+     </div>[m
+   );[m
+ };[m
+[1mdiff --git a/server/prisma/schema.prisma b/server/prisma/schema.prisma[m
+[1mindex ac858d4..3d21de9 100644[m
+[1m--- a/server/prisma/schema.prisma[m
+[1m+++ b/server/prisma/schema.prisma[m
+[36m@@ -23,16 +23,44 @@[m [mmodel User {[m
+   avatar        String?[m
+   isSuperAdmin  Boolean      @default(false)[m
+   isVerified    Boolean      @default(false)[m
+[32m+[m[32m  emailVerifiedAt DateTime?[m
+[32m+[m[32m  phoneVerifiedAt DateTime?[m
+[32m+[m[32m  lastOtpVerifiedAt DateTime?[m
+   otpCode       String?      // stores SHA256(otp + OTP_SECRET), never the plaintext OTP[m
+   otpExpiresAt  DateTime?[m
+   otpAttempts   Int          @default(0)  // failed verify attempts for the current OTP[m
+   otpLastSentAt DateTime?                  // last time an OTP was issued (resend cooldown)[m
+   memberships   Membership[][m
+   patientProfile Patient?[m
+[32m+[m[32m  authChallenges AuthChallenge[][m
+   createdAt     DateTime     @default(now())[m
+   updatedAt     DateTime     @updatedAt[m
+ }[m
+ [m
+[32m+[m[32mmodel AuthChallenge {[m
+[32m+[m[32m  id               String   @id @default(uuid())[m
+[32m+[m[32m  userId           String[m
+[32m+[m[32m  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)[m
+[32m+[m[32m  purpose          String[m
+[32m+[m[32m  emailOtpCode     String?[m
+[32m+[m[32m  emailOtpExpiresAt DateTime?[m
+[32m+[m[32m  emailOtpAttempts Int      @default(0)[m
+[32m+[m[32m  emailVerified    Boolean  @default(false)[m
+[32m+[m[32m  phoneOtpCode     String?[m
+[32m+[m[32m  phoneOtpExpiresAt DateTime?[m
+[32m+[m[32m  phoneOtpAttempts Int      @default(0)[m
+[32m+[m[32m  phoneVerified    Boolean  @default(false)[m
+[32m+[m[32m  requireEmail     Boolean  @default(true)[m
+[32m+[m[32m  requirePhone     Boolean  @default(true)[m
+[32m+[m[32m  emailFallback    Boolean  @default(false)[m
+[32m+[m[32m  smsFallback      Boolean  @default(false)[m
+[32m+[m[32m  expiresAt        DateTime[m
+[32m+[m[32m  createdAt        DateTime @default(now())[m
+[32m+[m[32m  updatedAt        DateTime @updatedAt[m
+[32m+[m
+[32m+[m[32m  @@index([userId, purpose])[m
+[32m+[m[32m}[m
+[32m+[m
+ // Links a User to a Hospital with a specific role[m
+ model Membership {[m
+   id          String   @id @default(uuid())[m
+[1mdiff --git a/server/src/controllers/authController.ts b/server/src/controllers/authController.ts[m
+[1mindex c7e7af2..cc271b6 100644[m
+[1m--- a/server/src/controllers/authController.ts[m
+[1m+++ b/server/src/controllers/authController.ts[m
+[36m@@ -1,6 +1,7 @@[m
+ import type { Request, Response } from 'express';[m
+ import bcrypt from 'bcryptjs';[m
+ import jwt from 'jsonwebtoken';[m
+[32m+[m[32mimport type { AuthChallenge, User } from '@prisma/client';[m
+ import { prisma } from '../index.js';[m
+ import { permissionsForRole } from '../utils/features.js';[m
+ import { signUrl } from '../services/r2.js';[m
+[36m@@ -13,27 +14,148 @@[m [mimport {[m
+   smsTargetFromPhone,[m
+   OTP_RESEND_COOLDOWN_MS,[m
+   OTP_MAX_ATTEMPTS,[m
+[32m+[m[32m  OTP_TTL_MS,[m
+ } from '../utils/otp.js';[m
+ import { normalizePhone } from '../utils/phone.js';[m
+ [m
+[31m-// No fallback — validateEnv() guarantees a strong JWT_SECRET is present at boot.[m
+ const JWT_SECRET = process.env.JWT_SECRET as string;[m
+[32m+[m[32mconst OTP_REVERIFY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;[m
+[32m+[m
+[32m+[m[32mtype ChallengePurpose = 'register' | 'login' | 'reset_password';[m
+[32m+[m[32mtype ChallengeChannel = 'email' | 'phone';[m
+[32m+[m
+[32m+[m[32minterface ChallengeSummary {[m
+[32m+[m[32m  challengeId: string;[m
+[32m+[m[32m  purpose: ChallengePurpose;[m
+[32m+[m[32m  email: string;[m
+[32m+[m[32m  phone: string | null;[m
+[32m+[m[32m  requiredChannels: { email: boolean; phone: boolean };[m
+[32m+[m[32m  verifiedChannels: { email: boolean; phone: boolean };[m
+[32m+[m[32m  expiresAt: string;[m
+[32m+[m[32m  warnings: string[];[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mtype ChallengeIssue = { error: string; status: number };[m
+[32m+[m[32mtype ChallengeSuccess = { challenge: AuthChallenge };[m
+[32m+[m[32mtype ChallengeResult = ChallengeIssue | ChallengeSuccess;[m
+[32m+[m[32mtype LoadedChallenge = { challenge: AuthChallenge & { user: User } } | ChallengeIssue;[m
+[32m+[m
+[32m+[m[32minterface ContextItem {[m
+[32m+[m[32m  type: 'hospital' | 'patient' | 'superadmin';[m
+[32m+[m[32m  hospitalId?: string;[m
+[32m+[m[32m  hospitalName?: string;[m
+[32m+[m[32m  role?: string;[m
+[32m+[m[32m  department?: string;[m
+[32m+[m[32m  permissions?: string[];[m
+[32m+[m[32m  staffTypeId?: string;[m
+[32m+[m[32m  staffTypeName?: string;[m
+[32m+[m[32m}[m
+ [m
+ const normalizeEmail = (email: string) => email.trim().toLowerCase();[m
+ [m
+[32m+[m[32mfunction normalizeIdentifier(identifier: string): string {[m
+[32m+[m[32m  return String(identifier || '').trim();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction maskPhone(phone: string | null | undefined): string | null {[m
+[32m+[m[32m  const digits = String(phone || '').replace(/[^\d]/g, '');[m
+[32m+[m[32m  if (digits.length < 4) return phone || null;[m
+[32m+[m[32m  return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction challengeWarnings(challenge: AuthChallenge): string[] {[m
+[32m+[m[32m  const warnings: string[] = [];[m
+[32m+[m[32m  if (challenge.smsFallback) {[m
+[32m+[m[32m    warnings.push('SMS OTP is unavailable right now. Continue with email verification.');[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (challenge.emailFallback) {[m
+[32m+[m[32m    warnings.push('Email OTP is unavailable right now. Continue with phone verification.');[m
+[32m+[m[32m  }[m
+[32m+[m[32m  return warnings;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction hasChallengeIssue(result: ChallengeResult | LoadedChallenge): result is ChallengeIssue {[m
+[32m+[m[32m  return 'error' in result;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction buildChallengeSummary(challenge: AuthChallenge, user: Pick<User, 'email' | 'phone'>): ChallengeSummary {[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    challengeId: challenge.id,[m
+[32m+[m[32m    purpose: challenge.purpose as ChallengePurpose,[m
+[32m+[m[32m    email: user.email,[m
+[32m+[m[32m    phone: maskPhone(user.phone),[m
+[32m+[m[32m    requiredChannels: {[m
+[32m+[m[32m      email: challenge.requireEmail,[m
+[32m+[m[32m      phone: challenge.requirePhone,[m
+[32m+[m[32m    },[m
+[32m+[m[32m    verifiedChannels: {[m
+[32m+[m[32m      email: challenge.emailVerified,[m
+[32m+[m[32m      phone: challenge.phoneVerified,[m
+[32m+[m[32m    },[m
+[32m+[m[32m    expiresAt: challenge.expiresAt.toISOString(),[m
+[32m+[m[32m    warnings: challengeWarnings(challenge),[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction challengePurposeCopy(purpose: ChallengePurpose) {[m
+[32m+[m[32m  if (purpose === 'register') {[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      emailSubject: 'Your HOSCORE email verification code',[m
+[32m+[m[32m      emailIntro: 'Use this code to verify your HOSCORE account.',[m
+[32m+[m[32m      smsText: 'Use this OTP to verify your HOSCORE account.',[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (purpose === 'reset_password') {[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      emailSubject: 'Your HOSCORE password reset code',[m
+[32m+[m[32m      emailIntro: 'Use this code to reset your HOSCORE password.',[m
+[32m+[m[32m      smsText: 'Use this OTP to reset your HOSCORE password.',[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    emailSubject: 'Your HOSCORE login verification code',[m
+[32m+[m[32m    emailIntro: 'Use this code to complete your HOSCORE login.',[m
+[32m+[m[32m    smsText: 'Use this OTP to complete your HOSCORE login.',[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+ async function findUserByPhone(phone: string | null | undefined) {[m
+   const normalized = normalizePhone(phone);[m
+   if (!normalized) return null;[m
+ [m
+   const users = await prisma.user.findMany({[m
+     where: { phone: { not: null } },[m
+[31m-    select: { id: true, name: true, email: true, phone: true, password: true, isVerified: true },[m
+[32m+[m[32m    select: {[m
+[32m+[m[32m      id: true,[m
+[32m+[m[32m      name: true,[m
+[32m+[m[32m      email: true,[m
+[32m+[m[32m      phone: true,[m
+[32m+[m[32m      password: true,[m
+[32m+[m[32m      isVerified: true,[m
+[32m+[m[32m      emailVerifiedAt: true,[m
+[32m+[m[32m      phoneVerifiedAt: true,[m
+[32m+[m[32m      lastOtpVerifiedAt: true,[m
+[32m+[m[32m    },[m
+   });[m
+ [m
+   return users.find((user) => normalizePhone(user.phone) === normalized) || null;[m
+ }[m
+ [m
+[31m-// Build a signed session token + response payload for a fully-verified user.[m
+[32m+[m[32masync function findUserByIdentifier(identifier: string) {[m
+[32m+[m[32m  const raw = normalizeIdentifier(identifier);[m
+[32m+[m[32m  if (!raw) return null;[m
+[32m+[m[32m  return raw.includes('@')[m
+[32m+[m[32m    ? prisma.user.findUnique({[m
+[32m+[m[32m        where: { email: raw.toLowerCase() },[m
+[32m+[m[32m      })[m
+[32m+[m[32m    : findUserByPhone(raw);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction needsOtpStepUp(user: Pick<User, 'lastOtpVerifiedAt'>): boolean {[m
+[32m+[m[32m  if (!user.lastOtpVerifiedAt) return true;[m
+[32m+[m[32m  return Date.now() - user.lastOtpVerifiedAt.getTime() >= OTP_REVERIFY_WINDOW_MS;[m
+[32m+[m[32m}[m
+[32m+[m
+ async function buildSession(userId: string) {[m
+   const user = await prisma.user.findUnique({[m
+     where: { id: userId },[m
+[36m@@ -67,57 +189,13 @@[m [masync function buildSession(userId: string) {[m
+   };[m
+ }[m
+ [m
+[31m-// Generate, store (hashed) and deliver an OTP for a user via SMS + email.[m
+[31m-// Returns false if delivery to every channel failed.[m
+[31m-async function issueOtp(user: { id: string; email: string; name: string; phone: string | null }): Promise<boolean> {[m
+[31m-  const otp = generateOtp();[m
+[31m-  await prisma.user.update({[m
+[31m-    where: { id: user.id },[m
+[31m-    data: { otpCode: hashOtp(otp), otpExpiresAt: otpExpiry(), otpAttempts: 0, otpLastSentAt: new Date() },[m
+[31m-  });[m
+[31m-[m
+[31m-  const smsTarget = smsTargetFromPhone(user.phone);[m
+[31m-  const deliveries: Promise<boolean>[] = [];[m
+[31m-  if (smsTarget) deliveries.push(sendSmsOtp(smsTarget, otp));[m
+[31m-  deliveries.push([m
+[31m-    sendMsg91Email({[m
+[31m-      to: user.email,[m
+[31m-      toName: user.name,[m
+[31m-      subject: `Your HOSCORE verification code: ${otp}`,[m
+[31m-      html: `[m
+[31m-        <div style="font-family:system-ui;max-width:480px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">[m
+[31m-          <h2 style="color:#1e293b;text-align:center;margin:0 0 8px">Verification Code</h2>[m
+[31m-          <p style="color:#64748b;text-align:center;margin:0 0 20px">Use this code to verify your HOSCORE account. It expires in 5 minutes.</p>[m
+[31m-          <div style="background:#2563eb;color:white;border-radius:16px;padding:20px;text-align:center;letter-spacing:8px;font-size:36px;font-weight:900">${otp}</div>[m
+[31m-        </div>`,[m
+[31m-    })[m
+[31m-  );[m
+[31m-[m
+[31m-  const results = await Promise.allSettled(deliveries);[m
+[31m-  return results.some((r) => r.status === 'fulfilled' && r.value === true);[m
+[31m-}[m
+[31m-[m
+[31m-interface ContextItem {[m
+[31m-  type: 'hospital' | 'patient' | 'superadmin';[m
+[31m-  hospitalId?: string;[m
+[31m-  hospitalName?: string;[m
+[31m-  role?: string;[m
+[31m-  department?: string;[m
+[31m-  permissions?: string[];[m
+[31m-  staffTypeId?: string;[m
+[31m-  staffTypeName?: string;[m
+[31m-}[m
+[31m-[m
+[31m-// Build all available contexts for a user[m
+ async function buildUserContexts(userId: string, isSuperAdmin: boolean, hasPatientProfile: boolean): Promise<ContextItem[]> {[m
+   const contexts: ContextItem[] = [];[m
+ [m
+[31m-  // Super admin context[m
+   if (isSuperAdmin) {[m
+     contexts.push({ type: 'superadmin', role: 'SUPER_ADMIN' });[m
+   }[m
+ [m
+[31m-  // Hospital memberships[m
+   const memberships = await prisma.membership.findMany({[m
+     where: { userId, status: 'ACTIVE' },[m
+     include: { hospital: { select: { id: true, name: true } }, staffType: true },[m
+[36m@@ -136,7 +214,6 @@[m [masync function buildUserContexts(userId: string, isSuperAdmin: boolean, hasPatie[m
+     });[m
+   }[m
+ [m
+[31m-  // Patient context[m
+   if (hasPatientProfile) {[m
+     contexts.push({ type: 'patient', role: 'PATIENT' });[m
+   }[m
+[36m@@ -144,6 +221,152 @@[m [masync function buildUserContexts(userId: string, isSuperAdmin: boolean, hasPatie[m
+   return contexts;[m
+ }[m
+ [m
+[32m+[m[32masync function ensurePatientProfile(user: { id: string; name: string; email: string; phone: string | null }) {[m
+[32m+[m[32m  const existing = await prisma.patient.findUnique({ where: { userId: user.id } });[m
+[32m+[m[32m  if (existing) return;[m
+[32m+[m
+[32m+[m[32m  let sixDigitId = '';[m
+[32m+[m[32m  let unique = false;[m
+[32m+[m[32m  while (!unique) {[m
+[32m+[m[32m    sixDigitId = Math.floor(100000 + Math.random() * 900000).toString();[m
+[32m+[m[32m    const clash = await prisma.patient.findUnique({ where: { sixDigitId } });[m
+[32m+[m[32m    if (!clash) unique = true;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  await prisma.patient.create({[m
+[32m+[m[32m    data: { userId: user.id, name: user.name, email: user.email, contact: user.phone, sixDigitId },[m
+[32m+[m[32m  });[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32masync function createChallenge([m
+[32m+[m[32m  user: Pick<User, 'id' | 'name' | 'email' | 'phone'>,[m
+[32m+[m[32m  purpose: ChallengePurpose,[m
+[32m+[m[32m  requestedChannels: { email: boolean; phone: boolean }[m
+[32m+[m[32m): Promise<ChallengeResult> {[m
+[32m+[m[32m  const existing = await prisma.authChallenge.findFirst({[m
+[32m+[m[32m    where: { userId: user.id, purpose, expiresAt: { gt: new Date() } },[m
+[32m+[m[32m    orderBy: { createdAt: 'desc' },[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  if (existing && Date.now() - existing.updatedAt.getTime() < OTP_RESEND_COOLDOWN_MS) {[m
+[32m+[m[32m    const wait = Math.ceil((OTP_RESEND_COOLDOWN_MS - (Date.now() - existing.updatedAt.getTime())) / 1000);[m
+[32m+[m[32m    return { error: `Please wait ${wait}s before requesting another code.`, status: 429 as const };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const copy = challengePurposeCopy(purpose);[m
+[32m+[m[32m  const emailOtp = requestedChannels.email ? generateOtp() : null;[m
+[32m+[m[32m  const phoneOtp = requestedChannels.phone ? generateOtp() : null;[m
+[32m+[m
+[32m+[m[32m  let emailDelivered = false;[m
+[32m+[m[32m  if (emailOtp) {[m
+[32m+[m[32m    emailDelivered = await sendMsg91Email({[m
+[32m+[m[32m      to: user.email,[m
+[32m+[m[32m      toName: user.name,[m
+[32m+[m[32m      subject: `${copy.emailSubject}: ${emailOtp}`,[m
+[32m+[m[32m      html: `[m
+[32m+[m[32m        <div style="font-family:system-ui;max-width:480px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">[m
+[32m+[m[32m          <h2 style="color:#1e293b;text-align:center;margin:0 0 8px">Verification Code</h2>[m
+[32m+[m[32m          <p style="color:#64748b;text-align:center;margin:0 0 20px">${copy.emailIntro} It expires in 5 minutes.</p>[m
+[32m+[m[32m          <div style="background:#2563eb;color:white;border-radius:16px;padding:20px;text-align:center;letter-spacing:8px;font-size:36px;font-weight:900">${emailOtp}</div>[m
+[32m+[m[32m        </div>`,[m
+[32m+[m[32m    });[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const smsTarget = requestedChannels.phone ? smsTargetFromPhone(user.phone) : null;[m
+[32m+[m[32m  let phoneDelivered = false;[m
+[32m+[m[32m  if (phoneOtp && smsTarget) {[m
+[32m+[m[32m    phoneDelivered = await sendSmsOtp(smsTarget, phoneOtp);[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const requireEmail = requestedChannels.email && emailDelivered;[m
+[32m+[m[32m  const requirePhone = requestedChannels.phone && phoneDelivered;[m
+[32m+[m[32m  const emailFallback = requestedChannels.email && !emailDelivered;[m
+[32m+[m[32m  const smsFallback = requestedChannels.phone && !phoneDelivered;[m
+[32m+[m
+[32m+[m[32m  if (!requireEmail && !requirePhone) {[m
+[32m+[m[32m    return { error: 'Could not deliver a verification code. Please try again.', status: 502 as const };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  await prisma.authChallenge.deleteMany({ where: { userId: user.id, purpose } });[m
+[32m+[m
+[32m+[m[32m  const challenge = await prisma.authChallenge.create({[m
+[32m+[m[32m    data: {[m
+[32m+[m[32m      userId: user.id,[m
+[32m+[m[32m      purpose,[m
+[32m+[m[32m      emailOtpCode: requireEmail && emailOtp ? hashOtp(emailOtp) : null,[m
+[32m+[m[32m      emailOtpExpiresAt: requireEmail ? otpExpiry() : null,[m
+[32m+[m[32m      phoneOtpCode: requirePhone && phoneOtp ? hashOtp(phoneOtp) : null,[m
+[32m+[m[32m      phoneOtpExpiresAt: requirePhone ? otpExpiry() : null,[m
+[32m+[m[32m      requireEmail,[m
+[32m+[m[32m      requirePhone,[m
+[32m+[m[32m      emailFallback,[m
+[32m+[m[32m      smsFallback,[m
+[32m+[m[32m      expiresAt: new Date(Date.now() + OTP_TTL_MS),[m
+[32m+[m[32m    },[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  return { challenge };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32masync function finalizeChallenge(user: User, challenge: AuthChallenge) {[m
+[32m+[m[32m  const now = new Date();[m
+[32m+[m
+[32m+[m[32m  await prisma.authChallenge.delete({ where: { id: challenge.id } });[m
+[32m+[m
+[32m+[m[32m  if (challenge.purpose === 'reset_password') {[m
+[32m+[m[32m    const resetToken = jwt.sign([m
+[32m+[m[32m      { userId: user.id, purpose: 'password_reset' },[m
+[32m+[m[32m      JWT_SECRET,[m
+[32m+[m[32m      { expiresIn: '15m' }[m
+[32m+[m[32m    );[m
+[32m+[m
+[32m+[m[32m    await prisma.user.update({[m
+[32m+[m[32m      where: { id: user.id },[m
+[32m+[m[32m      data: {[m
+[32m+[m[32m        lastOtpVerifiedAt: now,[m
+[32m+[m[32m        emailVerifiedAt: challenge.emailVerified ? now : user.emailVerifiedAt,[m
+[32m+[m[32m        phoneVerifiedAt: challenge.phoneVerified ? now : user.phoneVerifiedAt,[m
+[32m+[m[32m      },[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    return { resetToken };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  await prisma.user.update({[m
+[32m+[m[32m    where: { id: user.id },[m
+[32m+[m[32m    data: {[m
+[32m+[m[32m      isVerified: true,[m
+[32m+[m[32m      emailVerifiedAt: challenge.emailVerified ? now : user.emailVerifiedAt,[m
+[32m+[m[32m      phoneVerifiedAt: challenge.phoneVerified ? now : user.phoneVerifiedAt,[m
+[32m+[m[32m      lastOtpVerifiedAt: now,[m
+[32m+[m[32m      otpCode: null,[m
+[32m+[m[32m      otpExpiresAt: null,[m
+[32m+[m[32m      otpAttempts: 0,[m
+[32m+[m[32m    },[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  await ensurePatientProfile(user);[m
+[32m+[m[32m  return buildSession(user.id);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32masync function getChallengeOrError(challengeId: string) {[m
+[32m+[m[32m  const challenge = await prisma.authChallenge.findUnique({[m
+[32m+[m[32m    where: { id: challengeId },[m
+[32m+[m[32m    include: { user: true },[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  if (!challenge) {[m
+[32m+[m[32m    return { error: 'Verification request not found. Please start again.', status: 404 as const };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (challenge.expiresAt < new Date()) {[m
+[32m+[m[32m    await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);[m
+[32m+[m[32m    return { error: 'Verification request expired. Please request a new code.', status: 410 as const };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return { challenge } satisfies LoadedChallenge;[m
+[32m+[m[32m}[m
+[32m+[m
+ export const register = async (req: Request, res: Response) => {[m
+   const { name, password, phone } = req.body;[m
+   const email = normalizeEmail(req.body.email);[m
+[36m@@ -151,29 +374,21 @@[m [mexport const register = async (req: Request, res: Response) => {[m
+   const phoneValue = normalizedPhone || null;[m
+ [m
+   try {[m
+[31m-    // Email collision: block only if already verified. An unverified record is[m
+[31m-    // updated in place (never deleted) so a re-registration just refreshes it.[m
+     const existingEmail = await prisma.user.findUnique({ where: { email } });[m
+     if (existingEmail?.isVerified) {[m
+       return res.status(400).json({ error: 'Email already registered. Please log in instead.' });[m
+     }[m
+ [m
+[31m-    // Phone must be globally unique, but we also support reusing an unverified[m
+[31m-    // account that already owns the same phone number so retrying signup works.[m
+     const existingPhone = phoneValue ? await findUserByPhone(phoneValue) : null;[m
+[31m-    if (existingPhone && existingPhone.id !== existingEmail?.id) {[m
+[31m-      if (existingPhone.isVerified) {[m
+[31m-        return res.status(400).json({ error: 'Phone number already registered. Please log in instead.' });[m
+[31m-      }[m
+[32m+[m[32m    if (existingPhone && existingPhone.id !== existingEmail?.id && existingPhone.isVerified) {[m
+[32m+[m[32m      return res.status(400).json({ error: 'Phone number already registered. Please log in instead.' });[m
+     }[m
+ [m
+     const hashedPassword = await bcrypt.hash(password, 10);[m
+[31m-[m
+[31m-    // Create the verified-pending identity, or refresh the existing unverified one.[m
+     const user = existingEmail[m
+       ? await prisma.user.update({[m
+           where: { id: existingEmail.id },[m
+[31m-          data: { name, email, password: hashedPassword, phone: phoneValue },[m
+[32m+[m[32m          data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },[m
+         })[m
+       : existingPhone && !existingPhone.isVerified[m
+         ? await prisma.user.update({[m
+[36m@@ -184,192 +399,259 @@[m [mexport const register = async (req: Request, res: Response) => {[m
+             data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },[m
+           });[m
+ [m
+[31m-    // Patient profile is created only AFTER verification (see verifyOtp), never here.[m
+[31m-    const delivered = await issueOtp(user);[m
+[31m-    if (!delivered) {[m
+[31m-      return res.status(502).json({ error: 'Could not send your verification code. Please try again.' });[m
+[32m+[m[32m    const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });[m
+[32m+[m[32m    if (hasChallengeIssue(issued)) {[m
+[32m+[m[32m      return res.status(issued.status).json({ error: issued.error });[m
+     }[m
+ [m
+[31m-    res.status(201).json({[m
+[31m-      message: 'Verification code sent. Please check your email and phone.',[m
+[32m+[m[32m    return res.status(201).json({[m
+[32m+[m[32m      message: 'Verification codes sent. Verify each required channel to continue.',[m
+       requiresOtp: true,[m
+[31m-      email: user.email,[m
+[32m+[m[32m      challenge: buildChallengeSummary(issued.challenge, user),[m
+     });[m
+[31m-  } catch (error: any) {[m
+[32m+[m[32m  } catch (error) {[m
+     console.error('Registration error:', error);[m
+[31m-    res.status(500).json({ error: 'Registration failed' });[m
+[32m+[m[32m    return res.status(500).json({ error: 'Registration failed' });[m
+   }[m
+ };[m
+ [m
+[31m-// Ensure a verified user has a personal patient profile (free for every identity).[m
+[31m-async function ensurePatientProfile(user: { id: string; name: string; email: string; phone: string | null }) {[m
+[31m-  const existing = await prisma.patient.findUnique({ where: { userId: user.id } });[m
+[31m-  if (existing) return;[m
+[31m-  let sixDigitId = '';[m
+[31m-  let unique = false;[m
+[31m-  while (!unique) {[m
+[31m-    sixDigitId = Math.floor(100000 + Math.random() * 900000).toString();[m
+[31m-    const clash = await prisma.patient.findUnique({ where: { sixDigitId } });[m
+[31m-    if (!clash) unique = true;[m
+[31m-  }[m
+[31m-  await prisma.patient.create({[m
+[31m-    data: { userId: user.id, name: user.name, email: user.email, contact: user.phone, sixDigitId },[m
+[31m-  });[m
+[31m-}[m
+[31m-[m
+ export const login = async (req: Request, res: Response) => {[m
+   const { identifier, password } = req.body;[m
+[31m-  try {[m
+[31m-    // ONE login page: accept either an email or a phone number.[m
+[31m-    const raw = String(identifier || '').trim();[m
+[31m-    const isEmail = raw.includes('@');[m
+[31m-    const user = isEmail[m
+[31m-      ? await prisma.user.findUnique({ where: { email: raw.toLowerCase() } })[m
+[31m-      : await findUserByPhone(raw);[m
+ [m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const user = await findUserByIdentifier(identifier);[m
+     if (!user || !(await bcrypt.compare(password, user.password))) {[m
+       return res.status(401).json({ error: 'Invalid credentials' });[m
+     }[m
+ [m
+     if (!user.isVerified) {[m
+[31m-      // Re-issue an OTP so the client can move straight to the verify screen.[m
+[31m-      await issueOtp(user);[m
+[32m+[m[32m      const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });[m
+[32m+[m[32m      if (hasChallengeIssue(issued)) {[m
+[32m+[m[32m        return res.status(issued.status).json({ error: issued.error });[m
+[32m+[m[32m      }[m
+[32m+[m
+       return res.status(403).json({[m
+[31m-        error: 'Account not verified. We sent you a fresh verification code.',[m
+[32m+[m[32m        error: 'Account not verified. Verify the required channels to continue.',[m
+         isUnverified: true,[m
+[31m-        email: user.email,[m
+[32m+[m[32m        requiresOtp: true,[m
+[32m+[m[32m        challenge: buildChallengeSummary(issued.challenge, user),[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (needsOtpStepUp(user)) {[m
+[32m+[m[32m      const issued = await createChallenge(user, 'login', { email: true, phone: Boolean(user.phone) });[m
+[32m+[m[32m      if (hasChallengeIssue(issued)) {[m
+[32m+[m[32m        return res.status(issued.status).json({ error: issued.error });[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      return res.status(200).json({[m
+[32m+[m[32m        requiresOtp: true,[m
+[32m+[m[32m        challenge: buildChallengeSummary(issued.challenge, user),[m
+[32m+[m[32m        message: 'Verify the required OTP codes to complete sign in.',[m
+       });[m
+     }[m
+ [m
+     const session = await buildSession(user.id);[m
+[31m-    res.json(session);[m
+[31m-  } catch (error: any) {[m
+[32m+[m[32m    return res.json(session);[m
+[32m+[m[32m  } catch (error) {[m
+     console.error('Login error:', error);[m
+[31m-    res.status(500).json({ error: 'Login failed' });[m
+[32m+[m[32m    return res.status(500).json({ error: 'Login failed' });[m
+   }[m
+ };[m
+ [m
+[31m-export const switchContext = async (req: Request, res: Response) => {[m
+[31m-  const { contextType, hospitalId } = req.body;[m
+[31m-  const userId
