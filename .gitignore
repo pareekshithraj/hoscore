@@ -16,3 +16,6 @@ server/prisma/dev.db
 Logos.zip
 logos_extracted/
 outputs/
+
+.vercel
+.env*

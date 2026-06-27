@@ -146,8 +146,8 @@ async function findUserByIdentifier(identifier: string) {
   if (!raw) return null;
   return raw.includes('@')
     ? prisma.user.findUnique({
-        where: { email: raw.toLowerCase() },
-      })
+      where: { email: raw.toLowerCase() },
+    })
     : findUserByPhone(raw);
 }
 
@@ -384,17 +384,17 @@ export const register = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = existingEmail
       ? await prisma.user.update({
-          where: { id: existingEmail.id },
-          data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
-        })
+        where: { id: existingEmail.id },
+        data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
+      })
       : existingPhone && !existingPhone.isVerified
         ? await prisma.user.update({
-            where: { id: existingPhone.id },
-            data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
-          })
+          where: { id: existingPhone.id },
+          data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
+        })
         : await prisma.user.create({
-            data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
-          });
+          data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
+        });
 
     const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
@@ -611,17 +611,17 @@ export const verifyOtp = async (req: Request, res: Response) => {
       where: { id: challenge.id },
       data: channel === 'email'
         ? {
-            emailVerified: true,
-            emailOtpCode: null,
-            emailOtpExpiresAt: null,
-            emailOtpAttempts: 0,
-          }
+          emailVerified: true,
+          emailOtpCode: null,
+          emailOtpExpiresAt: null,
+          emailOtpAttempts: 0,
+        }
         : {
-            phoneVerified: true,
-            phoneOtpCode: null,
-            phoneOtpExpiresAt: null,
-            phoneOtpAttempts: 0,
-          },
+          phoneVerified: true,
+          phoneOtpCode: null,
+          phoneOtpExpiresAt: null,
+          phoneOtpAttempts: 0,
+        },
       include: { user: true },
     });
 
