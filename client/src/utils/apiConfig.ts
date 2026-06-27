@@ -1,9 +1,15 @@
-// Production API host (Vercel). Client rewrites /api/* → this service.
-export const PRODUCTION_API_ORIGIN = 'https://hoscore-api.vercel.app';
+// Canonical production API origin.
+export const PRODUCTION_API_ORIGIN = 'https://api.hoscore.in';
+
+// Guarantee the base URL ends with exactly one /api segment.
+const withApiSuffix = (origin: string): string => {
+  const trimmed = origin.replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
 
 export const getBaseUrl = (): string => {
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL as string;
+    return withApiSuffix(import.meta.env.VITE_API_URL as string);
   }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
@@ -20,14 +26,8 @@ export const getBaseUrl = (): string => {
     if (isLocal) {
       return `http://${hostname}:5000/api`;
     }
-    // Vercel: same-origin /api is proxied to Render in vercel.json
-    if (hostname.endsWith('.vercel.app')) {
-      return `https://${hostname}/api`;
-    }
-    if (hostname === 'hoscore.in' || hostname === 'www.hoscore.in') {
-      return `${PRODUCTION_API_ORIGIN}/api`;
-    }
-    return `https://${hostname}/api`;
+    // Production web app talks to the dedicated API subdomain.
+    return `${PRODUCTION_API_ORIGIN}/api`;
   }
   return 'http://localhost:5000/api';
 };

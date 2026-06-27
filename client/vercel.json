@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://hoscore-api.vercel.app/api/:path*"
+      "destination": "https://api.hoscore.in/api/:path*"
     },
     {
       "source": "/((?!assets/).*)",

@@ -26,18 +26,24 @@ const port = process.env.PORT || 5000;
 // Security headers
 app.use((helmetPkg as unknown as () => import('express').RequestHandler)());
 
-// CORS — supports configured CLIENT_URL and local dev origin
+// CORS — explicit production allow-list plus local dev origins.
+// Vercel preview deploys (*.vercel.app) are permitted only outside production.
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://hoscore.in',
-  'http://localhost:5173'
+  'https://hoscore.in',
+  'https://www.hoscore.in',
+  'http://localhost:5173',
+  'http://localhost:3000',
 ];
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(cors({
   origin: (origin, callback) => {
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
-      origin.endsWith('.vercel.app')
+      (!isProduction && origin.endsWith('.vercel.app'))
     ) {
       callback(null, true);
     } else {

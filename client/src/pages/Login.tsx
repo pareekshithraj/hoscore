@@ -23,30 +23,18 @@ const slideContent = [
 type Mode = 'login' | 'register' | 'forgot';
 type LoginMethod = 'password' | 'otp';
 
-// MSG91 OTP widget methods (exposed on window via index.html, exposeMethods: true)
-declare global {
-  interface Window {
-    sendOtp?: (identifier: string, success?: (data: any) => void, failure?: (err: any) => void) => void;
-    verifyOtp?: (otp: string, success?: (data: any) => void, failure?: (err: any) => void) => void;
-    retryOtp?: (channel: string | null, success?: (data: any) => void, failure?: (err: any) => void) => void;
-  }
+// Server-driven OTP challenge. The backend generates and delivers the codes
+// (email + phone via MSG91) and we verify each required channel separately.
+interface ChallengeSummary {
+  challengeId: string;
+  purpose: 'register' | 'login' | 'reset_password';
+  email: string;
+  phone: string | null;
+  requiredChannels: { email: boolean; phone: boolean };
+  verifiedChannels: { email: boolean; phone: boolean };
+  expiresAt: string;
+  warnings: string[];
 }
-
-// The OTP was sent via the widget; remember how to exchange it for a session.
-interface ChallengeState {
-  target: string; // shown to the user (phone/email the OTP went to)
-  email: string; // passed to verify endpoint (empty for phone-only)
-  identifier: string; // passed to verify endpoint
-}
-
-// MSG91 wants country code without '+'. Default Indian 10-digit numbers to 91.
-const toMsgIdentifier = (value: string): string => {
-  const raw = value.trim();
-  if (raw.includes('@')) return raw.toLowerCase();
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 10) return `91${digits}`;
-  return digits;
-};
 
 export const Login = () => {
   const { user, activeContext, login } = useAuth();
@@ -66,8 +54,9 @@ export const Login = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
-  const [challenge, setChallenge] = useState<ChallengeState | null>(null);
-  const [otp, setOtp] = useState('');
+  const [challenge, setChallenge] = useState<ChallengeSummary | null>(null);
+  const [emailOtp, setEmailOtp] = useState('');
+  const [phoneOtp, setPhoneOtp] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
@@ -100,7 +89,8 @@ export const Login = () => {
     if (nextMode) setMode(nextMode);
     setChallenge(null);
     setResetToken('');
-    setOtp('');
+    setEmailOtp('');
+    setPhoneOtp('');
     setResetPasswordValue('');
     setConfirmResetPassword('');
     setCountdown(0);
@@ -108,28 +98,15 @@ export const Login = () => {
     setInfo('');
   };
 
-  // Send an OTP via the MSG91 widget, then show the single OTP input.
-  const sendWidgetOtp = (target: string, verifyPayload: { email: string; identifier: string }, message?: string) => {
-    if (typeof window === 'undefined' || !window.sendOtp) {
-      setError('OTP service is still loading. Please try again in a moment.');
-      setIsLoading(false);
-      return;
-    }
-    window.sendOtp(
-      toMsgIdentifier(target),
-      () => {
-        setChallenge({ target, email: verifyPayload.email, identifier: verifyPayload.identifier });
-        setOtp('');
-        setCountdown(60);
-        setError('');
-        setInfo(message || `Enter the OTP sent to ${target}.`);
-        setIsLoading(false);
-      },
-      (err: any) => {
-        setError(err?.message || 'Could not send OTP. Please try again.');
-        setIsLoading(false);
-      }
-    );
+  // Show the challenge card for a server-issued OTP challenge.
+  const beginChallenge = (summary: ChallengeSummary, message?: string) => {
+    setChallenge(summary);
+    setEmailOtp('');
+    setPhoneOtp('');
+    setCountdown(60);
+    setError('');
+    setInfo(message || 'Enter the verification code(s) we sent you.');
+    setIsLoading(false);
   };
 
   const finishAuthResponse = (data: any) => {
@@ -151,6 +128,28 @@ export const Login = () => {
     return data;
   };
 
+  // Apply an updated challenge summary returned after verifying a channel.
+  // When the server finalizes (all required channels verified) it returns a
+  // session, a reset token, or nothing further — handled by the callers.
+  const applyChallengeResponse = (data: any): 'pending' | 'done' => {
+    if (data?.token && data?.contexts && data?.activeContext) {
+      finishAuthResponse(data);
+      return 'done';
+    }
+    if (data?.resetToken) {
+      setResetToken(data.resetToken);
+      setChallenge(null);
+      setInfo(data.message || 'Verification complete. Set your new password.');
+      return 'done';
+    }
+    if (data?.challenge) {
+      setChallenge(data.challenge);
+      if (data.message) setInfo(data.message);
+      return 'pending';
+    }
+    return 'pending';
+  };
+
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -158,8 +157,8 @@ export const Login = () => {
     setInfo('');
     try {
       const data = await postJson('/auth/login', { identifier, password });
-      if (data.requiresOtp) {
-        sendWidgetOtp(identifier, { email: identifier.includes('@') ? identifier : '', identifier });
+      if (data.requiresOtp && data.challenge) {
+        beginChallenge(data.challenge, data.message);
         return;
       }
       finishAuthResponse(data);
@@ -170,12 +169,19 @@ export const Login = () => {
     }
   };
 
-  const handleOtpLoginStart = (e: React.FormEvent) => {
+  const handleOtpLoginStart = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     setInfo('');
-    sendWidgetOtp(identifier, { email: identifier.includes('@') ? identifier : '', identifier });
+    try {
+      const data = await postJson('/auth/start-otp-login', { identifier });
+      if (data.challenge) beginChallenge(data.challenge, data.message);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -189,81 +195,75 @@ export const Login = () => {
     setInfo('');
     try {
       const fullName = `${firstName} ${lastName}`.trim();
-      await postJson('/auth/register', {
+      const data = await postJson('/auth/register', {
         name: fullName,
         email,
         password,
         phone: regPhone,
       });
       setIdentifier(email);
-      // Verify the phone via the widget; the email is passed so the account is matched on verify.
-      sendWidgetOtp(regPhone, { email, identifier: email }, `Enter the OTP sent to ${regPhone}.`);
+      if (data.challenge) beginChallenge(data.challenge, data.message);
     } catch (err: any) {
       setError(err.message);
       setIsLoading(false);
     }
   };
 
-  const handleForgotPasswordStart = (e: React.FormEvent) => {
+  const handleForgotPasswordStart = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     setInfo('');
-    sendWidgetOtp(identifier, { email: identifier.includes('@') ? identifier : '', identifier });
+    try {
+      const data = await postJson('/auth/forgot-password', { identifier });
+      if (data.challenge) beginChallenge(data.challenge, data.message);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const verifyOtpCode = () => {
+  // Verify a single channel's OTP against the server challenge.
+  const verifyChannel = async (channel: 'email' | 'phone') => {
     if (!challenge) return;
-    if (otp.length !== 6) {
-      setError('Enter the 6-digit OTP.');
+    const code = channel === 'email' ? emailOtp : phoneOtp;
+    if (code.length !== 6) {
+      setError(`Enter the 6-digit ${channel} code.`);
       return;
     }
-    if (typeof window === 'undefined' || !window.verifyOtp) {
-      setError('OTP service is still loading. Please try again in a moment.');
-      return;
-    }
-
     setIsLoading(true);
     setError('');
-    // Step 1: verify the OTP with the MSG91 widget → returns an access token.
-    window.verifyOtp(
-      otp,
-      async (widgetData: any) => {
-        const accessToken = widgetData?.message || widgetData?.token || widgetData?.['access-token'] || widgetData;
-        try {
-          // Step 2: exchange the widget access token for a HOSCORE session.
-          const data = await postJson('/auth/verify-msg91-access-token', {
-            accessToken: String(accessToken),
-            email: challenge.email,
-            identifier: challenge.identifier,
-          });
-          finishAuthResponse(data);
-        } catch (err: any) {
-          setError(err.message);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      (err: any) => {
-        setError(err?.message || 'Invalid OTP code.');
-        setIsLoading(false);
+    try {
+      const data = await postJson('/auth/verify-otp', {
+        challengeId: challenge.challengeId,
+        channel,
+        otpCode: code,
+      });
+      const state = applyChallengeResponse(data);
+      if (state === 'pending') {
+        setInfo(data.message || `${channel === 'email' ? 'Email' : 'Phone'} verified.`);
       }
-    );
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (!challenge) return;
-    if (typeof window === 'undefined' || !window.retryOtp) return;
     setError('');
-    window.retryOtp(
-      null,
-      () => {
-        setOtp('');
-        setCountdown(60);
-        setInfo('OTP resent.');
-      },
-      (err: any) => setError(err?.message || 'Could not resend OTP.')
-    );
+    try {
+      const data = await postJson('/auth/resend-otp', { challengeId: challenge.challengeId });
+      if (data.challenge) setChallenge(data.challenge);
+      setEmailOtp('');
+      setPhoneOtp('');
+      setCountdown(60);
+      setInfo(data.message || 'Verification codes resent.');
+    } catch (err: any) {
+      setError(err.message || 'Could not resend codes.');
+    }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -298,58 +298,94 @@ export const Login = () => {
     }
   };
 
-  const renderChallengeCard = () => (
-    <div className="space-y-4">
-      <div className="bg-[#23202E] border border-white/[0.05] rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 font-bold">Verification</p>
-            <h3 className="text-lg font-bold text-white">Enter OTP</h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => resetFlowState(mode === 'register' ? 'register' : 'login')}
-            className="text-xs font-semibold text-slate-400 hover:text-white"
-          >
-            Start over
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <span className="text-xs text-slate-500">Sent to {challenge?.target}</span>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              placeholder="Enter OTP"
-              className="flex-1 px-4 py-3.5 bg-[#1B1824] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 text-center tracking-[0.25em] font-mono font-bold"
-            />
-            <button
-              type="button"
-              disabled={isLoading || otp.length !== 6}
-              onClick={verifyOtpCode}
-              className="px-4 py-3.5 bg-red-600 hover:bg-red-700 rounded-xl text-sm font-semibold disabled:opacity-50"
-            >
-              Verify
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center text-xs">
-        <span className="text-slate-400 font-medium">Didn&apos;t receive a code?</span>
-        {countdown > 0 ? (
-          <span className="text-slate-500 font-semibold">Resend in {countdown}s</span>
-        ) : (
-          <button type="button" onClick={handleResend} className="text-red-500 hover:text-red-400 font-bold">
-            Resend code
-          </button>
+  const renderChannelInput = (
+    channel: 'email' | 'phone',
+    label: string,
+    target: string | null,
+    value: string,
+    setValue: (v: string) => void,
+    verified: boolean,
+  ) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-400 font-semibold">{label}{target ? ` · ${target}` : ''}</span>
+        {verified && (
+          <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+          </span>
         )}
       </div>
+      {!verified && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+            placeholder="6-digit code"
+            className="flex-1 px-4 py-3.5 bg-[#1B1824] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 text-center tracking-[0.25em] font-mono font-bold"
+          />
+          <button
+            type="button"
+            disabled={isLoading || value.length !== 6}
+            onClick={() => verifyChannel(channel)}
+            className="px-4 py-3.5 bg-red-600 hover:bg-red-700 rounded-xl text-sm font-semibold disabled:opacity-50"
+          >
+            Verify
+          </button>
+        </div>
+      )}
     </div>
   );
+
+  const renderChallengeCard = () => {
+    if (!challenge) return null;
+    const { requiredChannels, verifiedChannels } = challenge;
+    return (
+      <div className="space-y-4">
+        <div className="bg-[#23202E] border border-white/[0.05] rounded-2xl p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 font-bold">Verification</p>
+              <h3 className="text-lg font-bold text-white">
+                {requiredChannels.email && requiredChannels.phone ? 'Verify email & phone' : 'Enter OTP'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => resetFlowState(mode === 'register' ? 'register' : 'login')}
+              className="text-xs font-semibold text-slate-400 hover:text-white"
+            >
+              Start over
+            </button>
+          </div>
+
+          {challenge.warnings?.map((w) => (
+            <p key={w} className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">{w}</p>
+          ))}
+
+          {requiredChannels.email && renderChannelInput(
+            'email', 'Email code', challenge.email, emailOtp, setEmailOtp, verifiedChannels.email,
+          )}
+          {requiredChannels.phone && renderChannelInput(
+            'phone', 'Phone code', challenge.phone, phoneOtp, setPhoneOtp, verifiedChannels.phone,
+          )}
+        </div>
+
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-slate-400 font-medium">Didn&apos;t receive a code?</span>
+          {countdown > 0 ? (
+            <span className="text-slate-500 font-semibold">Resend in {countdown}s</span>
+          ) : (
+            <button type="button" onClick={handleResend} className="text-red-500 hover:text-red-400 font-bold">
+              Resend code
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderLoginForm = () => {
     if (resetToken) {
