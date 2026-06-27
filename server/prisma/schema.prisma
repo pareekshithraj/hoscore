@@ -23,14 +23,42 @@ model User {
   avatar        String?
   isSuperAdmin  Boolean      @default(false)
   isVerified    Boolean      @default(false)
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  lastOtpVerifiedAt DateTime?
   otpCode       String?      // stores SHA256(otp + OTP_SECRET), never the plaintext OTP
   otpExpiresAt  DateTime?
   otpAttempts   Int          @default(0)  // failed verify attempts for the current OTP
   otpLastSentAt DateTime?                  // last time an OTP was issued (resend cooldown)
   memberships   Membership[]
   patientProfile Patient?
+  authChallenges AuthChallenge[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+}
+
+model AuthChallenge {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose          String
+  emailOtpCode     String?
+  emailOtpExpiresAt DateTime?
+  emailOtpAttempts Int      @default(0)
+  emailVerified    Boolean  @default(false)
+  phoneOtpCode     String?
+  phoneOtpExpiresAt DateTime?
+  phoneOtpAttempts Int      @default(0)
+  phoneVerified    Boolean  @default(false)
+  requireEmail     Boolean  @default(true)
+  requirePhone     Boolean  @default(true)
+  emailFallback    Boolean  @default(false)
+  smsFallback      Boolean  @default(false)
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId, purpose])
 }
 
 // Links a User to a Hospital with a specific role

@@ -7,6 +7,10 @@ export const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+export const otpLoginSchema = z.object({
+  identifier: z.string().min(3, 'Enter your email or phone number'),
+});
+
 export const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
@@ -14,13 +18,23 @@ export const registerSchema = z.object({
   phone: z.string().min(10, 'Valid phone number required'),
 });
 
-export const sendOtpSchema = z.object({
-  email: z.string().email('Invalid email address'),
+export const verifyOtpSchema = z.object({
+  challengeId: z.string().uuid('Invalid challenge ID'),
+  channel: z.enum(['email', 'phone']),
+  otpCode: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
 });
 
-export const verifyOtpSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  otpCode: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+export const resendOtpSchema = z.object({
+  challengeId: z.string().uuid('Invalid challenge ID'),
+});
+
+export const forgotPasswordSchema = z.object({
+  identifier: z.string().min(3, 'Enter your email or phone number'),
+});
+
+export const resetPasswordSchema = z.object({
+  resetToken: z.string().min(20, 'Reset token is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 export const msg91AccessTokenSchema = z.object({

@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  ArrowRight, CheckCircle2, IndianRupee, Shield, Zap, Database, 
-  BarChart3, Users, Building2, Clock, Globe2, ChevronRight, 
-  Sparkles, Monitor, Cpu, ArrowUpRight, Bed, ClipboardList, Activity, 
+import {
+  ArrowRight, CheckCircle2, IndianRupee, Shield, Zap, Database,
+  BarChart3, Users, Building2, Clock, Globe2, ChevronRight,
+  Sparkles, Monitor, Cpu, ArrowUpRight, Bed, ClipboardList, Activity,
   ArrowDownToLine, Star, Bell, Menu, X
 } from 'lucide-react';
+import { BASE_URL } from '../utils/apiConfig';
+import { openRazorpayOrderCheckout } from '../utils/razorpayCheckout';
 
 export const ForHospitals = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [demoPaymentState, setDemoPaymentState] = useState<'idle' | 'processing' | 'success' | 'cancelled' | 'error'>('idle');
+  const [demoMessage, setDemoMessage] = useState('');
 
   const leadersLogos = [
     { name: "Apollo Hospitals", icon: <Building2 className="w-5 h-5" /> },
@@ -21,6 +25,72 @@ export const ForHospitals = () => {
 
   // Double the list of logos to create a continuous looping track without gaps
   const doubledLogos = [...leadersLogos, ...leadersLogos, ...leadersLogos];
+
+  const handleDemoPayment = async (amount: number) => {
+    setDemoPaymentState('processing');
+    setDemoMessage(`Opening secure checkout for ₹${amount.toLocaleString('en-IN')}...`);
+
+    try {
+      const orderResponse = await fetch(`${BASE_URL}/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amount * 100 }),
+      });
+
+      const data = await orderResponse.json();
+      if (!orderResponse.ok) {
+        throw new Error(data.error || 'Unable to start demo payment');
+      }
+
+      if (data.mockMode) {
+        setDemoPaymentState('success');
+        setDemoMessage(`Demo payment completed for ₹${data.amountInr.toLocaleString('en-IN')}. This is using the mock checkout flow because live Razorpay credentials are not available.`);
+        return;
+      }
+
+      await openRazorpayOrderCheckout({
+        keyId: data.key_id,
+        orderId: data.order_id,
+        amount: data.amount,
+        currency: data.currency,
+        name: 'HOSCORE Demo Payment',
+        description: `Demo checkout for ₹${(amount).toLocaleString('en-IN')}`,
+        prefill: {
+          name: 'Demo Hospital Admin',
+          email: 'demo@hoscore.in',
+          contact: '9999999999',
+        },
+        onSuccess: async (response) => {
+          const verifyResponse = await fetch(`${BASE_URL}/verify-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+              amount: amount * 100,
+            }),
+          });
+
+          const verifyData = await verifyResponse.json();
+          if (!verifyResponse.ok) {
+            throw new Error(verifyData.error || 'Payment verification failed');
+          }
+
+          setDemoPaymentState('success');
+          setDemoMessage(`Payment received successfully for ₹${Math.round((verifyData.amount || amount * 100) / 100).toLocaleString('en-IN')}.`);
+        },
+        onDismiss: () => {
+          setDemoPaymentState('cancelled');
+          setDemoMessage('Checkout was cancelled. You can retry anytime.');
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      setDemoPaymentState('error');
+      setDemoMessage(error instanceof Error ? error.message : 'Payment could not be completed.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
@@ -529,6 +599,29 @@ export const ForHospitals = () => {
               <a href="#" className="hover:text-blue-600 transition-colors">Terms</a>
             </div>
           </div>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleDemoPayment(5000)}
+              disabled={demoPaymentState === 'processing'}
+              className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              Try ₹5,000 demo payment
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDemoPayment(50000)}
+              disabled={demoPaymentState === 'processing'}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              Try ₹50,000 demo payment
+            </button>
+          </div>
+          {demoMessage ? (
+            <p className={`text-center text-sm font-semibold ${demoPaymentState === 'success' ? 'text-emerald-600' : demoPaymentState === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+              {demoMessage}
+            </p>
+          ) : null}
           <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col items-center gap-4">
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-400 font-semibold">Powered by</span>

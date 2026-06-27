@@ -17,8 +17,80 @@ import {
   getLatestSubscription,
 } from '../services/subscriptionService.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
-
 const hid = (req: Request) => (req as AuthRequest).user?.hospitalId;
+
+function normalizeAmountPaise(amount: unknown) {
+  const parsed = typeof amount === 'string' ? Number(amount) : amount;
+  if (typeof parsed !== 'number' || !Number.isFinite(parsed)) {
+    throw new Error('Amount must be a valid number');
+  }
+  const paise = Math.round(parsed);
+  if (paise < 100) {
+    throw new Error('Amount must be at least 100 paise');
+  }
+  return paise;
+}
+
+export const createRazorpayOrder = async (req: Request, res: Response) => {
+  try {
+    const amount = normalizeAmountPaise(req.body?.amount ?? req.query?.amount);
+    const order = await createOrder({
+      amount,
+      hospitalId: 'public-demo',
+      plan: 'STARTER',
+      userCount: 1,
+    });
+
+    res.json({
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: getRazorpayKeyId(),
+      mockMode: !isRazorpayLive,
+      description: `Demo checkout for ₹${(amount / 100).toLocaleString('en-IN')}`,
+    });
+  } catch (err) {
+    console.error('Create Razorpay order error:', err);
+    const message = err instanceof Error ? err.message : 'Failed to create Razorpay order';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const createDemoPaymentOrder = async (req: Request, res: Response) => {
+  return createRazorpayOrder(req, res);
+};
+
+export const verifyRazorpayPayment = async (req: Request, res: Response) => {
+  try {
+    const { orderId, paymentId, signature, amount } = req.body;
+    if (!orderId || !paymentId || !signature) {
+      return res.status(400).json({ error: 'orderId, paymentId and signature are required' });
+    }
+
+    const isValid = verifyPaymentSignature(orderId, paymentId, signature);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Payment signature verification failed' });
+    }
+
+    const amountPaise = normalizeAmountPaise(amount ?? 100);
+    res.json({
+      success: true,
+      message: 'Payment verified successfully',
+      amount: amountPaise,
+      orderId,
+      paymentId,
+      mockMode: !isRazorpayLive,
+    });
+  } catch (err) {
+    console.error('Verify Razorpay payment error:', err);
+    const message = err instanceof Error ? err.message : 'Payment verification failed';
+    res.status(400).json({ error: message });
+  }
+};
+
+export const verifyDemoPaymentOrder = async (req: Request, res: Response) => {
+  return verifyRazorpayPayment(req, res);
+};
 
 export const getPlans = async (_req: Request, res: Response) => {
   res.json({ plans: PLANS, razorpayKeyId: getRazorpayKeyId(), razorpayLive: isRazorpayLive });

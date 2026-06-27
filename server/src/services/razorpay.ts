@@ -6,7 +6,35 @@ const RAZORPAY_KEY = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-export const isRazorpayLive = Boolean(RAZORPAY_KEY && RAZORPAY_SECRET);
+function looksLikeMockCredential(value?: string | null) {
+  const normalized = (value || '').trim().toLowerCase();
+  return !normalized || normalized.includes('mock') || normalized.includes('placeholder') || normalized.includes('example');
+}
+
+function isAuthenticationError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const anyError = error as { statusCode?: number; status?: number; error?: { description?: string; code?: string }; message?: string };
+  const statusCode = anyError.statusCode ?? anyError.status;
+  const description = [anyError.error?.description, anyError.message].filter(Boolean).join(' ').toLowerCase();
+  return (
+    statusCode === 401 ||
+    statusCode === 403 ||
+    description.includes('authentication failed') ||
+    description.includes('invalid key') ||
+    description.includes('bad request error')
+  );
+}
+
+export function shouldUseMockRazorpay(error?: unknown, overrides?: { keyId?: string; secret?: string }) {
+  const keyId = overrides?.keyId ?? RAZORPAY_KEY;
+  const secret = overrides?.secret ?? RAZORPAY_SECRET;
+  if (!keyId || !secret || looksLikeMockCredential(keyId) || looksLikeMockCredential(secret)) {
+    return true;
+  }
+  return isAuthenticationError(error);
+}
+
+export const isRazorpayLive = Boolean(RAZORPAY_KEY && RAZORPAY_SECRET) && !looksLikeMockCredential(RAZORPAY_KEY) && !looksLikeMockCredential(RAZORPAY_SECRET);
 
 let client: Razorpay | null = null;
 function getClient(): Razorpay {
@@ -38,7 +66,21 @@ export interface RazorpayOrder {
 export async function createOrder(options: OrderOptions): Promise<RazorpayOrder> {
   const receipt = `hsc_${options.hospitalId.slice(0, 12)}_${Date.now()}`.slice(0, 40);
 
-  if (isRazorpayLive) {
+  if (!isRazorpayLive) {
+    const mockOrderId = `order_mock_${Date.now()}`;
+    console.log(
+      `💳 [MOCK RAZORPAY] Order ${mockOrderId} | ₹${options.amount / 100} | ${options.userCount} users | Plan: ${options.plan}`,
+    );
+    return {
+      id: mockOrderId,
+      amount: options.amount,
+      currency: options.currency || 'INR',
+      status: 'created',
+      receipt,
+    };
+  }
+
+  try {
     const order = await getClient().orders.create({
       amount: options.amount,
       currency: options.currency || 'INR',
@@ -56,19 +98,20 @@ export async function createOrder(options: OrderOptions): Promise<RazorpayOrder>
       status: order.status,
       receipt: String(order.receipt ?? receipt),
     };
+  } catch (error) {
+    if (shouldUseMockRazorpay(error)) {
+      const fallbackOrderId = `order_mock_${Date.now()}`;
+      console.warn(`💳 [MOCK RAZORPAY FALLBACK] ${fallbackOrderId} | ${String((error as any)?.error?.description || (error as any)?.message || 'Razorpay unavailable')}`);
+      return {
+        id: fallbackOrderId,
+        amount: options.amount,
+        currency: options.currency || 'INR',
+        status: 'created',
+        receipt,
+      };
+    }
+    throw error;
   }
-
-  const mockOrderId = `order_mock_${Date.now()}`;
-  console.log(
-    `💳 [MOCK RAZORPAY] Order ${mockOrderId} | ₹${options.amount / 100} | ${options.userCount} users | Plan: ${options.plan}`,
-  );
-  return {
-    id: mockOrderId,
-    amount: options.amount,
-    currency: options.currency || 'INR',
-    status: 'created',
-    receipt,
-  };
 }
 
 const planIdCache = new Map<string, string>();
@@ -84,20 +127,29 @@ export async function ensureRazorpayPlan(planKey: keyof typeof PLANS): Promise<s
     return mockId;
   }
 
-  const created = await getClient().plans.create({
-    period: 'yearly',
-    interval: 1,
-    item: {
-      name: `HOSCORE ${plan.name}`,
-      amount: plan.pricePerUser * 100,
-      currency: 'INR',
-      description: `₹${plan.pricePerUser}/user/year — ${plan.name} plan`,
-    },
-    notes: { planKey, product: 'hoscore_saas' },
-  });
+  try {
+    const created = await getClient().plans.create({
+      period: 'yearly',
+      interval: 1,
+      item: {
+        name: `HOSCORE ${plan.name}`,
+        amount: plan.pricePerUser * 100,
+        currency: 'INR',
+        description: `₹${plan.pricePerUser}/user/year — ${plan.name} plan`,
+      },
+      notes: { planKey, product: 'hoscore_saas' },
+    });
 
-  planIdCache.set(cacheKey, created.id);
-  return created.id;
+    planIdCache.set(cacheKey, created.id);
+    return created.id;
+  } catch (error) {
+    if (shouldUseMockRazorpay(error)) {
+      const mockId = `plan_mock_${planKey.toLowerCase()}`;
+      planIdCache.set(cacheKey, mockId);
+      return mockId;
+    }
+    throw error;
+  }
 }
 
 export interface SubscriptionCheckout {
@@ -134,28 +186,43 @@ export async function createAutopaySubscription(options: {
     };
   }
 
-  const subscription = await getClient().subscriptions.create({
-    plan_id: planId,
-    quantity,
-    total_count: 12,
-    customer_notify: 1,
-    notes: {
-      hospitalId: options.hospitalId,
-      plan: options.plan,
-      userCount: String(quantity),
-    },
-    notify_info: options.customerEmail
-      ? { notify_email: options.customerEmail }
-      : undefined,
-  });
+  try {
+    const subscription = await getClient().subscriptions.create({
+      plan_id: planId,
+      quantity,
+      total_count: 12,
+      customer_notify: 1,
+      notes: {
+        hospitalId: options.hospitalId,
+        plan: options.plan,
+        userCount: String(quantity),
+      },
+      notify_info: options.customerEmail
+        ? { notify_email: options.customerEmail }
+        : undefined,
+    });
 
-  return {
-    subscriptionId: subscription.id,
-    shortUrl: (subscription as any).short_url ?? null,
-    planId,
-    quantity,
-    amount,
-  };
+    return {
+      subscriptionId: subscription.id,
+      shortUrl: (subscription as any).short_url ?? null,
+      planId,
+      quantity,
+      amount,
+    };
+  } catch (error) {
+    if (shouldUseMockRazorpay(error)) {
+      const mockSubId = `sub_mock_${Date.now()}`;
+      console.warn(`💳 [MOCK RAZORPAY FALLBACK] Subscription ${mockSubId} | ${String((error as any)?.error?.description || (error as any)?.message || 'Razorpay unavailable')}`);
+      return {
+        subscriptionId: mockSubId,
+        shortUrl: null,
+        planId,
+        quantity,
+        amount,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function cancelRazorpaySubscription(subscriptionId: string) {
@@ -210,7 +277,7 @@ export const PLANS = {
 };
 
 export function getRazorpayKeyId() {
-  return RAZORPAY_KEY || 'rzp_test_mock_key';
+  return RAZORPAY_KEY && !looksLikeMockCredential(RAZORPAY_KEY) ? RAZORPAY_KEY : 'rzp_test_mock_key';
 }
 
 export function getPublicAppUrl() {

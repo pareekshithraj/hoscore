@@ -1,0 +1,148 @@
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'client/index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'client/src/pages/ForHospitals.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'client/src/pages/Login.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/prisma/schema.prisma', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/src/controllers/authController.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/src/controllers/paymentController.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/src/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/src/routes/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/src/services/razorpay.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server/src/utils/validators.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex fa5e4c0..58c9d85 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -9,6 +9,8 @@[m [mserver/dist[m
+ *.tsbuildinfo[m
+ [m
+ server/.env[m
+[32m+[m[32mclient/.env[m
+[32m+[m[32mclient/.env.local[m
+ server/prisma/dev.db[m
+ [m
+ Logos.zip[m
+[1mdiff --git a/client/index.html b/client/index.html[m
+[1mindex 4a6034f..0bf3442 100644[m
+[1m--- a/client/index.html[m
+[1m+++ b/client/index.html[m
+[36m@@ -66,6 +66,16 @@[m
+   </head>[m
+   <body>[m
+     <div id="root"></div>[m
+[32m+[m[32m    <script type="text/javascript">[m
+[32m+[m[32m      var configuration = {[m
+[32m+[m[32m        widgetId: "3666796a4a79323539373531",[m
+[32m+[m[32m        tokenAuth: "544542TfH0HQtWur6a3e02f2P1",[m
+[32m+[m[32m        exposeMethods: true,[m
+[32m+[m[32m        success: function (data) {},[m
+[32m+[m[32m        failure: function (error) {},[m
+[32m+[m[32m      };[m
+[32m+[m[32m    </script>[m
+[32m+[m[32m    <script type="text/javascript" onload="initSendOTP(configuration)" src="https://verify.msg91.com/otp-provider.js"></script>[m
+     <script type="module" src="/src/main.tsx"></script>[m
+   </body>[m
+ </html>[m
+[1mdiff --git a/client/src/pages/ForHospitals.tsx b/client/src/pages/ForHospitals.tsx[m
+[1mindex 443dda9..9cd7523 100644[m
+[1m--- a/client/src/pages/ForHospitals.tsx[m
+[1m+++ b/client/src/pages/ForHospitals.tsx[m
+[36m@@ -1,14 +1,18 @@[m
+ import { useState } from 'react';[m
+ import { Link } from 'react-router-dom';[m
+[31m-import { [m
+[31m-  ArrowRight, CheckCircle2, IndianRupee, Shield, Zap, Database, [m
+[31m-  BarChart3, Users, Building2, Clock, Globe2, ChevronRight, [m
+[31m-  Sparkles, Monitor, Cpu, ArrowUpRight, Bed, ClipboardList, Activity, [m
+[32m+[m[32mimport {[m
+[32m+[m[32m  ArrowRight, CheckCircle2, IndianRupee, Shield, Zap, Database,[m
+[32m+[m[32m  BarChart3, Users, Building2, Clock, Globe2, ChevronRight,[m
+[32m+[m[32m  Sparkles, Monitor, Cpu, ArrowUpRight, Bed, ClipboardList, Activity,[m
+   ArrowDownToLine, Star, Bell, Menu, X[m
+ } from 'lucide-react';[m
+[32m+[m[32mimport { BASE_URL } from '../utils/apiConfig';[m
+[32m+[m[32mimport { openRazorpayOrderCheckout } from '../utils/razorpayCheckout';[m
+ [m
+ export const ForHospitals = () => {[m
+   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);[m
+[32m+[m[32m  const [demoPaymentState, setDemoPaymentState] = useState<'idle' | 'processing' | 'success' | 'cancelled' | 'error'>('idle');[m
+[32m+[m[32m  const [demoMessage, setDemoMessage] = useState('');[m
+ [m
+   const leadersLogos = [[m
+     { name: "Apollo Hospitals", icon: <Building2 className="w-5 h-5" /> },[m
+[36m@@ -22,6 +26,72 @@[m [mexport const ForHospitals = () => {[m
+   // Double the list of logos to create a continuous looping track without gaps[m
+   const doubledLogos = [...leadersLogos, ...leadersLogos, ...leadersLogos];[m
+ [m
+[32m+[m[32m  const handleDemoPayment = async (amount: number) => {[m
+[32m+[m[32m    setDemoPaymentState('processing');[m
+[32m+[m[32m    setDemoMessage(`Opening secure checkout for ₹${amount.toLocaleString('en-IN')}...`);[m
+[32m+[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      const orderResponse = await fetch(`${BASE_URL}/create-order`, {[m
+[32m+[m[32m        method: 'POST',[m
+[32m+[m[32m        headers: { 'Content-Type': 'application/json' },[m
+[32m+[m[32m        body: JSON.stringify({ amount: amount * 100 }),[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      const data = await orderResponse.json();[m
+[32m+[m[32m      if (!orderResponse.ok) {[m
+[32m+[m[32m        throw new Error(data.error || 'Unable to start demo payment');[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      if (data.mockMode) {[m
+[32m+[m[32m        setDemoPaymentState('success');[m
+[32m+[m[32m        setDemoMessage(`Demo payment completed for ₹${data.amountInr.toLocaleString('en-IN')}. This is using the mock checkout flow because live Razorpay credentials are not available.`);[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      await openRazorpayOrderCheckout({[m
+[32m+[m[32m        keyId: data.key_id,[m
+[32m+[m[32m        orderId: data.order_id,[m
+[32m+[m[32m        amount: data.amount,[m
+[32m+[m[32m        currency: data.currency,[m
+[32m+[m[32m        name: 'HOSCORE Demo Payment',[m
+[32m+[m[32m        description: `Demo checkout for ₹${(amount).toLocaleString('en-IN')}`,[m
+[32m+[m[32m        prefill: {[m
+[32m+[m[32m          name: 'Demo Hospital Admin',[m
+[32m+[m[32m          email: 'demo@hoscore.in',[m
+[32m+[m[32m          contact: '9999999999',[m
+[32m+[m[32m        },[m
+[32m+[m[32m        onSuccess: async (response) => {[m
+[32m+[m[32m          const verifyResponse = await fetch(`${BASE_URL}/verify-payment`, {[m
+[32m+[m[32m            method: 'POST',[m
+[32m+[m[32m            headers: { 'Content-Type': 'application/json' },[m
+[32m+[m[32m            body: JSON.stringify({[m
+[32m+[m[32m              orderId: response.razorpay_order_id,[m
+[32m+[m[32m              paymentId: response.razorpay_payment_id,[m
+[32m+[m[32m              signature: response.razorpay_signature,[m
+[32m+[m[32m              amount: amount * 100,[m
+[32m+[m[32m            }),[m
+[32m+[m[32m          });[m
+[32m+[m
+[32m+[m[32m          const verifyData = await verifyResponse.json();[m
+[32m+[m[32m          if (!verifyResponse.ok) {[m
+[32m+[m[32m            throw new Error(verifyData.error || 'Payment verification failed');[m
+[32m+[m[32m          }[m
+[32m+[m
+[32m+[m[32m          setDemoPaymentState('success');[m
+[32m+[m[32m          setDemoMessage(`Payment received successfully for ₹${Math.round((verifyData.amount || amount * 100) / 100).toLocaleString('en-IN')}.`);[m
+[32m+[m[32m        },[m
+[32m+[m[32m        onDismiss: () => {[m
+[32m+[m[32m          setDemoPaymentState('cancelled');[m
+[32m+[m[32m          setDemoMessage('Checkout was cancelled. You can retry anytime.');[m
+[32m+[m[32m        },[m
+[32m+[m[32m      });[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      console.error(error);[m
+[32m+[m[32m      setDemoPaymentState('error');[m
+[32m+[m[32m      setDemoMessage(error instanceof Error ? error.message : 'Payment could not be completed.');[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+   return ([m
+     <div className="min-h-screen bg-white overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">[m
+       {/* Navigation */}[m
+[36m@@ -529,6 +599,29 @@[m [mexport const ForHospitals = () => {[m
+               <a href="#" className="hover:text-blue-600 transition-colors">Terms</a>[m
+             </d

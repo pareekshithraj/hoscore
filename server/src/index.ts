@@ -2,6 +2,8 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import helmetPkg from 'helmet';
 import rateLimitPkg from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
@@ -11,6 +13,9 @@ import routes from './routes/index.js';
 import { handlePaymentWebhook } from './controllers/paymentController.js';
 import { validateEnv } from './utils/validateEnv.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 validateEnv();
 
@@ -100,8 +105,11 @@ const otpVerifyLimiter = rateLimit({
 
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/register', loginLimiter);
-app.use('/api/auth/send-otp', otpSendLimiter);
+app.use('/api/auth/start-otp-login', otpSendLimiter);
+app.use('/api/auth/forgot-password', otpSendLimiter);
+app.use('/api/auth/resend-otp', otpSendLimiter);
 app.use('/api/auth/verify-otp', otpVerifyLimiter);
+app.use('/api/auth/reset-password', otpVerifyLimiter);
 app.use('/api/auth', authLimiter);
 
 // API Routes

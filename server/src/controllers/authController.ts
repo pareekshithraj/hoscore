@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import type { AuthChallenge, User } from '@prisma/client';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
 import { signUrl } from '../services/r2.js';
@@ -13,13 +14,110 @@ import {
   smsTargetFromPhone,
   OTP_RESEND_COOLDOWN_MS,
   OTP_MAX_ATTEMPTS,
+  OTP_TTL_MS,
 } from '../utils/otp.js';
 import { normalizePhone } from '../utils/phone.js';
 
-// No fallback — validateEnv() guarantees a strong JWT_SECRET is present at boot.
 const JWT_SECRET = process.env.JWT_SECRET as string;
+const OTP_REVERIFY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
+
+type ChallengePurpose = 'register' | 'login' | 'reset_password';
+type ChallengeChannel = 'email' | 'phone';
+
+interface ChallengeSummary {
+  challengeId: string;
+  purpose: ChallengePurpose;
+  email: string;
+  phone: string | null;
+  requiredChannels: { email: boolean; phone: boolean };
+  verifiedChannels: { email: boolean; phone: boolean };
+  expiresAt: string;
+  warnings: string[];
+}
+
+type ChallengeIssue = { error: string; status: number };
+type ChallengeSuccess = { challenge: AuthChallenge };
+type ChallengeResult = ChallengeIssue | ChallengeSuccess;
+type LoadedChallenge = { challenge: AuthChallenge & { user: User } } | ChallengeIssue;
+
+interface ContextItem {
+  type: 'hospital' | 'patient' | 'superadmin';
+  hospitalId?: string;
+  hospitalName?: string;
+  role?: string;
+  department?: string;
+  permissions?: string[];
+  staffTypeId?: string;
+  staffTypeName?: string;
+}
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+function normalizeIdentifier(identifier: string): string {
+  return String(identifier || '').trim();
+}
+
+function maskPhone(phone: string | null | undefined): string | null {
+  const digits = String(phone || '').replace(/[^\d]/g, '');
+  if (digits.length < 4) return phone || null;
+  return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
+}
+
+function challengeWarnings(challenge: AuthChallenge): string[] {
+  const warnings: string[] = [];
+  if (challenge.smsFallback) {
+    warnings.push('SMS OTP is unavailable right now. Continue with email verification.');
+  }
+  if (challenge.emailFallback) {
+    warnings.push('Email OTP is unavailable right now. Continue with phone verification.');
+  }
+  return warnings;
+}
+
+function hasChallengeIssue(result: ChallengeResult | LoadedChallenge): result is ChallengeIssue {
+  return 'error' in result;
+}
+
+function buildChallengeSummary(challenge: AuthChallenge, user: Pick<User, 'email' | 'phone'>): ChallengeSummary {
+  return {
+    challengeId: challenge.id,
+    purpose: challenge.purpose as ChallengePurpose,
+    email: user.email,
+    phone: maskPhone(user.phone),
+    requiredChannels: {
+      email: challenge.requireEmail,
+      phone: challenge.requirePhone,
+    },
+    verifiedChannels: {
+      email: challenge.emailVerified,
+      phone: challenge.phoneVerified,
+    },
+    expiresAt: challenge.expiresAt.toISOString(),
+    warnings: challengeWarnings(challenge),
+  };
+}
+
+function challengePurposeCopy(purpose: ChallengePurpose) {
+  if (purpose === 'register') {
+    return {
+      emailSubject: 'Your HOSCORE email verification code',
+      emailIntro: 'Use this code to verify your HOSCORE account.',
+      smsText: 'Use this OTP to verify your HOSCORE account.',
+    };
+  }
+  if (purpose === 'reset_password') {
+    return {
+      emailSubject: 'Your HOSCORE password reset code',
+      emailIntro: 'Use this code to reset your HOSCORE password.',
+      smsText: 'Use this OTP to reset your HOSCORE password.',
+    };
+  }
+  return {
+    emailSubject: 'Your HOSCORE login verification code',
+    emailIntro: 'Use this code to complete your HOSCORE login.',
+    smsText: 'Use this OTP to complete your HOSCORE login.',
+  };
+}
 
 async function findUserByPhone(phone: string | null | undefined) {
   const normalized = normalizePhone(phone);
@@ -27,13 +125,37 @@ async function findUserByPhone(phone: string | null | undefined) {
 
   const users = await prisma.user.findMany({
     where: { phone: { not: null } },
-    select: { id: true, name: true, email: true, phone: true, password: true, isVerified: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      password: true,
+      isVerified: true,
+      emailVerifiedAt: true,
+      phoneVerifiedAt: true,
+      lastOtpVerifiedAt: true,
+    },
   });
 
   return users.find((user) => normalizePhone(user.phone) === normalized) || null;
 }
 
-// Build a signed session token + response payload for a fully-verified user.
+async function findUserByIdentifier(identifier: string) {
+  const raw = normalizeIdentifier(identifier);
+  if (!raw) return null;
+  return raw.includes('@')
+    ? prisma.user.findUnique({
+        where: { email: raw.toLowerCase() },
+      })
+    : findUserByPhone(raw);
+}
+
+function needsOtpStepUp(user: Pick<User, 'lastOtpVerifiedAt'>): boolean {
+  if (!user.lastOtpVerifiedAt) return true;
+  return Date.now() - user.lastOtpVerifiedAt.getTime() >= OTP_REVERIFY_WINDOW_MS;
+}
+
 async function buildSession(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -67,57 +189,13 @@ async function buildSession(userId: string) {
   };
 }
 
-// Generate, store (hashed) and deliver an OTP for a user via SMS + email.
-// Returns false if delivery to every channel failed.
-async function issueOtp(user: { id: string; email: string; name: string; phone: string | null }): Promise<boolean> {
-  const otp = generateOtp();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { otpCode: hashOtp(otp), otpExpiresAt: otpExpiry(), otpAttempts: 0, otpLastSentAt: new Date() },
-  });
-
-  const smsTarget = smsTargetFromPhone(user.phone);
-  const deliveries: Promise<boolean>[] = [];
-  if (smsTarget) deliveries.push(sendSmsOtp(smsTarget, otp));
-  deliveries.push(
-    sendMsg91Email({
-      to: user.email,
-      toName: user.name,
-      subject: `Your HOSCORE verification code: ${otp}`,
-      html: `
-        <div style="font-family:system-ui;max-width:480px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">
-          <h2 style="color:#1e293b;text-align:center;margin:0 0 8px">Verification Code</h2>
-          <p style="color:#64748b;text-align:center;margin:0 0 20px">Use this code to verify your HOSCORE account. It expires in 5 minutes.</p>
-          <div style="background:#2563eb;color:white;border-radius:16px;padding:20px;text-align:center;letter-spacing:8px;font-size:36px;font-weight:900">${otp}</div>
-        </div>`,
-    })
-  );
-
-  const results = await Promise.allSettled(deliveries);
-  return results.some((r) => r.status === 'fulfilled' && r.value === true);
-}
-
-interface ContextItem {
-  type: 'hospital' | 'patient' | 'superadmin';
-  hospitalId?: string;
-  hospitalName?: string;
-  role?: string;
-  department?: string;
-  permissions?: string[];
-  staffTypeId?: string;
-  staffTypeName?: string;
-}
-
-// Build all available contexts for a user
 async function buildUserContexts(userId: string, isSuperAdmin: boolean, hasPatientProfile: boolean): Promise<ContextItem[]> {
   const contexts: ContextItem[] = [];
 
-  // Super admin context
   if (isSuperAdmin) {
     contexts.push({ type: 'superadmin', role: 'SUPER_ADMIN' });
   }
 
-  // Hospital memberships
   const memberships = await prisma.membership.findMany({
     where: { userId, status: 'ACTIVE' },
     include: { hospital: { select: { id: true, name: true } }, staffType: true },
@@ -136,12 +214,157 @@ async function buildUserContexts(userId: string, isSuperAdmin: boolean, hasPatie
     });
   }
 
-  // Patient context
   if (hasPatientProfile) {
     contexts.push({ type: 'patient', role: 'PATIENT' });
   }
 
   return contexts;
+}
+
+async function ensurePatientProfile(user: { id: string; name: string; email: string; phone: string | null }) {
+  const existing = await prisma.patient.findUnique({ where: { userId: user.id } });
+  if (existing) return;
+
+  let sixDigitId = '';
+  let unique = false;
+  while (!unique) {
+    sixDigitId = Math.floor(100000 + Math.random() * 900000).toString();
+    const clash = await prisma.patient.findUnique({ where: { sixDigitId } });
+    if (!clash) unique = true;
+  }
+
+  await prisma.patient.create({
+    data: { userId: user.id, name: user.name, email: user.email, contact: user.phone, sixDigitId },
+  });
+}
+
+async function createChallenge(
+  user: Pick<User, 'id' | 'name' | 'email' | 'phone'>,
+  purpose: ChallengePurpose,
+  requestedChannels: { email: boolean; phone: boolean }
+): Promise<ChallengeResult> {
+  const existing = await prisma.authChallenge.findFirst({
+    where: { userId: user.id, purpose, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (existing && Date.now() - existing.updatedAt.getTime() < OTP_RESEND_COOLDOWN_MS) {
+    const wait = Math.ceil((OTP_RESEND_COOLDOWN_MS - (Date.now() - existing.updatedAt.getTime())) / 1000);
+    return { error: `Please wait ${wait}s before requesting another code.`, status: 429 as const };
+  }
+
+  const copy = challengePurposeCopy(purpose);
+  const emailOtp = requestedChannels.email ? generateOtp() : null;
+  const phoneOtp = requestedChannels.phone ? generateOtp() : null;
+
+  let emailDelivered = false;
+  if (emailOtp) {
+    emailDelivered = await sendMsg91Email({
+      to: user.email,
+      toName: user.name,
+      subject: `${copy.emailSubject}: ${emailOtp}`,
+      html: `
+        <div style="font-family:system-ui;max-width:480px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">
+          <h2 style="color:#1e293b;text-align:center;margin:0 0 8px">Verification Code</h2>
+          <p style="color:#64748b;text-align:center;margin:0 0 20px">${copy.emailIntro} It expires in 5 minutes.</p>
+          <div style="background:#2563eb;color:white;border-radius:16px;padding:20px;text-align:center;letter-spacing:8px;font-size:36px;font-weight:900">${emailOtp}</div>
+        </div>`,
+    });
+  }
+
+  const smsTarget = requestedChannels.phone ? smsTargetFromPhone(user.phone) : null;
+  let phoneDelivered = false;
+  if (phoneOtp && smsTarget) {
+    phoneDelivered = await sendSmsOtp(smsTarget, phoneOtp);
+  }
+
+  const requireEmail = requestedChannels.email && emailDelivered;
+  const requirePhone = requestedChannels.phone && phoneDelivered;
+  const emailFallback = requestedChannels.email && !emailDelivered;
+  const smsFallback = requestedChannels.phone && !phoneDelivered;
+
+  if (!requireEmail && !requirePhone) {
+    return { error: 'Could not deliver a verification code. Please try again.', status: 502 as const };
+  }
+
+  await prisma.authChallenge.deleteMany({ where: { userId: user.id, purpose } });
+
+  const challenge = await prisma.authChallenge.create({
+    data: {
+      userId: user.id,
+      purpose,
+      emailOtpCode: requireEmail && emailOtp ? hashOtp(emailOtp) : null,
+      emailOtpExpiresAt: requireEmail ? otpExpiry() : null,
+      phoneOtpCode: requirePhone && phoneOtp ? hashOtp(phoneOtp) : null,
+      phoneOtpExpiresAt: requirePhone ? otpExpiry() : null,
+      requireEmail,
+      requirePhone,
+      emailFallback,
+      smsFallback,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+    },
+  });
+
+  return { challenge };
+}
+
+async function finalizeChallenge(user: User, challenge: AuthChallenge) {
+  const now = new Date();
+
+  await prisma.authChallenge.delete({ where: { id: challenge.id } });
+
+  if (challenge.purpose === 'reset_password') {
+    const resetToken = jwt.sign(
+      { userId: user.id, purpose: 'password_reset' },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastOtpVerifiedAt: now,
+        emailVerifiedAt: challenge.emailVerified ? now : user.emailVerifiedAt,
+        phoneVerifiedAt: challenge.phoneVerified ? now : user.phoneVerifiedAt,
+      },
+    });
+
+    return { resetToken };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isVerified: true,
+      emailVerifiedAt: challenge.emailVerified ? now : user.emailVerifiedAt,
+      phoneVerifiedAt: challenge.phoneVerified ? now : user.phoneVerifiedAt,
+      lastOtpVerifiedAt: now,
+      otpCode: null,
+      otpExpiresAt: null,
+      otpAttempts: 0,
+    },
+  });
+
+  await ensurePatientProfile(user);
+  return buildSession(user.id);
+}
+
+async function getChallengeOrError(challengeId: string) {
+  const challenge = await prisma.authChallenge.findUnique({
+    where: { id: challengeId },
+    include: { user: true },
+  });
+
+  if (!challenge) {
+    return { error: 'Verification request not found. Please start again.', status: 404 as const };
+  }
+
+  if (challenge.expiresAt < new Date()) {
+    await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+    return { error: 'Verification request expired. Please request a new code.', status: 410 as const };
+  }
+
+  return { challenge } satisfies LoadedChallenge;
 }
 
 export const register = async (req: Request, res: Response) => {
@@ -151,29 +374,21 @@ export const register = async (req: Request, res: Response) => {
   const phoneValue = normalizedPhone || null;
 
   try {
-    // Email collision: block only if already verified. An unverified record is
-    // updated in place (never deleted) so a re-registration just refreshes it.
     const existingEmail = await prisma.user.findUnique({ where: { email } });
     if (existingEmail?.isVerified) {
       return res.status(400).json({ error: 'Email already registered. Please log in instead.' });
     }
 
-    // Phone must be globally unique, but we also support reusing an unverified
-    // account that already owns the same phone number so retrying signup works.
     const existingPhone = phoneValue ? await findUserByPhone(phoneValue) : null;
-    if (existingPhone && existingPhone.id !== existingEmail?.id) {
-      if (existingPhone.isVerified) {
-        return res.status(400).json({ error: 'Phone number already registered. Please log in instead.' });
-      }
+    if (existingPhone && existingPhone.id !== existingEmail?.id && existingPhone.isVerified) {
+      return res.status(400).json({ error: 'Phone number already registered. Please log in instead.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create the verified-pending identity, or refresh the existing unverified one.
     const user = existingEmail
       ? await prisma.user.update({
           where: { id: existingEmail.id },
-          data: { name, email, password: hashedPassword, phone: phoneValue },
+          data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
         })
       : existingPhone && !existingPhone.isVerified
         ? await prisma.user.update({
@@ -184,68 +399,321 @@ export const register = async (req: Request, res: Response) => {
             data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
           });
 
-    // Patient profile is created only AFTER verification (see verifyOtp), never here.
-    const delivered = await issueOtp(user);
-    if (!delivered) {
-      return res.status(502).json({ error: 'Could not send your verification code. Please try again.' });
+    const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
+    if (hasChallengeIssue(issued)) {
+      return res.status(issued.status).json({ error: issued.error });
     }
 
-    res.status(201).json({
-      message: 'Verification code sent. Please check your email and phone.',
+    return res.status(201).json({
+      message: 'Verification codes sent. Verify each required channel to continue.',
       requiresOtp: true,
-      email: user.email,
+      challenge: buildChallengeSummary(issued.challenge, user),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    return res.status(500).json({ error: 'Registration failed' });
   }
 };
 
-// Ensure a verified user has a personal patient profile (free for every identity).
-async function ensurePatientProfile(user: { id: string; name: string; email: string; phone: string | null }) {
-  const existing = await prisma.patient.findUnique({ where: { userId: user.id } });
-  if (existing) return;
-  let sixDigitId = '';
-  let unique = false;
-  while (!unique) {
-    sixDigitId = Math.floor(100000 + Math.random() * 900000).toString();
-    const clash = await prisma.patient.findUnique({ where: { sixDigitId } });
-    if (!clash) unique = true;
-  }
-  await prisma.patient.create({
-    data: { userId: user.id, name: user.name, email: user.email, contact: user.phone, sixDigitId },
-  });
-}
-
 export const login = async (req: Request, res: Response) => {
   const { identifier, password } = req.body;
-  try {
-    // ONE login page: accept either an email or a phone number.
-    const raw = String(identifier || '').trim();
-    const isEmail = raw.includes('@');
-    const user = isEmail
-      ? await prisma.user.findUnique({ where: { email: raw.toLowerCase() } })
-      : await findUserByPhone(raw);
 
+  try {
+    const user = await findUserByIdentifier(identifier);
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     if (!user.isVerified) {
-      // Re-issue an OTP so the client can move straight to the verify screen.
-      await issueOtp(user);
+      const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
+      if (hasChallengeIssue(issued)) {
+        return res.status(issued.status).json({ error: issued.error });
+      }
+
       return res.status(403).json({
-        error: 'Account not verified. We sent you a fresh verification code.',
+        error: 'Account not verified. Verify the required channels to continue.',
         isUnverified: true,
-        email: user.email,
+        requiresOtp: true,
+        challenge: buildChallengeSummary(issued.challenge, user),
+      });
+    }
+
+    if (needsOtpStepUp(user)) {
+      const issued = await createChallenge(user, 'login', { email: true, phone: Boolean(user.phone) });
+      if (hasChallengeIssue(issued)) {
+        return res.status(issued.status).json({ error: issued.error });
+      }
+
+      return res.status(200).json({
+        requiresOtp: true,
+        challenge: buildChallengeSummary(issued.challenge, user),
+        message: 'Verify the required OTP codes to complete sign in.',
       });
     }
 
     const session = await buildSession(user.id);
-    res.json(session);
-  } catch (error: any) {
+    return res.json(session);
+  } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    return res.status(500).json({ error: 'Login failed' });
+  }
+};
+
+export const startOtpLogin = async (req: Request, res: Response) => {
+  const identifier = normalizeIdentifier(req.body.identifier);
+
+  try {
+    const user = await findUserByIdentifier(identifier);
+    if (!user) {
+      return res.status(404).json({ error: 'No account found for that email or phone number.' });
+    }
+
+    const purpose: ChallengePurpose = user.isVerified ? 'login' : 'register';
+    const issued = await createChallenge(user, purpose, { email: true, phone: Boolean(user.phone) });
+    if (hasChallengeIssue(issued)) {
+      return res.status(issued.status).json({ error: issued.error });
+    }
+
+    return res.json({
+      requiresOtp: true,
+      challenge: buildChallengeSummary(issued.challenge, user),
+      message: 'Verification codes sent. Verify each required channel to continue.',
+    });
+  } catch (error) {
+    console.error('OTP login start error:', error);
+    return res.status(500).json({ error: 'Failed to start OTP login' });
+  }
+};
+
+export const resendOtp = async (req: Request, res: Response) => {
+  const challengeId = String(req.body.challengeId || '').trim();
+
+  try {
+    const loaded = await getChallengeOrError(challengeId);
+    if (hasChallengeIssue(loaded)) {
+      return res.status(loaded.status).json({ error: loaded.error });
+    }
+
+    const { challenge } = loaded;
+    const issued = await createChallenge(challenge.user, challenge.purpose as ChallengePurpose, {
+      email: challenge.requireEmail || challenge.emailFallback,
+      phone: challenge.requirePhone || challenge.smsFallback,
+    });
+    if (hasChallengeIssue(issued)) {
+      return res.status(issued.status).json({ error: issued.error });
+    }
+
+    return res.json({
+      message: 'Verification codes resent.',
+      challenge: buildChallengeSummary(issued.challenge, challenge.user),
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    return res.status(500).json({ error: 'Failed to resend OTP' });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  const identifier = normalizeIdentifier(req.body.identifier);
+
+  try {
+    const user = await findUserByIdentifier(identifier);
+    if (!user) {
+      return res.status(404).json({ error: 'No account found for that email or phone number.' });
+    }
+
+    const issued = await createChallenge(user, 'reset_password', { email: true, phone: Boolean(user.phone) });
+    if (hasChallengeIssue(issued)) {
+      return res.status(issued.status).json({ error: issued.error });
+    }
+
+    return res.json({
+      requiresOtp: true,
+      challenge: buildChallengeSummary(issued.challenge, user),
+      message: 'Verification codes sent. Verify each required channel to reset your password.',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ error: 'Failed to start password reset' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const resetToken = String(req.body.resetToken || '').trim();
+  const password = String(req.body.password || '');
+
+  try {
+    const payload = jwt.verify(resetToken, JWT_SECRET) as { userId?: string; purpose?: string };
+    if (!payload?.userId || payload.purpose !== 'password_reset') {
+      return res.status(401).json({ error: 'Invalid reset token' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: payload.userId },
+      data: { password: hashedPassword },
+    });
+
+    return res.json({ message: 'Password updated successfully. You can log in now.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(401).json({ error: 'Reset token expired or invalid' });
+  }
+};
+
+export const verifyOtp = async (req: Request, res: Response) => {
+  const challengeId = String(req.body.challengeId || '').trim();
+  const channel = String(req.body.channel || '').trim() as ChallengeChannel;
+  const otpCode = String(req.body.otpCode || '').trim();
+
+  try {
+    const loaded = await getChallengeOrError(challengeId);
+    if (hasChallengeIssue(loaded)) {
+      return res.status(loaded.status).json({ error: loaded.error });
+    }
+
+    const { challenge } = loaded;
+    if (channel !== 'email' && channel !== 'phone') {
+      return res.status(400).json({ error: 'Invalid verification channel' });
+    }
+
+    const required = channel === 'email' ? challenge.requireEmail : challenge.requirePhone;
+    const alreadyVerified = channel === 'email' ? challenge.emailVerified : challenge.phoneVerified;
+    const storedHash = channel === 'email' ? challenge.emailOtpCode : challenge.phoneOtpCode;
+    const expiresAt = channel === 'email' ? challenge.emailOtpExpiresAt : challenge.phoneOtpExpiresAt;
+    const attempts = channel === 'email' ? challenge.emailOtpAttempts : challenge.phoneOtpAttempts;
+
+    if (!required) {
+      return res.status(400).json({ error: `${channel === 'email' ? 'Email' : 'Phone'} verification is not required for this request.` });
+    }
+
+    if (alreadyVerified) {
+      const summary = buildChallengeSummary(challenge, challenge.user);
+      return res.json({ challenge: summary, message: `${channel === 'email' ? 'Email' : 'Phone'} already verified.` });
+    }
+
+    if (!storedHash || !expiresAt || expiresAt < new Date()) {
+      return res.status(401).json({ error: 'OTP code expired. Please request a new code.' });
+    }
+
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new code.' });
+    }
+
+    if (!verifyOtpHash(otpCode, storedHash)) {
+      await prisma.authChallenge.update({
+        where: { id: challenge.id },
+        data: channel === 'email'
+          ? { emailOtpAttempts: { increment: 1 } }
+          : { phoneOtpAttempts: { increment: 1 } },
+      });
+      return res.status(401).json({ error: 'Invalid OTP code' });
+    }
+
+    const updated = await prisma.authChallenge.update({
+      where: { id: challenge.id },
+      data: channel === 'email'
+        ? {
+            emailVerified: true,
+            emailOtpCode: null,
+            emailOtpExpiresAt: null,
+            emailOtpAttempts: 0,
+          }
+        : {
+            phoneVerified: true,
+            phoneOtpCode: null,
+            phoneOtpExpiresAt: null,
+            phoneOtpAttempts: 0,
+          },
+      include: { user: true },
+    });
+
+    const complete = (!updated.requireEmail || updated.emailVerified) && (!updated.requirePhone || updated.phoneVerified);
+    if (!complete) {
+      return res.json({
+        message: `${channel === 'email' ? 'Email' : 'Phone'} verified. Verify the remaining channel to continue.`,
+        challenge: buildChallengeSummary(updated, updated.user),
+      });
+    }
+
+    const result = await finalizeChallenge(updated.user, updated);
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to complete verification' });
+    }
+
+    if ('resetToken' in result) {
+      return res.json({
+        message: 'Verification complete. Set your new password.',
+        resetToken: result.resetToken,
+      });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    return res.status(500).json({ error: 'Verification failed' });
+  }
+};
+
+export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
+  const accessToken = String(req.body.accessToken || '').trim();
+  const email = normalizeEmail(String(req.body.email || ''));
+  const identifier = String(req.body.identifier || '').trim();
+
+  if (!accessToken) {
+    return res.status(400).json({ error: 'Access token is required' });
+  }
+
+  try {
+    const verification = await verifyMsg91WidgetAccessToken(accessToken);
+    if (!verification.verified) {
+      return res.status(401).json({ error: verification.error || 'OTP verification failed' });
+    }
+
+    let user = null;
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } });
+    } else if (identifier) {
+      user = await findUserByIdentifier(identifier);
+    }
+
+    if (!user) {
+      const fallbackEmail = email || `${String(identifier || 'demo').replace(/[^a-z0-9]+/gi, '').toLowerCase()}@hoscore.demo`;
+      const fallbackPhone = identifier && !identifier.includes('@') ? normalizePhone(identifier) : null;
+      const fallbackPassword = await bcrypt.hash(`hoscore-demo-${Date.now()}`, 10);
+
+      user = await prisma.user.create({
+        data: {
+          email: fallbackEmail,
+          password: fallbackPassword,
+          name: 'Demo User',
+          phone: fallbackPhone || null,
+          isVerified: true,
+        },
+      });
+    }
+
+    if (!user.isVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isVerified: true,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: user.phone ? new Date() : user.phoneVerifiedAt,
+          lastOtpVerifiedAt: new Date(),
+          otpCode: null,
+          otpExpiresAt: null,
+          otpAttempts: 0,
+        },
+      });
+      await ensurePatientProfile(user);
+    }
+
+    const session = await buildSession(user.id);
+    return res.json({ message: 'OTP verified successfully', ...session });
+  } catch (error) {
+    console.error('MSG91 widget verification error:', error);
+    return res.status(500).json({ error: 'Failed to verify OTP widget access token' });
   }
 };
 
@@ -296,7 +764,7 @@ export const switchContext = async (req: Request, res: Response) => {
       { expiresIn: '24h' }
     );
 
-    res.json({
+    return res.json({
       token,
       activeContext: {
         type: contextType,
@@ -307,7 +775,7 @@ export const switchContext = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Switch context error:', error);
-    res.status(500).json({ error: 'Failed to switch context' });
+    return res.status(500).json({ error: 'Failed to switch context' });
   }
 };
 
@@ -321,9 +789,9 @@ export const getMyContexts = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const contexts = await buildUserContexts(user.id, user.isSuperAdmin, !!user.patientProfile);
-    res.json({ contexts });
+    return res.json({ contexts });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get contexts' });
+    return res.status(500).json({ error: 'Failed to get contexts' });
   }
 };
 
@@ -335,132 +803,10 @@ export const getMe = async (req: Request, res: Response) => {
       select: { id: true, name: true, email: true, phone: true, isSuperAdmin: true, avatar: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    
+
     const signedAvatar = user.avatar ? await signUrl(user.avatar) : null;
-    res.json({ ...user, avatar: signedAvatar });
+    return res.json({ ...user, avatar: signedAvatar });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get user' });
-  }
-};
-
-export const sendOtp = async (req: Request, res: Response) => {
-  const email = normalizeEmail(String(req.body.email || ''));
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    // Don't leak which emails exist — respond the same whether or not the user is found.
-    if (!user) {
-      return res.json({ message: 'If an account exists, a verification code has been sent.' });
-    }
-
-    // Resend cooldown to prevent SMS/email spam.
-    if (user.otpLastSentAt && Date.now() - user.otpLastSentAt.getTime() < OTP_RESEND_COOLDOWN_MS) {
-      const wait = Math.ceil((OTP_RESEND_COOLDOWN_MS - (Date.now() - user.otpLastSentAt.getTime())) / 1000);
-      return res.status(429).json({ error: `Please wait ${wait}s before requesting another code.` });
-    }
-
-    const delivered = await issueOtp(user);
-    if (!delivered) {
-      return res.status(502).json({ error: 'Failed to deliver OTP. Please try again.' });
-    }
-
-    res.json({ message: 'OTP sent successfully' });
-  } catch (error) {
-    console.error('Send OTP error:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
-  }
-};
-
-export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
-  const accessToken = String(req.body.accessToken || '').trim();
-  const email = normalizeEmail(String(req.body.email || ''));
-  const identifier = String(req.body.identifier || '').trim();
-
-  if (!accessToken) {
-    return res.status(400).json({ error: 'Access token is required' });
-  }
-
-  try {
-    const verification = await verifyMsg91WidgetAccessToken(accessToken);
-    if (!verification.verified) {
-      return res.status(401).json({ error: verification.error || 'OTP verification failed' });
-    }
-
-    let user = null;
-    if (email) {
-      user = await prisma.user.findUnique({ where: { email } });
-    } else if (identifier) {
-      const isEmail = identifier.includes('@');
-      user = isEmail
-        ? await prisma.user.findUnique({ where: { email: identifier.toLowerCase() } })
-        : await findUserByPhone(identifier);
-    }
-
-    if (!user) {
-      return res.status(404).json({ error: 'Account not found' });
-    }
-
-    if (!user.isVerified) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { isVerified: true, otpCode: null, otpExpiresAt: null, otpAttempts: 0 },
-      });
-      await ensurePatientProfile(user);
-    }
-
-    const session = await buildSession(user.id);
-    res.json({ message: 'OTP verified successfully', ...session });
-  } catch (error) {
-    console.error('MSG91 widget verification error:', error);
-    res.status(500).json({ error: 'Failed to verify OTP widget access token' });
-  }
-};
-
-export const verifyOtp = async (req: Request, res: Response) => {
-  const email = normalizeEmail(String(req.body.email || ''));
-  const otpCode = String(req.body.otpCode || '').trim();
-  if (!email || !otpCode) return res.status(400).json({ error: 'Email and OTP code are required' });
-
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: 'Invalid OTP code' });
-
-    // Single-use: no active OTP on record means it was already consumed or never issued.
-    if (!user.otpCode || !user.otpExpiresAt) {
-      return res.status(401).json({ error: 'No active code. Please request a new one.' });
-    }
-
-    if (user.otpExpiresAt < new Date()) {
-      return res.status(401).json({ error: 'OTP code has expired. Please request a new one.' });
-    }
-
-    if (user.otpAttempts >= OTP_MAX_ATTEMPTS) {
-      return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new code.' });
-    }
-
-    if (!verifyOtpHash(otpCode, user.otpCode)) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { otpAttempts: { increment: 1 } },
-      });
-      return res.status(401).json({ error: 'Invalid OTP code' });
-    }
-
-    // Success: mark verified and consume the OTP atomically (single-use).
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { isVerified: true, otpCode: null, otpExpiresAt: null, otpAttempts: 0 },
-    });
-
-    // Every verified identity owns a free personal patient dashboard.
-    await ensurePatientProfile(user);
-
-    const session = await buildSession(user.id);
-    res.json(session);
-  } catch (error) {
-    console.error('Verify OTP error:', error);
-    res.status(500).json({ error: 'Verification failed' });
+    return res.status(500).json({ error: 'Failed to get user' });
   }
 };

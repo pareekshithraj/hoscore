@@ -9,6 +9,8 @@ server/dist
 *.tsbuildinfo
 
 server/.env
+client/.env
+client/.env.local
 server/prisma/dev.db
 
 Logos.zip

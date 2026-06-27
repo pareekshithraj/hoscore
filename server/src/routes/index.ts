@@ -30,7 +30,18 @@ import * as uploadController from '../controllers/uploadController.js';
 import * as staffTypeController from '../controllers/staffTypeController.js';
 import * as paymentController from '../controllers/paymentController.js';
 import { upload } from '../controllers/uploadController.js';
-import { validate, loginSchema, registerSchema, hospitalRegisterSchema, sendOtpSchema, verifyOtpSchema, msg91AccessTokenSchema } from '../utils/validators.js';
+import {
+  validate,
+  loginSchema,
+  otpLoginSchema,
+  registerSchema,
+  hospitalRegisterSchema,
+  verifyOtpSchema,
+  resendOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  msg91AccessTokenSchema,
+} from '../utils/validators.js';
 import { FEATURES } from '../utils/features.js';
 
 const router = Router();
@@ -38,9 +49,16 @@ const router = Router();
 // ================= PUBLIC ROUTES =================
 router.post('/auth/register', validate(registerSchema), authController.register);
 router.post('/auth/login', validate(loginSchema), authController.login);
-router.post('/auth/send-otp', validate(sendOtpSchema), authController.sendOtp);
+router.post('/auth/start-otp-login', validate(otpLoginSchema), authController.startOtpLogin);
 router.post('/auth/verify-otp', validate(verifyOtpSchema), authController.verifyOtp);
+router.post('/auth/resend-otp', validate(resendOtpSchema), authController.resendOtp);
+router.post('/auth/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
+router.post('/auth/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 router.post('/auth/verify-msg91-access-token', validate(msg91AccessTokenSchema), authController.verifyMsg91AccessToken);
+router.post('/create-order', paymentController.createRazorpayOrder);
+router.post('/verify-payment', paymentController.verifyRazorpayPayment);
+router.post('/payments/demo-order', paymentController.createDemoPaymentOrder);
+router.post('/payments/demo-verify', paymentController.verifyDemoPaymentOrder);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
 
