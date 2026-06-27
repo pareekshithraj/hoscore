@@ -339,6 +339,9 @@ async function finalizeChallenge(user: User, challenge: AuthChallenge) {
       emailVerifiedAt: challenge.emailVerified ? now : user.emailVerifiedAt,
       phoneVerifiedAt: challenge.phoneVerified ? now : user.phoneVerifiedAt,
       lastOtpVerifiedAt: now,
+      otpCode: null,
+      otpExpiresAt: null,
+      otpAttempts: 0,
     },
   });
 
@@ -698,6 +701,9 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
           emailVerifiedAt: new Date(),
           phoneVerifiedAt: user.phone ? new Date() : user.phoneVerifiedAt,
           lastOtpVerifiedAt: new Date(),
+          otpCode: null,
+          otpExpiresAt: null,
+          otpAttempts: 0,
         },
       });
       await ensurePatientProfile(user);
