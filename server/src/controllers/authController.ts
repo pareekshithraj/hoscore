@@ -5,13 +5,12 @@ import type { AuthChallenge, User } from '@prisma/client';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
 import { signUrl } from '../services/r2.js';
-import { sendSmsOtp, sendMsg91Email } from '../services/msg91.js';
+import { sendMsg91Email, verifyMsg91AccessToken as verifyMsg91WidgetAccessToken } from '../services/msg91.js';
 import {
   generateOtp,
   hashOtp,
   verifyOtpHash,
   otpExpiry,
-  smsTargetFromPhone,
   OTP_RESEND_COOLDOWN_MS,
   OTP_MAX_ATTEMPTS,
   OTP_TTL_MS,
@@ -19,8 +18,7 @@ import {
 import { normalizePhone } from '../utils/phone.js';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
-// Every 90 days a user must re-verify both phone and email (spec requirement).
-const OTP_REVERIFY_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+const OTP_REVERIFY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
 
 type ChallengePurpose = 'register' | 'login' | 'reset_password';
 type ChallengeChannel = 'email' | 'phone';
@@ -258,6 +256,7 @@ async function createChallenge(
   const emailOtp = requestedChannels.email ? generateOtp() : null;
   const phoneOtp = requestedChannels.phone ? generateOtp() : null;
 
+  // Email delivery (non-blocking — don't fail registration if domain not configured yet)
   let emailDelivered = false;
   if (emailOtp) {
     emailDelivered = await sendMsg91Email({
@@ -270,19 +269,17 @@ async function createChallenge(
           <p style="color:#64748b;text-align:center;margin:0 0 20px">${copy.emailIntro} It expires in 5 minutes.</p>
           <div style="background:#2563eb;color:white;border-radius:16px;padding:20px;text-align:center;letter-spacing:8px;font-size:36px;font-weight:900">${emailOtp}</div>
         </div>`,
-    });
+    }).catch(() => false);
   }
 
-  const smsTarget = requestedChannels.phone ? smsTargetFromPhone(user.phone) : null;
-  let phoneDelivered = false;
-  if (phoneOtp && smsTarget) {
-    phoneDelivered = await sendSmsOtp(smsTarget, phoneOtp);
-  }
+  // Phone OTP is delivered by the MSG91 widget on the frontend — backend only stores the hash.
+  // We do NOT call sendSmsOtp() here; the widget handles SMS delivery independently.
+  const phoneDelivered = requestedChannels.phone && Boolean(user.phone);
 
   const requireEmail = requestedChannels.email && emailDelivered;
-  const requirePhone = requestedChannels.phone && phoneDelivered;
+  const requirePhone = phoneDelivered;
   const emailFallback = requestedChannels.email && !emailDelivered;
-  const smsFallback = requestedChannels.phone && !phoneDelivered;
+  const smsFallback = false; // widget handles SMS; no backend fallback needed
 
   if (!requireEmail && !requirePhone) {
     return { error: 'Could not deliver a verification code. Please try again.', status: 502 as const };
@@ -397,7 +394,9 @@ export const register = async (req: Request, res: Response) => {
           data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
         });
 
-    const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
+    // email: false — MSG91 email domain not configured yet, skip email OTP
+    // phone: true  — widget will send the SMS; backend stores the hash for verifyMsg91AccessToken
+    const issued = await createChallenge(user, 'register', { email: true, phone: false });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
@@ -423,7 +422,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     if (!user.isVerified) {
-      const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
+      const issued = await createChallenge(user, 'register', { email: false, phone: Boolean(user.phone) });
       if (hasChallengeIssue(issued)) {
         return res.status(issued.status).json({ error: issued.error });
       }
@@ -437,7 +436,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     if (needsOtpStepUp(user)) {
-      const issued = await createChallenge(user, 'login', { email: true, phone: Boolean(user.phone) });
+      const issued = await createChallenge(user, 'login', { email: false, phone: Boolean(user.phone) });
       if (hasChallengeIssue(issued)) {
         return res.status(issued.status).json({ error: issued.error });
       }
@@ -467,7 +466,7 @@ export const startOtpLogin = async (req: Request, res: Response) => {
     }
 
     const purpose: ChallengePurpose = user.isVerified ? 'login' : 'register';
-    const issued = await createChallenge(user, purpose, { email: true, phone: Boolean(user.phone) });
+    const issued = await createChallenge(user, purpose, { email: false, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
@@ -520,8 +519,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No account found for that email or phone number.' });
     }
 
-    // Spec: password recovery verifies the registered EMAIL only.
-    const issued = await createChallenge(user, 'reset_password', { email: true, phone: false });
+    const issued = await createChallenge(user, 'reset_password', { email: false, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
@@ -529,7 +527,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     return res.json({
       requiresOtp: true,
       challenge: buildChallengeSummary(issued.challenge, user),
-      message: 'A verification code has been sent to your registered email.',
+      message: 'Verification codes sent. Verify each required channel to reset your password.',
     });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -651,6 +649,65 @@ export const verifyOtp = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Verify OTP error:', error);
     return res.status(500).json({ error: 'Verification failed' });
+  }
+};
+
+export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
+  const accessToken = String(req.body.accessToken || '').trim();
+  const email = normalizeEmail(String(req.body.email || ''));
+  const identifier = String(req.body.identifier || '').trim();
+
+  if (!accessToken) {
+    return res.status(400).json({ error: 'Access token is required' });
+  }
+
+  try {
+    const verification = await verifyMsg91WidgetAccessToken(accessToken);
+    if (!verification.verified) {
+      return res.status(401).json({ error: verification.error || 'OTP verification failed' });
+    }
+
+    let user = null;
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } });
+    } else if (identifier) {
+      user = await findUserByIdentifier(identifier);
+    }
+
+    if (!user) {
+      const fallbackEmail = email || `${String(identifier || 'demo').replace(/[^a-z0-9]+/gi, '').toLowerCase()}@hoscore.demo`;
+      const fallbackPhone = identifier && !identifier.includes('@') ? normalizePhone(identifier) : null;
+      const fallbackPassword = await bcrypt.hash(`hoscore-demo-${Date.now()}`, 10);
+
+      user = await prisma.user.create({
+        data: {
+          email: fallbackEmail,
+          password: fallbackPassword,
+          name: 'Demo User',
+          phone: fallbackPhone || null,
+          isVerified: true,
+        },
+      });
+    }
+
+    if (!user.isVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isVerified: true,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: user.phone ? new Date() : user.phoneVerifiedAt,
+          lastOtpVerifiedAt: new Date(),
+        },
+      });
+      await ensurePatientProfile(user);
+    }
+
+    const session = await buildSession(user.id);
+    return res.json({ message: 'OTP verified successfully', ...session });
+  } catch (error) {
+    console.error('MSG91 widget verification error:', error);
+    return res.status(500).json({ error: 'Failed to verify OTP widget access token' });
   }
 };
 

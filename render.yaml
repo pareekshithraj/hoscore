@@ -28,7 +28,7 @@ services:
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
       # MSG91 — SMS OTP, Email OTP, widget verification
-      - key: MSG91_AUTHKEY
+      - key: MSG91_AUTH_KEY
         sync: false
       - key: MSG91_TEMPLATE_ID
         sync: false

@@ -76,9 +76,12 @@ export const PatientDashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // The API runs on Render (api.hoscore.in), which supports WebSockets.
-    // Only Vercel serverless preview hosts lack WS support — skip there.
-    const isServerless = window.location.hostname.endsWith('.vercel.app');
+    // WebSocket is not supported on Vercel serverless — skip silently
+    const hostname = window.location.hostname;
+    const isServerless =
+      hostname.endsWith('.vercel.app') ||
+      hostname === 'hoscore.in' ||
+      hostname === 'www.hoscore.in';
     if (isServerless) return;
 
     const wsUrl = getWsUrl(token);

@@ -26,24 +26,19 @@ const port = process.env.PORT || 5000;
 // Security headers
 app.use((helmetPkg as unknown as () => import('express').RequestHandler)());
 
-// CORS — explicit production allow-list plus local dev origins.
-// Vercel preview deploys (*.vercel.app) are permitted only outside production.
+// CORS — supports configured CLIENT_URL and local dev origin
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://hoscore.in',
-  'https://hoscore.in',
-  'https://www.hoscore.in',
   'http://localhost:5173',
-  'http://localhost:3000',
+  'http://localhost:5174',
 ];
-
-const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(cors({
   origin: (origin, callback) => {
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
-      (!isProduction && origin.endsWith('.vercel.app'))
+      origin.endsWith('.vercel.app')
     ) {
       callback(null, true);
     } else {
@@ -79,7 +74,7 @@ const rateLimit = rateLimitPkg as unknown as (options: {
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 150, // More generous limit for general session validation/context switching
+  max: 150,
   message: { error: 'Too many auth request checks, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -87,23 +82,23 @@ const authLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10, // Strict limit for password/register attempts
+  max: 100, // Increased for development/testing
   message: { error: 'Too many login attempts, please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const otpSendLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 3, // Prevent SMS/Email OTP spamming
+  windowMs: 10 * 60 * 1000,
+  max: 20, // Increased for development/testing
   message: { error: 'Too many OTP requests. Please wait 10 minutes before requesting a new code.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const otpVerifyLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 5, // Block brute-force verification guesses
+  windowMs: 5 * 60 * 1000,
+  max: 20, // Increased for development/testing
   message: { error: 'Too many failed verification attempts. Please wait 5 minutes before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,

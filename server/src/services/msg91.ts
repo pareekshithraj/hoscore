@@ -3,13 +3,13 @@
 // logging (dev) so the app still runs without credentials.
 import axios from 'axios';
 
-const AUTHKEY = process.env.MSG91_AUTHKEY;
+const AUTH_KEY = process.env.MSG91_AUTH_KEY;
 const TEMPLATE_ID = process.env.MSG91_TEMPLATE_ID; // SMS OTP template
 const EMAIL_DOMAIN = process.env.MSG91_EMAIL_DOMAIN; // e.g. hoscore.in
 const FROM_EMAIL = process.env.MSG91_FROM_EMAIL || 'noreply@hoscore.in';
 const FROM_NAME = process.env.MSG91_FROM_NAME || 'HOSCORE';
 
-export const isMsg91Live = Boolean(AUTHKEY);
+export const isMsg91Live = Boolean(AUTH_KEY);
 
 const SMS_OTP_URL = 'https://control.msg91.com/api/v5/otp';
 const EMAIL_URL = 'https://control.msg91.com/api/v5/email/send';
@@ -33,14 +33,22 @@ export async function sendSmsOtp(mobile: string, otp: string): Promise<boolean> 
     return true;
   }
   try {
-    await axios.post(
+    const response = await axios.post(
       SMS_OTP_URL,
       { template_id: TEMPLATE_ID, mobile, otp },
-      { headers: { authkey: AUTHKEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
+      { headers: { authkey: AUTH_KEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
+    console.log('✅ [MSG91 SMS OTP] Success:', JSON.stringify(response.data, null, 2));
     return true;
   } catch (err: any) {
-    console.error('MSG91 SMS OTP failed:', err?.response?.data || err?.message);
+    console.error('========== MSG91 SMS OTP ERROR ==========');
+    console.error('Mobile:', mobile);
+    console.error('Template ID:', TEMPLATE_ID);
+    console.error('Status:', err?.response?.status);
+    console.error('Headers:', JSON.stringify(err?.response?.headers, null, 2));
+    console.error('Data:', JSON.stringify(err?.response?.data, null, 2));
+    console.error('Message:', err?.message);
+    console.error('=========================================');
     return false;
   }
 }
@@ -70,7 +78,7 @@ export async function sendMsg91Email({ to, toName, subject, html }: EmailArgs): 
         subject,
         body: [{ type: 'text/html', value: html }],
       },
-      { headers: { authkey: AUTHKEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
+      { headers: { authkey: AUTH_KEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
     return true;
   } catch (err: any) {
@@ -84,7 +92,7 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
     return { verified: false, error: 'Access token is required' };
   }
 
-  if (!AUTHKEY) {
+  if (!AUTH_KEY) {
     console.log(`📱 [MOCK MSG91 WIDGET] Verified access token for demo flow`);
     return { verified: true, response: { mocked: true } };
   }
@@ -92,7 +100,7 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
   try {
     const response = await axios.post(
       WIDGET_VERIFY_URL,
-      buildVerifyAccessTokenPayload(accessToken, AUTHKEY),
+      buildVerifyAccessTokenPayload(accessToken, AUTH_KEY),
       { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
     );
 
@@ -113,13 +121,27 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
       };
     }
 
-    return { verified: true, response: payload };
+    return {
+      verified: true,
+      response: payload,
+    };
+
   } catch (err: any) {
-    console.error('MSG91 widget verification failed:', err?.response?.data || err?.message);
+    console.error("========== MSG91 WIDGET ERROR ==========");
+    console.error("Status:", err?.response?.status);
+    console.error("Headers:", err?.response?.headers);
+    console.error("Data:", JSON.stringify(err?.response?.data, null, 2));
+    console.error("Message:", err?.message);
+    console.error("========================================");
+
     return {
       verified: false,
       response: err?.response?.data,
-      error: err?.response?.data?.message || err?.message || 'MSG91 access token verification failed',
+      error:
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "MSG91 access token verification failed",
     };
   }
 }
