@@ -5,7 +5,7 @@ import type { AuthChallenge, User } from '@prisma/client';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
 import { signUrl } from '../services/r2.js';
-import { sendMsg91Email, sendSmsOtp } from '../services/msg91.js';
+import { sendMsg91Email, verifyMsg91AccessToken as verifyMsg91WidgetAccessToken } from '../services/msg91.js';
 import {
   generateOtp,
   hashOtp,
@@ -273,15 +273,14 @@ async function createChallenge(
     }).catch(() => false);
   }
 
-  let phoneDelivered = false;
-  if (phoneOtp && requestedChannels.phone && Boolean(user.phone)) {
-    phoneDelivered = await sendSmsOtp(user.phone!, phoneOtp).catch(() => false);
-  }
+  // Phone OTP is delivered by the MSG91 widget on the frontend — backend only stores the hash.
+  // We do NOT call sendSmsOtp() here; the widget handles SMS delivery independently.
+  const phoneDelivered = requestedChannels.phone && Boolean(user.phone);
 
   const requireEmail = requestedChannels.email && emailDelivered;
-  const requirePhone = requestedChannels.phone && phoneDelivered;
+  const requirePhone = phoneDelivered;
   const emailFallback = requestedChannels.email && !emailDelivered;
-  const smsFallback = requestedChannels.phone && !phoneDelivered;
+  const smsFallback = false; // widget handles SMS; no backend fallback needed
 
   if (!requireEmail && !requirePhone) {
     return { error: 'Could not deliver a verification code. Please try again.', status: 502 as const };
@@ -397,7 +396,7 @@ export const register = async (req: Request, res: Response) => {
         });
 
     // email: true  — backend sends the email OTP via MSG91 email API
-    // phone: true   — backend sends the phone OTP via MSG91 sms API
+    // phone: true   — widget sends the SMS; backend stores the hash for verifyMsg91AccessToken
     const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
@@ -654,7 +653,64 @@ export const verifyOtp = async (req: Request, res: Response) => {
   }
 };
 
+export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
+  const accessToken = String(req.body.accessToken || '').trim();
+  const email = normalizeEmail(String(req.body.email || ''));
+  const identifier = String(req.body.identifier || '').trim();
 
+  if (!accessToken) {
+    return res.status(400).json({ error: 'Access token is required' });
+  }
+
+  try {
+    const verification = await verifyMsg91WidgetAccessToken(accessToken);
+    if (!verification.verified) {
+      return res.status(401).json({ error: verification.error || 'OTP verification failed' });
+    }
+
+    let user = null;
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } });
+    } else if (identifier) {
+      user = await findUserByIdentifier(identifier);
+    }
+
+    if (!user) {
+      const fallbackEmail = email || `${String(identifier || 'demo').replace(/[^a-z0-9]+/gi, '').toLowerCase()}@hoscore.demo`;
+      const fallbackPhone = identifier && !identifier.includes('@') ? normalizePhone(identifier) : null;
+      const fallbackPassword = await bcrypt.hash(`hoscore-demo-${Date.now()}`, 10);
+
+      user = await prisma.user.create({
+        data: {
+          email: fallbackEmail,
+          password: fallbackPassword,
+          name: 'Demo User',
+          phone: fallbackPhone || null,
+          isVerified: true,
+        },
+      });
+    }
+
+    if (!user.isVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isVerified: true,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: user.phone ? new Date() : user.phoneVerifiedAt,
+          lastOtpVerifiedAt: new Date(),
+        },
+      });
+      await ensurePatientProfile(user);
+    }
+
+    const session = await buildSession(user.id);
+    return res.json({ message: 'OTP verified successfully', ...session });
+  } catch (error) {
+    console.error('MSG91 widget verification error:', error);
+    return res.status(500).json({ error: 'Failed to verify OTP widget access token' });
+  }
+};
 
 export const switchContext = async (req: Request, res: Response) => {
   const { contextType, hospitalId } = req.body;

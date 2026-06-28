@@ -53,6 +53,7 @@ router.post('/auth/verify-otp', validate(verifyOtpSchema), authController.verify
 router.post('/auth/resend-otp', validate(resendOtpSchema), authController.resendOtp);
 router.post('/auth/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
 router.post('/auth/reset-password', validate(resetPasswordSchema), authController.resetPassword);
+router.post('/auth/verify-msg91-access-token', authController.verifyMsg91AccessToken);
 router.post('/create-order', paymentController.createRazorpayOrder);
 router.post('/verify-payment', paymentController.verifyRazorpayPayment);
 router.post('/payments/demo-order', paymentController.createDemoPaymentOrder);
