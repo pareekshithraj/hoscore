@@ -21,21 +21,23 @@ const EMAIL_URL = 'https://control.msg91.com/api/v5/email/send';
  * store in the DB (MSG91 can also generate, but we keep verification server-side).
  */
 export async function sendSmsOtp(mobile: string, otp: string): Promise<boolean> {
+  const intlMobile = mobile.length === 10 ? `91${mobile}` : mobile;
+
   if (!isMsg91Live || !TEMPLATE_ID) {
-    console.log(`📱 [MOCK SMS OTP] ${mobile} -> ${otp}`);
+    console.log(`📱 [MOCK SMS OTP] ${intlMobile} -> ${otp}`);
     return true;
   }
   try {
     const response = await axios.post(
       SMS_OTP_URL,
-      { template_id: TEMPLATE_ID, mobile, otp },
+      { template_id: TEMPLATE_ID, mobile: intlMobile, otp },
       { headers: { authkey: AUTH_KEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
     console.log('✅ [MSG91 SMS OTP] Success:', JSON.stringify(response.data, null, 2));
     return true;
   } catch (err: any) {
     console.error('========== MSG91 SMS OTP ERROR ==========');
-    console.error('Mobile:', mobile);
+    console.error('Mobile:', intlMobile);
     console.error('Template ID:', TEMPLATE_ID);
     console.error('Status:', err?.response?.status);
     console.error('Headers:', JSON.stringify(err?.response?.headers, null, 2));
