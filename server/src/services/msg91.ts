@@ -23,19 +23,14 @@ const EMAIL_URL = 'https://control.msg91.com/api/v5/email/send';
 export async function sendSmsOtp(mobile: string, otp: string): Promise<boolean> {
   const intlMobile = mobile.length === 10 ? `91${mobile}` : mobile;
 
-  if (!isMsg91Live) {
+  if (!isMsg91Live || !TEMPLATE_ID) {
     console.log(`📱 [MOCK SMS OTP] ${intlMobile} -> ${otp}`);
     return true;
   }
   try {
-    const payload: Record<string, string> = { mobile: intlMobile, otp };
-    if (TEMPLATE_ID) {
-      payload.template_id = TEMPLATE_ID;
-    }
-
     const response = await axios.post(
       SMS_OTP_URL,
-      payload,
+      { template_id: TEMPLATE_ID, mobile: intlMobile, otp },
       { headers: { authkey: AUTH_KEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
     console.log('✅ [MSG91 SMS OTP] Success:', JSON.stringify(response.data, null, 2));
