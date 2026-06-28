@@ -65,14 +65,8 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  // Phone is verified through the MSG91 widget (window.sendOtp / window.verifyOtp),
-  // not the backend OTP. We track its verification locally and hold the session
-  // returned by the widget endpoint until email is also verified.
-  const [widgetPhone, setWidgetPhone] = useState('');
   const [emailVerifiedLocal, setEmailVerifiedLocal] = useState(false);
   const [phoneVerifiedLocal, setPhoneVerifiedLocal] = useState(false);
-  const [pendingSession, setPendingSession] = useState<any>(null);
-  const [widgetSent, setWidgetSent] = useState(false);
 
   const toIntlPhone = (raw: string) => {
     const digits = (raw || '').replace(/\D/g, '');
@@ -110,8 +104,6 @@ export const Login = () => {
     setConfirmResetPassword('');
     setEmailVerifiedLocal(false);
     setPhoneVerifiedLocal(false);
-    setPendingSession(null);
-    setWidgetSent(false);
     setCountdown(0);
     setError('');
     setInfo('');
@@ -124,20 +116,10 @@ export const Login = () => {
     setPhoneOtp('');
     setEmailVerifiedLocal(false);
     setPhoneVerifiedLocal(false);
-    setPendingSession(null);
-    setWidgetSent(false);
     setCountdown(60);
     setError('');
     setInfo(message || 'Enter the verification code(s) we sent you.');
     setIsLoading(false);
-    // Auto-fire the MSG91 widget SMS when phone verification is required.
-    if (summary.requiredChannels.phone) {
-      const intl = toIntlPhone(widgetPhone || regPhone || identifier);
-      const sendOtp = (window as any).sendOtp;
-      if (intl && typeof sendOtp === 'function') {
-        sendOtp(intl, () => setWidgetSent(true), () => undefined);
-      }
-    }
   };
 
   const finishAuthResponse = (data: any) => {
@@ -233,7 +215,6 @@ export const Login = () => {
         phone: regPhone,
       });
       setIdentifier(email);
-      setWidgetPhone(regPhone);
       if (data.challenge) beginChallenge(data.challenge, data.message);
     } catch (err: any) {
       setError(err.message);
@@ -256,17 +237,7 @@ export const Login = () => {
     }
   };
 
-  // Once both required channels are confirmed locally, complete the login using
-  // the session the MSG91 widget endpoint returned.
-  useEffect(() => {
-    if (!pendingSession || !challenge) return;
-    const needEmail = challenge.requiredChannels.email;
-    const needPhone = challenge.requiredChannels.phone;
-    if ((!needEmail || emailVerifiedLocal) && (!needPhone || phoneVerifiedLocal)) {
-      finishAuthResponse(pendingSession);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingSession, emailVerifiedLocal, phoneVerifiedLocal, challenge]);
+
 
   // Verify the EMAIL channel against the server challenge. Phone is handled by
   // the MSG91 widget separately (see verifyPhoneWidget).
@@ -286,6 +257,7 @@ export const Login = () => {
         otpCode: code,
       });
       if (channel === 'email') setEmailVerifiedLocal(true);
+      if (channel === 'phone') setPhoneVerifiedLocal(true);
       const state = applyChallengeResponse(data);
       if (state === 'pending') {
         setInfo(data.message || `${channel === 'email' ? 'Email' : 'Phone'} verified.`);
@@ -297,65 +269,7 @@ export const Login = () => {
     }
   };
 
-  // Trigger the MSG91 widget to send an SMS OTP to the registered phone.
-  const sendPhoneWidget = () => {
-    const intl = toIntlPhone(widgetPhone || regPhone || identifier);
-    if (!intl) {
-      setError('Enter a valid phone number for SMS OTP.');
-      return;
-    }
-    const sendOtp = (window as any).sendOtp;
-    if (typeof sendOtp !== 'function') {
-      setError('OTP service is still loading. Please try again in a moment.');
-      return;
-    }
-    setError('');
-    sendOtp(
-      intl,
-      () => { setWidgetSent(true); setInfo('SMS OTP sent to your phone.'); },
-      (err: any) => setError(err?.message || 'Could not send SMS OTP.'),
-    );
-  };
 
-  // Verify the SMS OTP via the widget, then exchange the access token for a
-  // session at the backend.
-  const verifyPhoneWidget = async () => {
-    if (phoneOtp.length !== 6) {
-      setError('Enter the 6-digit phone code.');
-      return;
-    }
-    const verifyOtp = (window as any).verifyOtp;
-    if (typeof verifyOtp !== 'function') {
-      setError('OTP service is still loading. Please try again in a moment.');
-      return;
-    }
-    setIsLoading(true);
-    setError('');
-    verifyOtp(
-      phoneOtp,
-      async (data: any) => {
-        const accessToken = data?.message || data?.['access-token'] || data?.accessToken || data;
-        try {
-          const session = await postJson('/auth/verify-msg91-access-token', {
-            accessToken,
-            email: challenge?.email || email,
-            identifier: toIntlPhone(widgetPhone || regPhone || identifier),
-          });
-          setPhoneVerifiedLocal(true);
-          setPendingSession(session);
-          setInfo('Phone verified.');
-        } catch (err: any) {
-          setError(err.message || 'Phone verification failed.');
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      (err: any) => {
-        setError(err?.message || 'Invalid SMS OTP.');
-        setIsLoading(false);
-      },
-    );
-  };
 
   const handleResend = async () => {
     if (!challenge) return;
@@ -435,22 +349,14 @@ export const Login = () => {
           <button
             type="button"
             disabled={isLoading || value.length !== 6}
-            onClick={() => (channel === 'phone' ? verifyPhoneWidget() : verifyChannel(channel))}
+            onClick={() => verifyChannel(channel)}
             className="px-4 py-3.5 bg-red-600 hover:bg-red-700 rounded-xl text-sm font-semibold disabled:opacity-50"
           >
             Verify
           </button>
         </div>
       )}
-      {channel === 'phone' && !verified && (
-        <button
-          type="button"
-          onClick={sendPhoneWidget}
-          className="text-[11px] font-bold text-red-500 hover:text-red-400"
-        >
-          {widgetSent ? 'Resend SMS code' : 'Send SMS code'}
-        </button>
-      )}
+
     </div>
   );
 
