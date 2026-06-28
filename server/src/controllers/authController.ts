@@ -394,9 +394,9 @@ export const register = async (req: Request, res: Response) => {
           data: { name, email, password: hashedPassword, phone: phoneValue, isVerified: false },
         });
 
-    // email: false — MSG91 email domain not configured yet, skip email OTP
-    // phone: true  — widget will send the SMS; backend stores the hash for verifyMsg91AccessToken
-    const issued = await createChallenge(user, 'register', { email: false, phone: Boolean(user.phone) });
+    // email: true  — backend sends the email OTP via MSG91 email API
+    // phone: true   — widget sends the SMS; backend stores the hash for verifyMsg91AccessToken
+    const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
@@ -422,7 +422,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     if (!user.isVerified) {
-      const issued = await createChallenge(user, 'register', { email: false, phone: Boolean(user.phone) });
+      const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
       if (hasChallengeIssue(issued)) {
         return res.status(issued.status).json({ error: issued.error });
       }
@@ -436,7 +436,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     if (needsOtpStepUp(user)) {
-      const issued = await createChallenge(user, 'login', { email: false, phone: Boolean(user.phone) });
+      const issued = await createChallenge(user, 'login', { email: true, phone: Boolean(user.phone) });
       if (hasChallengeIssue(issued)) {
         return res.status(issued.status).json({ error: issued.error });
       }
@@ -466,7 +466,7 @@ export const startOtpLogin = async (req: Request, res: Response) => {
     }
 
     const purpose: ChallengePurpose = user.isVerified ? 'login' : 'register';
-    const issued = await createChallenge(user, purpose, { email: false, phone: Boolean(user.phone) });
+    const issued = await createChallenge(user, purpose, { email: true, phone: Boolean(user.phone) });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
@@ -519,7 +519,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No account found for that email or phone number.' });
     }
 
-    const issued = await createChallenge(user, 'reset_password', { email: false, phone: Boolean(user.phone) });
+    const issued = await createChallenge(user, 'reset_password', { email: true, phone: false });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
