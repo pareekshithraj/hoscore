@@ -23,6 +23,9 @@ const app = express();
 const prisma = new PrismaClient();
 const port = process.env.PORT || 5000;
 
+// Vercel runs behind a proxy; trust it so express-rate-limit reads the real client IP.
+app.set('trust proxy', 1);
+
 // Security headers
 app.use((helmetPkg as unknown as () => import('express').RequestHandler)());
 
