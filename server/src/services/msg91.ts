@@ -76,7 +76,7 @@ export async function sendMsg91Email({ to, toName, subject, html }: EmailArgs): 
         from: { email: FROM_EMAIL, name: FROM_NAME },
         domain: EMAIL_DOMAIN,
         subject,
-        body: { type: 'html', data: html },
+        body: { type: 'text/html', data: html },
       },
       { headers: { authkey: AUTH_KEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
