@@ -131,11 +131,21 @@ export const Login = () => {
     setInfo(message || 'Enter the verification code(s) we sent you.');
     setIsLoading(false);
     // Auto-fire the MSG91 widget SMS when phone verification is required.
+    // Retry up to 10 times with 500ms delay to handle widget script load race.
     if (summary.requiredChannels.phone) {
       const intl = toIntlPhone(widgetPhone || regPhone || identifier);
-      const sendOtp = (window as any).sendOtp;
-      if (intl && typeof sendOtp === 'function') {
-        sendOtp(intl, () => setWidgetSent(true), () => undefined);
+      if (intl) {
+        let attempts = 0;
+        const tryWidget = () => {
+          const sendOtp = (window as any).sendOtp;
+          if (typeof sendOtp === 'function') {
+            sendOtp(intl, () => setWidgetSent(true), () => undefined);
+          } else if (attempts < 10) {
+            attempts++;
+            setTimeout(tryWidget, 500);
+          }
+        };
+        tryWidget();
       }
     }
   };
@@ -446,9 +456,9 @@ export const Login = () => {
         <button
           type="button"
           onClick={sendPhoneWidget}
-          className="text-[11px] font-bold text-red-500 hover:text-red-400"
+          className="text-[11px] font-bold text-red-500 hover:text-red-400 underline underline-offset-2"
         >
-          {widgetSent ? 'Resend SMS code' : 'Send SMS code'}
+          {widgetSent ? '📱 Resend SMS code' : '📱 Send SMS code to your phone'}
         </button>
       )}
     </div>
