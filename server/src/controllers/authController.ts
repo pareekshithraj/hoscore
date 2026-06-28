@@ -262,6 +262,7 @@ async function createChallenge(
     emailDelivered = await sendMsg91Email({
       to: user.email,
       toName: user.name,
+      otp: emailOtp,
       subject: `${copy.emailSubject}: ${emailOtp}`,
       html: `
         <div style="font-family:system-ui;max-width:480px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">

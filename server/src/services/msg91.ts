@@ -5,6 +5,7 @@ import axios from 'axios';
 
 const AUTH_KEY = process.env.MSG91_AUTH_KEY;
 const TEMPLATE_ID = process.env.MSG91_TEMPLATE_ID; // SMS OTP template
+const EMAIL_TEMPLATE_ID = process.env.MSG91_EMAIL_TEMPLATE_ID; // Email OTP template (MSG91 requires this for email/send)
 const EMAIL_DOMAIN = process.env.MSG91_EMAIL_DOMAIN; // e.g. hoscore.in
 const FROM_EMAIL = process.env.MSG91_FROM_EMAIL || 'noreply@hoscore.in';
 const FROM_NAME = process.env.MSG91_FROM_NAME || 'HOSCORE';
@@ -58,26 +59,44 @@ interface EmailArgs {
   toName?: string;
   subject: string;
   html: string;
+  otp?: string;
 }
 
 /**
  * Send a transactional email via MSG91 Email API.
+ * MSG91's email/send endpoint requires a pre-created template (template_id) on
+ * most accounts — inline HTML is rejected with "template id field is required".
+ * When MSG91_EMAIL_TEMPLATE_ID is set we send via template with the OTP as a
+ * variable; otherwise we attempt inline HTML (works only on inline-enabled accounts).
  */
-export async function sendMsg91Email({ to, toName, subject, html }: EmailArgs): Promise<boolean> {
+export async function sendMsg91Email({ to, toName, subject, html, otp }: EmailArgs): Promise<boolean> {
   if (!isMsg91Live || !EMAIL_DOMAIN) {
     console.log(`📧 [MOCK EMAIL] To: ${to} | Subject: ${subject}`);
     return true;
   }
   try {
-    await axios.post(
-      EMAIL_URL,
-      {
+    const payload: Record<string, unknown> = EMAIL_TEMPLATE_ID
+      ? {
+        recipients: [{
+          to: [{ email: to, name: toName || to }],
+          // Common variable aliases so the template can reference any of them.
+          variables: { otp, OTP: otp, code: otp, company: FROM_NAME, company_name: FROM_NAME },
+        }],
+        from: { email: FROM_EMAIL, name: FROM_NAME },
+        domain: EMAIL_DOMAIN,
+        template_id: EMAIL_TEMPLATE_ID,
+      }
+      : {
         recipients: [{ to: [{ email: to, name: toName || to }] }],
         from: { email: FROM_EMAIL, name: FROM_NAME },
         domain: EMAIL_DOMAIN,
         subject,
         body: { type: 'text/html', data: html },
-      },
+      };
+
+    await axios.post(
+      EMAIL_URL,
+      payload,
       { headers: { authkey: AUTH_KEY as string, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
     return true;
