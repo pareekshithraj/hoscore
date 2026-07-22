@@ -218,7 +218,7 @@ export const ForHospitals = () => {
                 <span className="w-3 h-3 rounded-full bg-emerald-400" />
               </div>
               <div className="w-full max-w-xs sm:max-w-md h-6.5 bg-white border border-slate-200/60 rounded-md text-[11px] text-slate-400 flex items-center justify-center font-semibold shadow-inner">
-                <span className="text-slate-300 mr-1">https://</span>hoscore.com/dashboard
+                <span className="text-slate-300 mr-1">https://</span>hoscore.in/dashboard
               </div>
               <div className="flex items-center gap-2 text-slate-400">
                 <ArrowDownToLine className="w-3.5 h-3.5" />

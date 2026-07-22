@@ -44,6 +44,13 @@ export function validateEnv() {
   for (const key of REQUIRED_IN_PROD) {
     if (!process.env[key] || process.env[key]!.trim() === '') missingProd.push(key);
   }
+
+  // Ensure Razorpay credentials are key-paired (both present if either is configured)
+  const rzId = process.env.RAZORPAY_KEY_ID?.trim();
+  const rzSecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+  if ((rzId && !rzSecret) || (!rzId && rzSecret)) {
+    missingCritical.push('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET (must be configured as a pair)');
+  }
   for (const key of OPTIONAL) {
     if (!process.env[key] || process.env[key]!.trim() === '') missingOptional.push(key);
   }

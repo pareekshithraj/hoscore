@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Bed, Plus, Edit2, Trash2, Filter } from 'lucide-react';
+import { Bed, Plus, Edit2, Trash2, Filter, AlertTriangle, X } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 const statusStyles: Record<string, string> = {
@@ -17,6 +17,7 @@ export const Rooms = () => {
   const [loading, setLoading] = useState(true);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [isBedModalOpen, setIsBedModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'room' | 'bed'; name: string } | null>(null);
 
   const [roomData, setRoomData] = useState({ hospitalId: 'h1', name: '', type: 'Ward', capacity: 1, basePrice: 50 });
   const [bedData, setBedData] = useState({ roomId: '', bedNumber: '', pricePerDay: 50 });
@@ -35,10 +36,11 @@ export const Rooms = () => {
     }).finally(() => setLoading(false));
   };
 
-  const handleDelete = async (id: string, type: 'room' | 'bed') => {
-    if (!window.confirm(`Are you sure you want to delete this ${type}?`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/${type}s/${id}`);
+      await api.delete(`/${deleteTarget.type}s/${deleteTarget.id}`);
+      setDeleteTarget(null);
       fetchData();
     } catch (err) { console.error(err); }
   };
@@ -223,48 +225,48 @@ export const Rooms = () => {
         </select>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
         {activeTab === 'rooms' ? (
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Room Name</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Capacity</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Occupancy</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Base Price</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+              <tr className="bg-slate-50/75 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Room Name</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Capacity</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Occupancy</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Base Price</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
               {rooms.map((room) => (
-                <tr key={room.id} className="hover:bg-slate-50 transition-colors group">
+                <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Bed className="w-4 h-4 text-blue-600" />
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-950/40 rounded-lg flex items-center justify-center">
+                        <Bed className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <span className="font-semibold text-slate-900">{room.name}</span>
+                      <span className="font-semibold text-slate-900 dark:text-zinc-150">{room.name}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-zinc-900 text-slate-800 dark:text-zinc-350 border border-slate-200/50 dark:border-zinc-800/40">
                       {room.type}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{room.capacity} Beds</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">{room.capacity} Beds</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                       <span className="text-xs text-slate-500">{room.beds?.filter((b:any)=>b.status==='OCCUPIED').length || 0}/{room.capacity}</span>
+                       <span className="text-xs text-slate-500 dark:text-zinc-400">{room.beds?.filter((b:any)=>b.status==='OCCUPIED').length || 0}/{room.capacity}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">${room.basePrice || 0}/day</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-zinc-150">${room.basePrice || 0}/day</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                      <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-zinc-900 rounded-md transition-colors cursor-pointer">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(room.id, 'room')} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                      <button onClick={() => setDeleteTarget({ id: room.id, type: 'room', name: room.name })} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-zinc-900 rounded-md transition-colors cursor-pointer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -276,26 +278,26 @@ export const Rooms = () => {
         ) : (
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bed Number</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Room</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Patient</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Daily Price</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+              <tr className="bg-slate-50/75 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Bed Number</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Room</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Current Patient</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Daily Price</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
               {beds.map((bed) => (
-                <tr key={bed.id} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-6 py-4 font-semibold text-slate-900">{bed.bedNumber}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{bed.room?.name || 'N/A'}</td>
+                <tr key={bed.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors group">
+                  <td className="px-6 py-4 font-semibold text-slate-900 dark:text-zinc-150">{bed.bedNumber}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">{bed.room?.name || 'N/A'}</td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles[bed.status]}`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyles[bed.status]}`}>
                       {bed.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">
                     <span className="text-slate-400 italic">None</span>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-slate-900">${bed.pricePerDay || 0}</td>
@@ -304,7 +306,7 @@ export const Rooms = () => {
                       <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(bed.id, 'bed')} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                      <button onClick={() => setDeleteTarget({ id: bed.id, type: 'bed', name: bed.bedNumber })} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -315,6 +317,29 @@ export const Rooms = () => {
           </table>
         )}
       </div>
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 border border-red-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Delete {deleteTarget.type === 'room' ? 'Room' : 'Bed'}</h3>
+                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+              </div>
+              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm text-slate-700 mb-5">Are you sure you want to delete <span className="font-semibold">{deleteTarget.name}</span>?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -6,6 +6,20 @@ import { COUNTRIES, citiesForRegion, statesForCountry } from '../utils/locations
 import { BASE_URL } from '../utils/apiConfig';
 import { fetchJson } from '../utils/fetchJson';
 
+interface RegisterHospitalForm {
+  hospitalName: string;
+  address: string;
+  country: string;
+  city: string;
+  state: string;
+  contact: string;
+  description: string;
+  adminName: string;
+  adminEmail: string;
+  adminPassword: string;
+  adminPhone: string;
+}
+
 export const RegisterHospital = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -13,12 +27,28 @@ export const RegisterHospital = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const [form, setForm] = useState({
-    hospitalName: '', address: '', country: 'India', city: '', state: '', contact: '', description: '',
-    adminName: '', adminEmail: '', adminPassword: '', adminPhone: '',
+  const [form, setForm] = useState<RegisterHospitalForm>(() => {
+    try {
+      const saved = sessionStorage.getItem('hoscore_hospital_register_draft');
+      if (saved) return JSON.parse(saved);
+    } catch (_err) {
+      // Storage unavailable or quota exceeded
+    }
+    return {
+      hospitalName: '', address: '', country: 'India', city: '', state: '', contact: '', description: '',
+      adminName: '', adminEmail: '', adminPassword: '', adminPhone: '',
+    };
   });
 
-  const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+  const update = (key: keyof RegisterHospitalForm, value: string) => setForm((prev: RegisterHospitalForm) => {
+    const updated = { ...prev, [key]: value };
+    try {
+      sessionStorage.setItem('hoscore_hospital_register_draft', JSON.stringify(updated));
+    } catch (_err) {
+      // Storage unavailable
+    }
+    return updated;
+  });
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -30,6 +60,11 @@ export const RegisterHospital = () => {
         body: JSON.stringify(form),
       });
       if (!response.ok) throw new Error(data.error || 'Registration failed');
+      try {
+        sessionStorage.removeItem('hoscore_hospital_register_draft');
+      } catch (_err) {
+        // Storage unavailable
+      }
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);
@@ -92,7 +127,7 @@ export const RegisterHospital = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Country</label>
-                <input list="register-country-options" type="text" placeholder="India" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.country} onChange={e => setForm(prev => ({ ...prev, country: e.target.value, state: '', city: '' }))} />
+                <input list="register-country-options" type="text" placeholder="India" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.country} onChange={e => setForm((prev: RegisterHospitalForm) => ({ ...prev, country: e.target.value, state: '', city: '' }))} />
                 <datalist id="register-country-options">
                   {COUNTRIES.map(country => <option key={country} value={country} />)}
                 </datalist>
@@ -107,7 +142,7 @@ export const RegisterHospital = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">State</label>
-                  <input list="register-state-options" type="text" placeholder="Maharashtra" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.state} onChange={e => setForm(prev => ({ ...prev, state: e.target.value, city: '' }))} />
+                  <input list="register-state-options" type="text" placeholder="Maharashtra" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white" value={form.state} onChange={e => setForm((prev: RegisterHospitalForm) => ({ ...prev, state: e.target.value, city: '' }))} />
                   <datalist id="register-state-options">
                     {statesForCountry(form.country).map(state => <option key={state} value={state} />)}
                   </datalist>

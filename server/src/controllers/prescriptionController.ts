@@ -22,11 +22,43 @@ export const create = async (req: Request, res: Response) => {
 
 export const updateStatus = async (req: Request, res: Response) => {
   try {
-    const existing = await prisma.prescription.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    const hospitalId = hid(req);
+    const existing = await prisma.prescription.findFirst({ where: { id: req.params.id!, hospitalId } });
     if (!existing) return res.status(404).json({ error: 'Prescription not found' });
-    // @ts-ignore
-    const rx = await prisma.prescription.update({ where: { id: req.params.id! }, data: { status: req.body.status } });
-    // @ts-ignore
+    
+    const newStatus = req.body.status;
+    const rx = await prisma.prescription.update({ where: { id: req.params.id! }, data: { status: newStatus } });
+
+    // Auto-deduct matching medicine items from Inventory when status transitions to DISPENSED
+    if (newStatus === 'DISPENSED' && existing.status !== 'DISPENSED' && existing.medicines) {
+      try {
+        let medicineList: Array<{ name?: string; itemName?: string; quantity?: number; count?: number }> = [];
+        if (typeof existing.medicines === 'string') {
+          medicineList = JSON.parse(existing.medicines);
+        } else if (Array.isArray(existing.medicines)) {
+          medicineList = existing.medicines as any;
+        }
+
+        for (const med of medicineList) {
+          const medName = med.name || med.itemName;
+          const qty = Number(med.quantity || med.count || 1);
+          if (medName) {
+            const item = await prisma.inventory.findFirst({
+              where: { hospitalId, itemName: { contains: medName, mode: 'insensitive' } }
+            });
+            if (item && item.stock >= qty) {
+              await prisma.inventory.update({
+                where: { id: item.id },
+                data: { stock: Math.max(0, item.stock - qty) }
+              });
+            }
+          }
+        }
+      } catch (_e) {
+        console.warn('Inventory auto-deduction skipped or failed for prescription:', existing.id);
+      }
+    }
+
     await logAudit(req, 'UPDATE', 'Prescription', rx.id, `Status set to ${rx.status}`);
     res.json(rx);
   } catch (err) { res.status(500).json({ error: 'Failed to update prescription' }); }

@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Plus, Search, AlertTriangle, Package, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Package, Edit2, Trash2, RefreshCw, X } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
+interface InventoryItem {
+  id: string;
+  itemName: string;
+  type: string;
+  stock: number;
+  reorderLevel: number;
+  unit: string;
+  price: number;
+  supplier?: string;
+}
+
 export const Inventory = () => {
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
   const itemTypes = ['Medicine', 'Consumable', 'Equipment', 'Lab Reagent'];
   
   const [formData, setFormData] = useState({ itemName: '', type: 'Medicine', stock: 100, reorderLevel: 20, price: 10, supplier: '' });
@@ -19,10 +32,11 @@ export const Inventory = () => {
       .finally(() => setLoading(false));
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/inventory/${id}`);
+      await api.delete(`/inventory/${deleteTarget.id}`);
+      setDeleteTarget(null);
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -49,7 +63,11 @@ export const Inventory = () => {
     );
   }
 
-  const filtered = typeFilter === 'All' ? inventory : inventory.filter(i => i.type === typeFilter);
+  const byType = typeFilter === 'All' ? inventory : inventory.filter(i => i.type === typeFilter);
+  const filtered = !searchQuery ? byType : byType.filter(i =>
+    i.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (i.supplier || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
   const lowStockCount = inventory.filter(i => i.stock <= i.reorderLevel).length;
 
   return (
@@ -77,7 +95,13 @@ export const Inventory = () => {
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search inventory..." className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input
+            type="text"
+            placeholder="Search inventory..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {['All', ...itemTypes].map(f => (
@@ -133,7 +157,7 @@ export const Inventory = () => {
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md" title="Restock"><RefreshCw className="w-4 h-4" /></button>
                       <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setDeleteTarget(item)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -179,6 +203,29 @@ export const Inventory = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 border border-red-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Delete Item</h3>
+                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+              </div>
+              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm text-slate-700 mb-5">Are you sure you want to remove <span className="font-semibold">{deleteTarget.itemName}</span> from inventory?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Delete Item</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

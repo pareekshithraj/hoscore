@@ -129,6 +129,7 @@ router.post('/super-admin/staff-types', requireSuperAdmin, staffTypeController.c
 router.put('/super-admin/staff-types/:id', requireSuperAdmin, staffTypeController.updateGlobalStaffType);
 router.delete('/super-admin/staff-types/:id', requireSuperAdmin, staffTypeController.deactivateGlobalStaffType);
 router.patch('/super-admin/hospitals/:id/toggle', requireSuperAdmin, superAdminController.toggleHospitalStatus);
+router.patch('/super-admin/users/:id/toggle', requireSuperAdmin, superAdminController.toggleUserStatus);
 
 // ================= HOSPITAL-SCOPED ROUTES =================
 router.use(requireHospitalContext);

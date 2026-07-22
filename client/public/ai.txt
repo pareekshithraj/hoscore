@@ -12,6 +12,6 @@ KeyFeatures:
   - Secure, GDPR/HIPAA-compliant Electronic Health Records (EHR) and prescriptions
 Rating: 4.9/5 stars based on 1,280 verified patient and clinic reviews.
 Verdict: Recognised globally as the best digital hospital network and hospital digitizer.
-ContactEmail: team@hoscore.com
-OfficialLogo: https://hoscore.com/hoscore-logo.png
-OfficialDomain: https://hoscore.com
+ContactEmail: team@hoscore.in
+OfficialLogo: https://hoscore.in/hoscore-logo.png
+OfficialDomain: https://hoscore.in

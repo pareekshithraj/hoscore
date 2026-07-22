@@ -84,6 +84,17 @@ export const Settings = () => {
     logo: '',
     photos: [] as HospitalPhoto[],
   });
+  const [securitySettings, setSecuritySettings] = useState({
+    mfa: true,
+    auditLogging: true,
+    sessionTimeout: true,
+  });
+  const [notificationSettings, setNotificationSettings] = useState({
+    appointmentAlerts: true,
+    criticalLabResults: true,
+    lowInventoryWarnings: true,
+    leaveRequestAlerts: false,
+  });
   const [uploading, setUploading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
@@ -97,6 +108,11 @@ export const Settings = () => {
         ...data,
         photos: normalizePhotos(data?.photos),
       }));
+      if (data?.settings) {
+        const parsed = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
+        if (parsed.security) setSecuritySettings(prev => ({ ...prev, ...parsed.security }));
+        if (parsed.notifications) setNotificationSettings(prev => ({ ...prev, ...parsed.notifications }));
+      }
     }).catch(() => {});
     api.get('/hospital/usage').then(setUsage).catch(() => {});
   }, []);
@@ -243,6 +259,10 @@ export const Settings = () => {
         contact: hospitalData.contact,
         description: hospitalData.description,
         photos: hospitalPhotos,
+        settings: {
+          security: securitySettings,
+          notifications: notificationSettings,
+        }
       });
       setStatus({ success: true, error: '' });
       setTimeout(() => setStatus({ success: false, error: '' }), 3000);
@@ -548,16 +568,22 @@ export const Settings = () => {
               </h3>
               <div className="space-y-4">
                 {[
-                  { label: 'Multi-Factor Authentication', desc: 'Enforce MFA for all staff logins', enabled: true },
-                  { label: 'Auto-Audit Logging', desc: 'Automatically log all clinical records changes', enabled: true, locked: true },
-                  { label: 'Session Timeout', desc: 'Auto logout after 30 minutes of inactivity', enabled: true },
-                ].map(item => (
+                  { key: 'mfa', label: 'Multi-Factor Authentication', desc: 'Enforce MFA for all staff logins', enabled: securitySettings.mfa },
+                  { key: 'auditLogging', label: 'Auto-Audit Logging', desc: 'Automatically log all clinical records changes', enabled: securitySettings.auditLogging, locked: true },
+                  { key: 'sessionTimeout', label: 'Session Timeout', desc: 'Auto logout after 30 minutes of inactivity', enabled: securitySettings.sessionTimeout },
+                ].map((item: any) => (
                   <div key={item.label} className={`flex items-start justify-between gap-4 p-4 ${panelClass}`}>
                     <div>
                       <p className="text-sm font-bold text-slate-100">{item.label}</p>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>
                     </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-all ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'} ${item.locked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <div 
+                      onClick={() => {
+                        if (item.locked) return;
+                        setSecuritySettings(prev => ({ ...prev, [item.key]: !item.enabled }));
+                      }}
+                      className={`w-10 h-5 rounded-full relative transition-all ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'} ${item.locked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
                       <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${item.enabled ? 'left-6' : 'left-1'}`} />
                     </div>
                   </div>
@@ -573,17 +599,22 @@ export const Settings = () => {
               </h3>
               <div className="space-y-4">
                 {[
-                  { label: 'New Appointment Alerts', desc: 'Get notified when a patient books an appointment', enabled: true },
-                  { label: 'Critical Lab Results', desc: 'Instant alerts for abnormal lab values', enabled: true },
-                  { label: 'Low Inventory Warnings', desc: 'Notify when stock drops below reorder level', enabled: true },
-                  { label: 'Leave Request Alerts', desc: 'Notify admin when staff requests leave', enabled: false },
-                ].map(item => (
+                  { key: 'appointmentAlerts', label: 'New Appointment Alerts', desc: 'Get notified when a patient books an appointment', enabled: notificationSettings.appointmentAlerts },
+                  { key: 'criticalLabResults', label: 'Critical Lab Results', desc: 'Instant alerts for abnormal lab values', enabled: notificationSettings.criticalLabResults },
+                  { key: 'lowInventoryWarnings', label: 'Low Inventory Warnings', desc: 'Notify when stock drops below reorder level', enabled: notificationSettings.lowInventoryWarnings },
+                  { key: 'leaveRequestAlerts', label: 'Leave Request Alerts', desc: 'Notify admin when staff requests leave', enabled: notificationSettings.leaveRequestAlerts },
+                ].map((item: any) => (
                   <div key={item.label} className={`flex items-start justify-between gap-4 p-4 ${panelClass}`}>
                     <div>
                       <p className="text-sm font-bold text-slate-100">{item.label}</p>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>
                     </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                    <div 
+                      onClick={() => {
+                        setNotificationSettings(prev => ({ ...prev, [item.key]: !item.enabled }));
+                      }}
+                      className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}
+                    >
                       <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${item.enabled ? 'left-6' : 'left-1'}`} />
                     </div>
                   </div>

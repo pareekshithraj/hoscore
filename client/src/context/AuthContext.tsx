@@ -168,7 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (user && activeContext) {
         try {
           if (typeof bridge.syncUser === 'function') {
-            bridge.syncUser(user.name, activeContext.role || 'STAFF', activeContext.type);
+            bridge.syncUser(user.name, activeContext.role || 'STAFF', activeContext.type, token || localStorage.getItem('token') || '');
           }
         } catch (e) {
           console.error("Failed to sync user via AndroidBridge", e);
@@ -183,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }, [user, activeContext]);
+  }, [user, activeContext, token]);
 
 
   const login = (userData: User, newToken: string, ctxs: ContextItem[], active: ContextItem) => {

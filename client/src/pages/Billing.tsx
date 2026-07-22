@@ -19,6 +19,7 @@ export const Billing = () => {
   const [billing, setBilling] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchBillings = () => {
     setLoading(true);
@@ -48,7 +49,11 @@ export const Billing = () => {
     );
   }
 
-  const filtered = statusFilter === 'All' ? billing : billing.filter(b => b.status === statusFilter);
+  const byStatus = statusFilter === 'All' ? billing : billing.filter(b => b.status === statusFilter);
+  const filtered = !searchQuery ? byStatus : byStatus.filter(b =>
+    (b.admission?.patient?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   const totalRevenue = billing.filter(b => b.status === 'Paid').reduce((sum, b) => sum + (b.totalAmount || 0), 0);
   const totalPending = billing.filter(b => b.status === 'Pending').reduce((sum, b) => sum + (b.totalAmount || 0), 0);
 
@@ -83,7 +88,13 @@ export const Billing = () => {
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search by patient name or invoice..." className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input
+            type="text"
+            placeholder="Search by patient name or invoice..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {['All', 'Paid', 'Pending', 'Partial'].map(f => (

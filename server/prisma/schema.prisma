@@ -23,6 +23,7 @@ model User {
   avatar        String?
   isSuperAdmin  Boolean      @default(false)
   isVerified    Boolean      @default(false)
+  isActive      Boolean      @default(true)
   emailVerifiedAt DateTime?
   phoneVerifiedAt DateTime?
   lastOtpVerifiedAt DateTime?
@@ -116,6 +117,7 @@ model Hospital {
   rating        Float          @default(0)
   isPartnered   Boolean        @default(false)
   isActive      Boolean        @default(true)
+  settings      Json?          @default("{}")
   memberships   Membership[]
   subscriptions Subscription[]
   rooms         Room[]

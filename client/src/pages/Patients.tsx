@@ -21,6 +21,9 @@ export const Patients = () => {
   const [createdAppointment, setCreatedAppointment] = useState<any>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   const openBookingModal = (patient: any) => {
     setSelectedPatient(patient);
@@ -55,7 +58,7 @@ export const Patients = () => {
       setBookingSuccess(true);
     } catch (err) {
       console.error(err);
-      alert('Failed to book appointment');
+      setAlertMessage('Failed to book appointment');
     } finally {
       setBookingLoading(false);
     }
@@ -87,10 +90,15 @@ export const Patients = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this patient?')) return;
+  const handleDelete = (id: string) => {
+    setConfirmDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
     try {
-      await api.delete(`/patients/${id}`);
+      await api.delete(`/patients/${confirmDeleteId}`);
+      setConfirmDeleteId(null);
       fetchPatients();
     } catch (err) {
       console.error(err);
@@ -132,79 +140,88 @@ export const Patients = () => {
         </button>
       </div>
 
-      <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex flex-wrap items-center gap-4 bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-200/60 dark:border-zinc-800/80 shadow-sm">
+        <div className="relative flex-1 min-w-[240px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
           <input 
             type="text" 
             placeholder="Search by name, ID or phone..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800/80 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-650 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
+          <button className="flex items-center gap-2 px-3 py-2 border border-slate-200/60 dark:border-zinc-800/80 rounded-lg text-sm text-slate-600 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors cursor-pointer">
             <Filter className="w-4 h-4" />
             Filter
           </button>
-          <button className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
+          <button className="flex items-center gap-2 px-3 py-2 border border-slate-200/60 dark:border-zinc-800/80 rounded-lg text-sm text-slate-600 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors cursor-pointer">
             <Calendar className="w-4 h-4" />
             Date Range
           </button>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient Name</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Info</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Blood Group</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Last Visit</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+            <tr className="bg-slate-50/75 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Patient Name</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Info</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Blood Group</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Last Visit</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
-            {patients.map((patient) => (
-              <tr key={patient.id} className="hover:bg-slate-50 transition-colors group">
+          <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
+            {(() => {
+              const filteredPatients = patients.filter(patient => 
+                patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                patient.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (patient.sixDigitId || patient.id).toLowerCase().includes(searchQuery.toLowerCase())
+              );
+              return filteredPatients.map((patient) => (
+              <tr key={patient.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors group">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-500">
+                    <div className="w-10 h-10 bg-slate-100 dark:bg-zinc-900 rounded-full flex items-center justify-center font-bold text-slate-500 dark:text-zinc-400 border border-slate-200/30 dark:border-zinc-800/40">
                       {patient.name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div>
-                      <span className="font-semibold text-slate-900 block">{patient.name}</span>
-                      <span className="text-xs text-slate-500">
+                      <span className="font-bold text-slate-900 dark:text-zinc-150 block">{patient.name}</span>
+                      <span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">
                         {patient.isHoscoreUser === false ? 'Manual walk-in' : `HSC-${patient.sixDigitId || patient.id.padStart(5, '0')}`}
                       </span>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-sm text-slate-600">
+                  <div className="text-xs font-semibold text-slate-600 dark:text-zinc-350 space-y-1">
                     <div className="flex items-center gap-1.5">
-                      <Activity className="w-3.5 h-3.5" />
+                      <Activity className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-550" />
                       {calculateAge(patient.dateOfBirth)}y, {patient.gender || 'Unknown'}
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Phone className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-550" />
                       {patient.contact || 'N/A'}
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="px-2 py-1 bg-red-50 text-red-700 rounded text-xs font-bold">
+                  <span className="px-2 py-0.5 bg-red-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded text-xs font-bold font-mono">
                     {patient.bloodGroup || 'N/A'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600">{getLastVisit(patient.admissions)}</td>
+                <td className="px-6 py-4 text-xs font-semibold text-slate-650 dark:text-zinc-400">{getLastVisit(patient.admissions)}</td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    patient.isHoscoreUser === false ? 'bg-slate-900 text-white' :
-                    patient.status === 'In-Patient' ? 'bg-blue-100 text-blue-800' : 
-                    patient.status === 'Out-Patient' ? 'bg-amber-100 text-amber-800' : 
-                    'bg-slate-100 text-slate-800'
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                    patient.isHoscoreUser === false ? 'bg-slate-900 dark:bg-zinc-900 text-white dark:text-zinc-300 border-slate-800 dark:border-zinc-800' :
+                    patient.status === 'In-Patient' ? 'bg-blue-100 dark:bg-blue-950/20 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/25' : 
+                    patient.status === 'Out-Patient' ? 'bg-amber-100 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 border-amber-200/50 dark:border-amber-500/25' : 
+                    'bg-slate-100 dark:bg-zinc-900 text-slate-800 dark:text-zinc-305 border-slate-200/40 dark:border-zinc-800/50'
                   }`}>
                     {patient.isHoscoreUser === false ? 'Manual Care' : patient.status}
                   </span>
@@ -213,12 +230,12 @@ export const Patients = () => {
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => openBookingModal(patient)} 
-                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md" 
+                      className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-blue-50 dark:hover:bg-zinc-900 rounded-md cursor-pointer transition-colors" 
                       title="Book Appointment"
                     >
                       <Calendar className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md">
+                    <button className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-blue-50 dark:hover:bg-zinc-900 rounded-md cursor-pointer transition-colors">
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button onClick={() => handleDelete(patient.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md">
@@ -230,7 +247,8 @@ export const Patients = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+            ));
+          })()}
           </tbody>
         </table>
       </div>
@@ -408,6 +426,24 @@ export const Patients = () => {
         )}
       </Modal>
 
+      <Modal isOpen={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)} title="Delete Patient Record">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">Are you sure you want to delete this patient record? This action is permanent and clears EMR history.</p>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button onClick={confirmDelete} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold">Delete</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!alertMessage} onClose={() => setAlertMessage(null)} title="Alert">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">{alertMessage}</p>
+          <div className="flex justify-end">
+            <button onClick={() => setAlertMessage(null)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold">OK</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

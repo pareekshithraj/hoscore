@@ -1,20 +1,64 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Plus, Search, Stethoscope, User, Edit2, Trash2, Star } from 'lucide-react';
+import { Plus, Search, Stethoscope, User, Edit2, Trash2, Star, X, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
+interface Doctor {
+  id: string;
+  name: string;
+  specialty: string;
+  email: string;
+  status: string;
+  rating?: number;
+  patientsCount?: number;
+}
+
 export const Doctors = () => {
-  const [doctors, setDoctors] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [specialtyFilter, setSpecialtyFilter] = useState('All');
+  const [deleteTarget, setDeleteTarget] = useState<Doctor | null>(null);
+  const [formData, setFormData] = useState({ name: '', specialty: 'Cardiology', contact: '', email: '' });
 
   const specialties = ['Cardiology', 'Neurosurgery', 'Pulmonology', 'Orthopedics', 'Pediatrics', 'Dermatology', 'General Medicine'];
 
-  useEffect(() => {
+  const fetchDoctors = () => {
+    setLoading(true);
     api.get('/doctors')
       .then(res => setDoctors(res))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchDoctors(); }, []);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`/doctors/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      fetchDoctors();
+    } catch (err) { console.error(err); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/doctors', formData);
+      setIsModalOpen(false);
+      setFormData({ name: '', specialty: 'Cardiology', contact: '', email: '' });
+      fetchDoctors();
+    } catch (err) { console.error(err); }
+  };
+
+  const filtered = doctors.filter(doc => {
+    const matchesSearch = !searchQuery ||
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.specialty.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSpecialty = specialtyFilter === 'All' || doc.specialty === specialtyFilter;
+    return matchesSearch && matchesSpecialty;
+  });
 
   if (loading) {
     return (
@@ -40,16 +84,27 @@ export const Doctors = () => {
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search by name or specialty..." className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input
+            type="text"
+            placeholder="Search by name or specialty..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-        <select className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none">
-          <option>All Specialties</option>
+        <select
+          value={specialtyFilter}
+          onChange={e => setSpecialtyFilter(e.target.value)}
+          className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none"
+        >
+          <option value="All">All Specialties</option>
           {specialties.map(s => <option key={s}>{s}</option>)}
         </select>
+        <span className="text-sm text-slate-500 font-medium">{filtered.length} of {doctors.length}</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {doctors.map((doc) => (
+        {filtered.map((doc) => (
           <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md transition-shadow group">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
@@ -82,34 +137,63 @@ export const Doctors = () => {
               <button className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100">
                 View Patients
               </button>
-              <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <button onClick={() => setDeleteTarget(doc)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
         ))}
+        {filtered.length === 0 && (
+          <div className="col-span-3 flex flex-col items-center justify-center py-16 text-slate-400">
+            <Stethoscope className="w-12 h-12 mb-3 opacity-30" />
+            <p className="font-medium">No doctors match your search</p>
+          </div>
+        )}
       </div>
 
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 border border-red-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Remove Doctor</h3>
+                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+              </div>
+              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm text-slate-700 mb-5">Are you sure you want to remove <span className="font-semibold">{deleteTarget.name}</span> from the system?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Doctor">
-        <form className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-              <input type="text" placeholder="Dr. First Last" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" placeholder="Dr. First Last" required value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Specialty</label>
-              <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select value={formData.specialty} onChange={e => setFormData(p => ({ ...p, specialty: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 {specialties.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Contact</label>
-              <input type="text" placeholder="+1 234 567 890" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" placeholder="+1 234 567 890" value={formData.contact} onChange={e => setFormData(p => ({ ...p, contact: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-              <input type="email" placeholder="doctor@hospital.com" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="email" placeholder="doctor@hospital.com" required value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
           <div className="pt-4 flex gap-3">

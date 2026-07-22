@@ -198,49 +198,53 @@ export const SubscriptionBilling = () => {
       )}
 
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500 text-sm mb-2"><Users className="w-4 h-4" /> Team members</div>
-          <p className="text-3xl font-black text-slate-900">{activeUsers}</p>
-          {paidActive && <p className="text-xs text-slate-500 mt-1">{subscription.billedSeats} seats paid</p>}
-          <Link to="/dashboard/staff" className="inline-flex items-center gap-1 text-sm text-rose-600 font-bold mt-3 hover:underline">
+        <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-550 text-sm mb-2"><Users className="w-4 h-4" /> Team members</div>
+          <p className="text-3xl font-black text-slate-900 dark:text-zinc-205">{activeUsers}</p>
+          {paidActive && <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">{subscription.billedSeats} seats paid</p>}
+          <Link to="/dashboard/staff" className="inline-flex items-center gap-1 text-sm text-rose-600 dark:text-rose-400 font-bold mt-3 hover:underline">
             Manage staff <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500 text-sm mb-2"><Calendar className="w-4 h-4" /> Status</div>
-          <p className="text-lg font-bold text-slate-900">{statusLabel}</p>
-          <p className="text-xs text-slate-500 mt-1 capitalize">{subscription.plan.toLowerCase()} plan</p>
+        <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-550 text-sm mb-2"><Calendar className="w-4 h-4" /> Status</div>
+          <p className="text-lg font-bold text-slate-900 dark:text-zinc-205">{statusLabel}</p>
+          <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 capitalize">{subscription.plan.toLowerCase()} plan</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500 text-sm mb-2"><IndianRupee className="w-4 h-4" /> Amount due</div>
-          <p className="text-3xl font-black text-slate-900 flex items-baseline gap-0.5"><IndianRupee className="w-6 h-6" />{annualAmount.toLocaleString()}</p>
-          <p className="text-xs text-slate-500 mt-1">per year ({activeUsers} × ₹{subscription.pricePerUser})</p>
+        <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-550 text-sm mb-2"><IndianRupee className="w-4 h-4" /> Amount due</div>
+          <p className="text-3xl font-black text-slate-900 dark:text-zinc-205 flex items-baseline gap-0.5"><IndianRupee className="w-6 h-6" />{annualAmount.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">per year ({activeUsers} × ₹{subscription.pricePerUser})</p>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-slate-900">Choose plan</h2>
+      <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm space-y-4 transition-all duration-300">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-150">Choose plan</h2>
         <div className="grid md:grid-cols-3 gap-3">
           {PLANS.map((plan) => (
             <button
               key={plan}
               type="button"
               onClick={() => setSelectedPlan(plan)}
-              className={`text-left p-4 rounded-xl border-2 transition-all ${selectedPlan === plan ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 hover:border-slate-300'}`}
+              className={`text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                selectedPlan === plan 
+                  ? 'border-rose-500 bg-rose-50/20 dark:bg-rose-500/10' 
+                  : 'border-slate-200 dark:border-zinc-800 hover:border-slate-350 dark:hover:border-zinc-700'
+              }`}
             >
-              <p className="font-black text-slate-900">{plan}</p>
-              <p className="text-sm text-slate-500 mt-1">₹{plan === 'STARTER' ? 150 : plan === 'PROFESSIONAL' ? 300 : 500}/user/yr</p>
+              <p className="font-black text-slate-900 dark:text-zinc-150">{plan}</p>
+              <p className="text-sm text-slate-500 dark:text-zinc-450 mt-1">₹{plan === 'STARTER' ? 150 : plan === 'PROFESSIONAL' ? 300 : 500}/user/yr</p>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white space-y-4">
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-zinc-900 dark:to-zinc-950 border dark:border-zinc-800/50 rounded-2xl p-6 text-white space-y-4">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-rose-400" />
           <h2 className="text-lg font-bold">Pay for your team</h2>
         </div>
-        <p className="text-slate-300 text-sm">
+        <p className="text-slate-300 dark:text-zinc-400 text-sm">
           You have <strong className="text-white">{activeUsers}</strong> active team member{activeUsers !== 1 ? 's' : ''}.
           {activeUsers < 1 ? ' Add staff in Portal Access Accounts before paying.' : ` Total: ₹${annualAmount}/year.`}
         </p>
@@ -248,7 +252,7 @@ export const SubscriptionBilling = () => {
           <button
             onClick={handlePayNow}
             disabled={paying || activeUsers < 1}
-            className="px-6 py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-xl font-bold flex items-center gap-2 transition-colors"
+            className="px-6 py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-xl font-bold flex items-center gap-2 transition-colors cursor-pointer"
           >
             <CreditCard className="w-4 h-4" />
             {paying ? 'Processing...' : `Pay ₹${annualAmount} now`}
@@ -257,13 +261,13 @@ export const SubscriptionBilling = () => {
             <button
               onClick={handleEnableAutopay}
               disabled={autopayLoading || activeUsers < 1}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-xl font-bold flex items-center gap-2 border border-white/20"
+              className="px-6 py-3 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-xl font-bold flex items-center gap-2 border border-white/20 cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
               {autopayLoading ? 'Setting up...' : 'Enable autopay (yearly)'}
             </button>
           ) : (
-            <button onClick={handleCancelAutopay} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold border border-white/20">
+            <button onClick={handleCancelAutopay} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold border border-white/20 cursor-pointer">
               Cancel autopay
             </button>
           )}
@@ -272,32 +276,32 @@ export const SubscriptionBilling = () => {
           <p className="text-emerald-300 text-sm flex items-center gap-2"><Shield className="w-4 h-4" /> Autopay is active — your subscription renews automatically each year.</p>
         )}
         {!snapshot.razorpayLive && (
-          <p className="text-amber-300 text-xs">Test mode: Razorpay mock checkout (add RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET for live test keys).</p>
+          <p className="text-amber-305 text-xs font-semibold">Test mode: Razorpay mock checkout (add RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET for live test keys).</p>
         )}
       </div>
 
       {snapshot.payments.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Payment history</h2>
+        <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm transition-all duration-300">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-150 mb-4 font-extrabold">Payment history</h2>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm text-left border-collapse">
               <thead>
-                <tr className="text-left text-slate-500 border-b">
-                  <th className="pb-2 pr-4">Date</th>
-                  <th className="pb-2 pr-4">Type</th>
-                  <th className="pb-2 pr-4">Users</th>
-                  <th className="pb-2 pr-4">Amount</th>
-                  <th className="pb-2">Status</th>
+                <tr className="text-left text-slate-500 dark:text-zinc-400 border-b border-slate-100 dark:border-zinc-800 pb-2">
+                  <th className="pb-3 pr-4 font-bold text-xs uppercase tracking-wider">Date</th>
+                  <th className="pb-3 pr-4 font-bold text-xs uppercase tracking-wider">Type</th>
+                  <th className="pb-3 pr-4 font-bold text-xs uppercase tracking-wider">Users</th>
+                  <th className="pb-3 pr-4 font-bold text-xs uppercase tracking-wider">Amount</th>
+                  <th className="pb-3 font-bold text-xs uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
                 {snapshot.payments.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-100">
-                    <td className="py-3 pr-4">{new Date(p.paidAt || p.createdAt).toLocaleDateString()}</td>
-                    <td className="py-3 pr-4 capitalize">{p.paymentType.toLowerCase().replace('_', ' ')}</td>
-                    <td className="py-3 pr-4">{p.userCount}</td>
-                    <td className="py-3 pr-4">₹{p.amount}</td>
-                    <td className="py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${p.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : p.status === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{p.status}</span></td>
+                  <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors">
+                    <td className="py-3.5 pr-4 text-xs font-semibold text-slate-600 dark:text-zinc-400 font-mono">{new Date(p.paidAt || p.createdAt).toLocaleDateString()}</td>
+                    <td className="py-3.5 pr-4 text-xs font-semibold text-slate-700 dark:text-zinc-350 capitalize">{p.paymentType.toLowerCase().replace('_', ' ')}</td>
+                    <td className="py-3.5 pr-4 text-xs font-semibold text-slate-750 dark:text-zinc-300 font-mono">{p.userCount}</td>
+                    <td className="py-3.5 pr-4 text-xs font-bold text-slate-800 dark:text-zinc-100 font-mono">₹{p.amount}</td>
+                    <td className="py-3.5"><span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border ${p.status === 'PAID' ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-250/20 dark:border-emerald-500/15' : p.status === 'FAILED' ? 'bg-rose-100 dark:bg-rose-950/20 text-rose-700 dark:text-rose-450 border-rose-250/20 dark:border-rose-550/15' : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'}`}>{p.status}</span></td>
                   </tr>
                 ))}
               </tbody>

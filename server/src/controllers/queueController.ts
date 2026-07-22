@@ -87,8 +87,14 @@ export const addToQueue = async (req: Request, res: Response) => {
   try {
     const today = new Date(); today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+    const doctorId = req.body.doctorId || null;
+    const department = req.body.department || 'General';
     const lastToken = await prisma.oPDQueue.findFirst({
-      where: { hospitalId: hid(req), date: { gte: today, lt: tomorrow } },
+      where: {
+        hospitalId: hid(req),
+        date: { gte: today, lt: tomorrow },
+        ...(doctorId ? { doctorId } : { department }),
+      },
       orderBy: { tokenNumber: 'desc' },
     });
     const tokenNumber = (lastToken?.tokenNumber || 0) + 1;

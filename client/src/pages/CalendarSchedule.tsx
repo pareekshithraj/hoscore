@@ -51,13 +51,7 @@ export const CalendarSchedule = () => {
   const [staff, setStaff] = useState<any[]>([]);
 
   // Live feed for updates tab
-  const [activityFeed] = useState<any[]>([
-    { id: '1', action: 'ADMIT', entity: 'Patient', details: 'Patient admitted to General Ward Bed A12.', createdAt: new Date(Date.now() - 5 * 60000) },
-    { id: '2', action: 'VITALS', entity: 'Clinical', details: 'Vitals recorded for patient Meera K. — SpO2 98%, BP 118/76.', createdAt: new Date(Date.now() - 12 * 60000) },
-    { id: '3', action: 'LAB_ORDER', entity: 'Laboratory', details: 'STAT haematology panel dispatched for patient Rajan S.', createdAt: new Date(Date.now() - 25 * 60000) },
-    { id: '4', action: 'DISCHARGE', entity: 'Discharge', details: 'Patient Priya D. discharged from Orthopaedics.', createdAt: new Date(Date.now() - 42 * 60000) },
-    { id: '5', action: 'PRESCRIPTION', entity: 'E-Rx', details: 'Dr. Arun issued electronic Rx for patient Vikram N.', createdAt: new Date(Date.now() - 60 * 60000) },
-  ]);
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -69,6 +63,7 @@ export const CalendarSchedule = () => {
 
   useEffect(() => {
     api.get('/notices').then(setNotices).catch(() => {});
+    api.get('/audit-logs').then(res => setActivityFeed(Array.isArray(res) ? res : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -163,7 +158,7 @@ export const CalendarSchedule = () => {
   });
 
   const timeAgo = (date: Date) => {
-    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+    const diff = Math.floor((today.getTime() - date.getTime()) / 1000);
     if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

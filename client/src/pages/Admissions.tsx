@@ -11,6 +11,9 @@ export const Admissions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Active' | 'Discharged'>('All');
   const [formData, setFormData] = useState({ patientName: '', doctorId: '', bedId: '', reason: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dischargeId, setDischargeId] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   const fetchData = () => {
     setLoading(true);
@@ -34,10 +37,15 @@ export const Admissions = () => {
     fetchData();
   }, []);
 
-  const handleDischarge = async (id: string) => {
-    if (!window.confirm('Are you sure you want to discharge this patient?')) return;
+  const handleDischarge = (id: string) => {
+    setDischargeId(id);
+  };
+
+  const confirmDischarge = async () => {
+    if (!dischargeId) return;
     try {
-      await api.patch(`/admissions/${id}/discharge`, {});
+      await api.patch(`/admissions/${dischargeId}/discharge`, {});
+      setDischargeId(null);
       fetchData(); // Refresh the list
     } catch (err) {
       console.error(err);
@@ -47,7 +55,7 @@ export const Admissions = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (!formData.bedId) return alert('No beds available!');
+      if (!formData.bedId) return setAlertMessage('No beds available!');
       await api.post('/admissions', formData);
       setIsModalOpen(false);
       setFormData(p => ({ ...p, patientName: '', reason: '' }));
@@ -66,7 +74,15 @@ export const Admissions = () => {
   const activeCount = admissions.filter(a => a.status === 'Active').length;
   const dischargedCount = admissions.filter(a => a.status === 'Discharged').length;
 
-  const filtered = admissions.filter(a => filter === 'All' || a.status === filter);
+  const filtered = admissions.filter(a => {
+    const matchesFilter = filter === 'All' || a.status === filter;
+    const matchesSearch = 
+      a.patientName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      a.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      a.bed?.bedNumber?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      a.reason?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -95,14 +111,33 @@ export const Admissions = () => {
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Avg. Stay Duration</p>
-          <p className="text-3xl font-bold text-amber-600">4.2 <span className="text-sm font-medium text-slate-500">days</span></p>
+          <p className="text-3xl font-bold text-amber-600">
+            {(() => {
+              const discharged = admissions.filter(a => a.status === 'Discharged' && a.dischargeDate && a.admissionDate);
+              if (discharged.length === 0) return '0.0';
+              const totalStayMs = discharged.reduce((sum, a) => {
+                const start = new Date(a.admissionDate).getTime();
+                const end = new Date(a.dischargeDate).getTime();
+                return sum + Math.max(0, end - start);
+              }, 0);
+              const avgDays = totalStayMs / (1000 * 60 * 60 * 24);
+              return avgDays.toFixed(1);
+            })()}{' '}
+            <span className="text-sm font-medium text-slate-500">days</span>
+          </p>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search admissions..." className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input 
+            type="text" 
+            placeholder="Search admissions..." 
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
         </div>
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {(['All', 'Active', 'Discharged'] as const).map(f => (
@@ -195,6 +230,25 @@ export const Admissions = () => {
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Admit Patient</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={!!dischargeId} onClose={() => setDischargeId(null)} title="Discharge Patient">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">Are you sure you want to discharge this patient? This will update the bed status to cleaning.</p>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setDischargeId(null)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button onClick={confirmDischarge} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold">Discharge</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!alertMessage} onClose={() => setAlertMessage(null)} title="Alert">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">{alertMessage}</p>
+          <div className="flex justify-end">
+            <button onClick={() => setAlertMessage(null)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold">OK</button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

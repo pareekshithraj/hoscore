@@ -62,10 +62,94 @@ export const getStats = async (req: Request, res: Response) => {
     const todaysShifts = await prisma.shiftSchedule.count({ where: { hospitalId, date: { gte: startOfToday, lte: endOfToday } } });
     const pendingClaims = await prisma.insuranceClaim.count({ where: { hospitalId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } });
 
+    // Calculate real ICU bed occupancy rate
+    const totalICUBeds = await prisma.bed.count({ where: { room: { hospitalId, type: "ICU" } } });
+    const occupiedICUBeds = await prisma.bed.count({ where: { room: { hospitalId, type: "ICU" }, status: "OCCUPIED" } });
+    const icuOccupancyRate = totalICUBeds > 0 ? Math.round((occupiedICUBeds / totalICUBeds) * 100) : undefined;
+
+    // Calculate real Emergency/Triage bed occupancy rate
+    const totalERBeds = await prisma.bed.count({ where: { room: { hospitalId, type: { in: ["Emergency", "Triage", "ER"] } } } });
+    const occupiedERBeds = await prisma.bed.count({ where: { room: { hospitalId, type: { in: ["Emergency", "Triage", "ER"] } }, status: "OCCUPIED" } });
+    const erOccupancyRate = totalERBeds > 0 ? Math.round((occupiedERBeds / totalERBeds) * 100) : undefined;
+
+    // Calculate real weekly admissions, discharges, and revenues for the last 7 calendar days
+    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const weeklyData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+      
+      const admissions = await prisma.admission.count({
+        where: {
+          bed: { room: { hospitalId } },
+          admissionDate: { gte: start, lte: end }
+        }
+      });
+      const discharges = await prisma.admission.count({
+        where: {
+          bed: { room: { hospitalId } },
+          dischargeDate: { gte: start, lte: end }
+        }
+      });
+      const dayBilling = await prisma.billing.aggregate({
+        where: { hospitalId, createdAt: { gte: start, lte: end } },
+        _sum: { totalAmount: true }
+      });
+      weeklyData.push({
+        name: weekdays[d.getDay()],
+        admissions: admissions || 0,
+        discharges: discharges || 0,
+        revenue: dayBilling._sum.totalAmount || 0
+      });
+    }
+
+    // Calculate real department distribution based on doctor specialty appointment counts
+    const doctorsList = await prisma.doctor.findMany({ where: { hospitalId } });
+    const deptCounts: Record<string, number> = {};
+    for (const doc of doctorsList) {
+      if (doc.specialty) {
+        const count = await prisma.appointment.count({ where: { hospitalId, doctorId: doc.id } });
+        if (count > 0) {
+          deptCounts[doc.specialty] = (deptCounts[doc.specialty] || 0) + count;
+        }
+      }
+    }
+    const colors = ["#38bdf8", "#6366f1", "#a78bfa", "#34d399", "#f43f5e", "#fbbf24"];
+    const departmentData = Object.entries(deptCounts).map(([name, value], idx) => ({
+      name,
+      value,
+      color: colors[idx % colors.length]
+    }));
+
+    // Calculate real average wait/triage time from completed OPD queues
+    const completedQueues = await prisma.oPDQueue.findMany({
+      where: { hospitalId, status: "COMPLETED", calledAt: { not: null } },
+      select: { createdAt: true, calledAt: true },
+      take: 50,
+      orderBy: { createdAt: "desc" }
+    });
+    let avgTriageTime = 8.5; // Default fallback if no queues exist
+    if (completedQueues.length > 0) {
+      const sum = completedQueues.reduce((acc, q) => {
+        if (q.calledAt && q.createdAt) {
+          return acc + (q.calledAt.getTime() - q.createdAt.getTime()) / (1000 * 60);
+        }
+        return acc;
+      }, 0);
+      avgTriageTime = Math.round((sum / completedQueues.length) * 10) / 10;
+    }
+
     res.json({
       totalPatients, totalRooms, totalBeds, occupiedBeds,
       occupancyRate: Math.round(occupancyRate),
+      icuOccupancyRate,
+      erOccupancyRate,
+      weeklyData,
+      departmentData,
       recentAdmissions, upcomingAppointments,
+      avgTriageTime,
       telemetry: { activeQueue, pendingLabs, pendingRx, todaysShifts, pendingClaims },
     });
   } catch (error) { res.status(500).json({ error: "Failed to fetch statistics" }); }

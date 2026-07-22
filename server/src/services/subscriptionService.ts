@@ -22,6 +22,8 @@ export function isTrialActive(sub: { status: string; trialEndsAt: Date | null })
   return sub.trialEndsAt > new Date();
 }
 
+const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+
 export function isSubscriptionUsable(sub: {
   status: string;
   endDate: Date;
@@ -30,6 +32,13 @@ export function isSubscriptionUsable(sub: {
 }) {
   if (sub.status === 'ACTIVE' && sub.endDate > new Date()) return true;
   if (isTrialActive(sub)) return true;
+
+  // 7-day grace period after subscription expiration before locking out clinical shift access
+  const expirationTime = sub.status === 'TRIAL' ? sub.trialEndsAt?.getTime() : sub.endDate?.getTime();
+  if (expirationTime && Date.now() - expirationTime < GRACE_PERIOD_MS) {
+    return true;
+  }
+
   return false;
 }
 

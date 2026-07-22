@@ -28,4 +28,4 @@ User-agent: Claude-Web
 Allow: /
 Allow: /ai.txt
 
-Sitemap: https://hoscore.com/sitemap.xml
+Sitemap: https://hoscore.in/sitemap.xml

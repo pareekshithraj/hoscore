@@ -13,6 +13,11 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField("String", "PROD_API_BASE", "\"https://api.hoscore.in/api/\"")
+        buildConfigField("String", "PROD_WS_URL", "\"wss://api.hoscore.in/ws\"")
+        buildConfigField("String", "DEV_API_BASE", "\"http://10.0.2.2:5000/api/\"")
+        buildConfigField("String", "DEV_WS_URL", "\"ws://10.0.2.2:5000/ws\"")
     }
 
     buildTypes {
@@ -28,7 +33,7 @@ android {
     buildFeatures {
       compose = true
       aidl = false
-      buildConfig = false
+      buildConfig = true
       shaders = false
     }
 
@@ -84,4 +89,20 @@ dependencies {
   
   // Compose Icons
   implementation("androidx.compose.material:material-icons-core")
+
+  // Networking
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
+  implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+  implementation(libs.retrofit)
+  implementation(libs.retrofit.kotlinx.serialization.converter)
+  implementation(libs.kotlinx.serialization.json)
+
+  // Image loading
+  implementation(libs.coil.compose)
+
+  // Extended Material icons
+  implementation("androidx.compose.material:material-icons-extended")
+
+  // Encrypted Storage (JWT token)
+  implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }

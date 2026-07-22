@@ -94,11 +94,26 @@ export const Login = () => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  if (user && activeContext) {
-    if (activeContext.type === 'superadmin') return <Navigate to="/super-admin" replace />;
-    if (activeContext.type === 'patient') return <Navigate to={nextPath || '/patient'} replace />;
-    return <Navigate to="/dashboard" replace />;
-  }
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const challengeIdParam = params.get('challengeId');
+    if (challengeIdParam && !challenge) {
+      setIsLoading(true);
+      postJson('/auth/resend-otp', { challengeId: challengeIdParam })
+        .then((data) => {
+          if (data.challenge) {
+            beginChallenge(data.challenge, data.message || 'Complete the verification code(s) sent to you.');
+          }
+        })
+        .catch((err) => {
+          setError(err.message || 'Failed to load authentication challenge.');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [location.search, challenge]);
+
 
   const resetFlowState = (nextMode?: Mode) => {
     if (nextMode) setMode(nextMode);
@@ -130,8 +145,8 @@ export const Login = () => {
     setError('');
     setInfo(message || 'Enter the verification code(s) we sent you.');
     setIsLoading(false);
-    // Auto-fire the MSG91 widget SMS when phone verification is required.
-    // Retry up to 10 times with 500ms delay to handle widget script load race.
+    // If the widget is present, try to use it; otherwise the backend will have
+    // already delivered an SMS OTP to the registered phone for the challenge.
     if (summary.requiredChannels.phone) {
       const intl = toIntlPhone(widgetPhone || regPhone || identifier);
       if (intl) {
@@ -146,6 +161,8 @@ export const Login = () => {
           }
         };
         tryWidget();
+      } else {
+        setInfo((prev) => prev || 'Use the SMS code sent to your phone to continue.');
       }
     }
   };
@@ -275,8 +292,14 @@ export const Login = () => {
     if ((!needEmail || emailVerifiedLocal) && (!needPhone || phoneVerifiedLocal)) {
       finishAuthResponse(pendingSession);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingSession, emailVerifiedLocal, phoneVerifiedLocal, challenge]);
+
+  if (user && activeContext) {
+    if (activeContext.type === 'superadmin') return <Navigate to="/super-admin" replace />;
+    if (activeContext.type === 'patient') return <Navigate to={nextPath || '/patient'} replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+
 
   // Verify the EMAIL channel against the server challenge. Phone is handled by
   // the MSG91 widget separately (see verifyPhoneWidget).
@@ -315,16 +338,17 @@ export const Login = () => {
       return;
     }
     const sendOtp = (window as any).sendOtp;
-    if (typeof sendOtp !== 'function') {
-      setError('OTP service is still loading. Please try again in a moment.');
+    if (typeof sendOtp === 'function') {
+      setError('');
+      sendOtp(
+        intl,
+        () => { setWidgetSent(true); setInfo('SMS OTP sent to your phone.'); },
+        (err: any) => setError(err?.message || 'Could not send SMS OTP.'),
+      );
       return;
     }
-    setError('');
-    sendOtp(
-      intl,
-      () => { setWidgetSent(true); setInfo('SMS OTP sent to your phone.'); },
-      (err: any) => setError(err?.message || 'Could not send SMS OTP.'),
-    );
+    setWidgetSent(true);
+    setInfo('Use the SMS code that was sent to your phone for this verification step.');
   };
 
   // Verify the SMS OTP via the widget, then exchange the access token for a
@@ -334,37 +358,24 @@ export const Login = () => {
       setError('Enter the 6-digit phone code.');
       return;
     }
-    const verifyOtp = (window as any).verifyOtp;
-    if (typeof verifyOtp !== 'function') {
-      setError('OTP service is still loading. Please try again in a moment.');
-      return;
-    }
     setIsLoading(true);
     setError('');
-    verifyOtp(
-      phoneOtp,
-      async (data: any) => {
-        const accessToken = data?.message || data?.['access-token'] || data?.accessToken || data;
-        try {
-          const session = await postJson('/auth/verify-msg91-access-token', {
-            accessToken,
-            email: challenge?.email || email,
-            identifier: toIntlPhone(widgetPhone || regPhone || identifier),
-          });
-          setPhoneVerifiedLocal(true);
-          setPendingSession(session);
-          setInfo('Phone verified.');
-        } catch (err: any) {
-          setError(err.message || 'Phone verification failed.');
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      (err: any) => {
-        setError(err?.message || 'Invalid SMS OTP.');
-        setIsLoading(false);
-      },
-    );
+    try {
+      const resData = await postJson('/auth/verify-otp', {
+        challengeId: challenge?.challengeId,
+        channel: 'phone',
+        otpCode: phoneOtp,
+      });
+      setPhoneVerifiedLocal(true);
+      const state = applyChallengeResponse(resData);
+      if (state === 'pending') {
+        setInfo('Phone verified. Verify the remaining channel to continue.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Phone verification failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResend = async () => {

@@ -14,7 +14,7 @@ export const isMsg91Live = Boolean(AUTH_KEY);
 
 const SMS_OTP_URL = 'https://control.msg91.com/api/v5/otp';
 const EMAIL_URL = 'https://control.msg91.com/api/v5/email/send';
-const WIDGET_VERIFY_URL = 'https://control.msg91.com/api/v5/widget/verifyAccessToken';
+const WIDGET_VERIFY_URL = 'https://api.msg91.com/api/v5/widget/verifyAccessToken';
 
 export function buildVerifyAccessTokenPayload(accessToken: string, authKey: string) {
   return {
@@ -119,8 +119,8 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
   try {
     const response = await axios.post(
       WIDGET_VERIFY_URL,
-      buildVerifyAccessTokenPayload(accessToken, AUTH_KEY),
-      { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+      { 'access-token': accessToken },
+      { headers: { authkey: AUTH_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
     );
 
     const payload = response?.data ?? {};
@@ -128,6 +128,7 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
       payload?.success === true ||
       payload?.verified === true ||
       payload?.status === 'success' ||
+      payload?.type === 'success' ||
       payload?.message?.toLowerCase?.().includes('success') ||
       payload?.token
     );

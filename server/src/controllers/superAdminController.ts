@@ -61,7 +61,7 @@ export const getAllUsers = async (_req: AuthRequest, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       select: {
-        id: true, name: true, email: true, phone: true, isSuperAdmin: true, createdAt: true,
+        id: true, name: true, email: true, phone: true, isSuperAdmin: true, isActive: true, createdAt: true,
         memberships: { include: { hospital: { select: { id: true, name: true } } } },
         patientProfile: { select: { id: true } },
       },
@@ -93,5 +93,21 @@ export const toggleHospitalStatus = async (req: AuthRequest, res: Response) => {
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to toggle status' });
+  }
+};
+
+export const toggleUserStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const u = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!u) return res.status(404).json({ error: 'Not found' });
+    if (u.isSuperAdmin) return res.status(400).json({ error: 'Cannot deactivate a Super Admin' });
+    
+    const updated = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { isActive: !u.isActive },
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to toggle user status' });
   }
 };

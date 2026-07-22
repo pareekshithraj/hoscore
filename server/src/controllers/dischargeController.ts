@@ -27,6 +27,15 @@ export const create = async (req: Request, res: Response) => {
 
     const isSigned = status === 'SIGNED' || status === 'FINAL' || !status;
     if (admission && isSigned) {
+      const billing = await prisma.billing.findFirst({ where: { admissionId: admission.id } });
+      if (billing && billing.status === 'PENDING' && !req.body.bypassBillingCheck) {
+        return res.status(400).json({
+          error: 'Patient has an unsettled billing invoice. Please settle billing or check "Bypass Billing Check" to proceed with discharge.',
+          billingId: billing.id,
+          totalAmount: billing.totalAmount,
+        });
+      }
+
       // Transition bed to CLEANING
       await prisma.bed.update({
         where: { id: admission.bedId },

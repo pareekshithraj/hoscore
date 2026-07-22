@@ -125,51 +125,9 @@ export const Dashboard = () => {
         }
       })
       .catch(() => {
-        // Fallback to dynamic clinical mock activities
-        const fallbackLogs = [
-          { id: "2", action: "CHECKIN", entity: "Patient", details: "Patient check-in recorded for General OPD.", createdAt: new Date(Date.now() - 4 * 60 * 1000) },
-          { id: "3", action: "DISPENSE", entity: "Pharmacy", details: "Formulation marked as DISPENSED at counter.", createdAt: new Date(Date.now() - 10 * 60 * 1000) },
-          { id: "4", action: "ADMIT", entity: "Admission", details: "Admitted patient to General Ward Bed #A14.", createdAt: new Date(Date.now() - 18 * 60 * 1000) },
-        ];
-        setActivityFeed(prev => [...prev, ...fallbackLogs]);
+        // No audit logs available — leave the feed empty rather than fabricate activity.
       });
   }, [stats]);
-
-  // Dynamic activity simulator ticks to keep feed live
-  useEffect(() => {
-    const mockActions = [
-      { action: "CHECKIN", entity: "Patient", details: "Walk-in patient checked in at front desk." },
-      { action: "VITALS", entity: "Clinical", details: "Vital signs recorded: BP 120/80, heart rate normal." },
-      { action: "PRESCRIPTION", entity: "E-Rx", details: "Electronic Rx formulation dispatched to database." },
-      { action: "LAB_ORDER", entity: "Laboratory", details: "STAT lab assay order dispatched to Pathology." },
-      { action: "ADMIT", entity: "Admission", details: "General ward bed check-in recorded." }
-    ];
-    
-    const interval = setInterval(() => {
-      const action = mockActions[Math.floor(Math.random() * mockActions.length)];
-      const names = ["Aditya", "Meera", "Rajesh", "Kavita", "Siddharth", "Neha"];
-      const randomName = names[Math.floor(Math.random() * names.length)];
-      
-      let details = action.details;
-      if (action.action === "CHECKIN") details = `Walk-in patient ${randomName} checked in for consultation.`;
-      else if (action.action === "VITALS") details = `Logged vitals for ${randomName}: heart rate ${70 + Math.floor(Math.random()*15)} bpm.`;
-      else if (action.action === "PRESCRIPTION") details = `Doctor issued Rx formulation for patient ${randomName}.`;
-      else if (action.action === "LAB_ORDER") details = `STAT lab order registered for patient ${randomName}.`;
-
-      setActivityFeed(prev => [
-        {
-          id: Math.random().toString(),
-          action: action.action,
-          entity: action.entity,
-          details,
-          createdAt: new Date()
-        },
-        ...prev.slice(0, 5) // limit size
-      ]);
-    }, 30000); // 30s ticks
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleRxSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -387,6 +345,8 @@ export const Dashboard = () => {
   const todaysShiftsCount = useAnimatedCounter(stats?.telemetry?.todaysShifts || 0);
 
   const occupancyRateCount = useAnimatedCounter(stats?.occupancyRate || 0);
+  const icuOccupancyRateCount = useAnimatedCounter(stats?.icuOccupancyRate ?? 0);
+  const erOccupancyRateCount = useAnimatedCounter(stats?.erOccupancyRate ?? 0);
   const pendingClaimsCount = useAnimatedCounter(stats?.telemetry?.pendingClaims || 0);
 
   if (loading) {
@@ -402,22 +362,10 @@ export const Dashboard = () => {
     );
   }
 
-  const weeklyData = [
-    { name: "Mon", admissions: 24, discharges: 18, revenue: 4200 },
-    { name: "Tue", admissions: 31, discharges: 22, revenue: 5100 },
-    { name: "Wed", admissions: 28, discharges: 30, revenue: 4800 },
-    { name: "Thu", admissions: 45, discharges: 35, revenue: 6200 },
-    { name: "Fri", admissions: 38, discharges: 25, revenue: 5600 },
-    { name: "Sat", admissions: 22, discharges: 20, revenue: 3800 },
-    { name: "Sun", admissions: 15, discharges: 12, revenue: 2800 },
-  ];
-
-  const departmentData = [
-    { name: "Cardiology", value: 35, color: "#38bdf8" },
-    { name: "Neurology", value: 25, color: "#6366f1" },
-    { name: "Orthopedics", value: 20, color: "#a78bfa" },
-    { name: "Pediatrics", value: 20, color: "#34d399" },
-  ];
+  const DEPT_COLORS = ["#6366f1", "#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185"];
+  const weeklyData = (stats?.weeklyData?.length ? stats.weeklyData : []) as any[];
+  const departmentData = ((stats?.departmentData?.length ? stats.departmentData : []) as any[])
+    .map((d: any, i: number) => ({ ...d, color: d.color || DEPT_COLORS[i % DEPT_COLORS.length] }));
 
   const upcomingAppts = stats?.upcomingAppointments || [];
 
@@ -496,29 +444,21 @@ export const Dashboard = () => {
     <div className="space-y-6 pb-10 animate-fade-in-up">
       
       {/* 1. Command Center Header Panel */}
-      <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 border rounded-2xl relative overflow-hidden transition-all duration-300 ${
-        theme === 'dark'
-          ? "bg-slate-900 border-slate-800 shadow-2xl"
-          : "bg-white border-slate-200/60 shadow-sm"
-      }`}>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl relative overflow-hidden transition-all duration-300 shadow-sm">
         <div className="relative z-10 space-y-1.5">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="relative flex h-2.5 w-2.5">
+            <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full bg-blue-500/60 animate-ping opacity-60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-500" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
             </span>
-            <h2 className={`text-xl lg:text-2xl font-black tracking-tight flex items-center gap-2 ${
-              theme === 'dark' ? "text-white" : "text-slate-900"
-            }`}>
+            <h2 className="text-lg lg:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
               Clinical Operations Command Center
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400">
               Live System Active
             </span>
           </div>
-          <p className={`text-xs font-semibold ${
-            theme === 'dark' ? "text-slate-400" : "text-slate-600"
-          }`}>
+          <p className="text-xs font-semibold text-[var(--text-secondary)]">
             Real-time multi-department operational overview · {" "}
             {currentTime.toLocaleDateString("en-US", {
               weekday: "long",
@@ -531,24 +471,16 @@ export const Dashboard = () => {
 
         {/* Global Clock & Live simulator toggle */}
         <div className="flex flex-wrap items-center gap-4 relative z-10">
-          <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs shadow-inner border ${
-            theme === 'dark'
-              ? "bg-slate-800/50 border-slate-700 text-slate-300"
-              : "bg-slate-50 border-slate-200 text-slate-600"
-          }`}>
-            <Clock className={`w-3.5 h-3.5 ${theme === 'dark' ? "text-slate-400" : "text-blue-500"}`} />
-            <span className={`text-[10px] font-black uppercase tracking-wider font-mono ${
-              theme === 'dark' ? "text-slate-500" : "text-slate-400"
-            }`}>SYSTEM TIME</span>
-            <span className={`font-mono font-bold tracking-widest tabular-nums ${
-              theme === 'dark' ? "text-slate-200" : "text-blue-600"
-            }`}>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border border-[var(--card-border)] bg-[var(--inner-bg)] text-[var(--text-secondary)]">
+            <Clock className="w-3.5 h-3.5 text-blue-500" />
+            <span className="text-[9px] font-black uppercase tracking-wider font-mono text-[var(--text-muted)]">SYSTEM TIME</span>
+            <span className="font-mono font-bold tracking-widest tabular-nums text-[var(--text-primary)]">
               {formatTime(currentTime)}
             </span>
           </div>
           <Link
             to="/dashboard/simulator"
-            className="px-5 py-2.5 btn-premium rounded-xl text-xs font-black tracking-wider uppercase active:scale-95 transition-all flex items-center gap-2"
+            className="px-4 py-2 border border-[var(--card-border)] hover:bg-[var(--inner-bg)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-sm bg-[var(--card-bg)]"
           >
             <Activity className="w-4 h-4" />
             Simulation Control
@@ -561,12 +493,11 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in-up">
           {/* Pharmacist Dispenser Hub */}
           <div className="lg:col-span-8 space-y-6">
-            <div className="glass-card rounded-2xl border p-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-emerald-500/5 to-transparent pointer-events-none" />
-              <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight mb-1">
+            <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-6 relative overflow-hidden shadow-sm">
+              <h3 className="text-lg font-black text-[var(--text-primary)] tracking-tight mb-1">
                 Prescription Dispensing Portal
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 font-semibold">
+              <p className="text-xs text-[var(--text-secondary)] mb-6 font-semibold">
                 Verify patient identity and dispense authorized prescriptions. Enter the patient's unique 6-digit Patient ID.
               </p>
 
@@ -578,72 +509,72 @@ export const Dashboard = () => {
                     value={rxSearchId}
                     onChange={(e) => setRxSearchId(e.target.value.replace(/\D/g, ""))}
                     placeholder="Enter 6-digit Patient ID (e.g. 123456)"
-                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-11 pr-4 py-3.5 text-slate-900 dark:text-white placeholder-slate-500 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono tracking-widest text-center text-lg shadow-inner"
+                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-lg pl-11 pr-4 py-3 text-slate-900 dark:text-white placeholder-slate-500 font-bold focus:outline-none focus:border-blue-500 font-mono tracking-widest text-center text-lg"
                   />
-                  <Search className="absolute left-4 top-4.5 w-5 h-5 text-slate-500" />
+                  <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
                 </div>
                 <button
                   type="submit"
                   disabled={rxLoading}
-                  className="px-6 py-3.5 btn-premium font-black tracking-wider uppercase rounded-xl active:scale-95 transition-all text-xs cursor-pointer disabled:opacity-55"
+                  className="px-5 py-3 bg-[var(--text-primary)] hover:opacity-90 text-[var(--bg-secondary)] font-black tracking-wider uppercase rounded-lg active:scale-95 transition-all text-xs cursor-pointer disabled:opacity-55"
                 >
                   {rxLoading ? "Retrieving..." : "Retrieve Patient Rx"}
                 </button>
               </form>
 
               {rxError && (
-                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold mb-4">
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold mb-4">
                   {rxError}
                 </div>
               )}
 
               {rxSuccessMsg && (
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold mb-4">
+                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold mb-4">
                   {rxSuccessMsg}
                 </div>
               )}
 
               {rxPatient && (
-                <div className="space-y-6 animate-fade-in-up mt-6 border-t border-slate-200/60 dark:border-white/[0.06] pt-6">
-                  <div className="flex justify-between items-start bg-[var(--inner-bg)] p-4 rounded-xl border border-[var(--inner-border)]">
+                <div className="space-y-6 animate-fade-in-up mt-6 border-t border-[var(--card-border)] pt-6">
+                  <div className="flex justify-between items-start bg-[var(--inner-bg)] p-4 rounded-lg border border-[var(--inner-border)]">
                     <div>
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">{rxPatient.name}</h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-semibold">
+                      <h4 className="text-sm font-extrabold text-[var(--text-primary)]">{rxPatient.name}</h4>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 font-semibold">
                         Gender: {rxPatient.gender || "Unspecified"} · DOB: {rxPatient.dateOfBirth ? new Date(rxPatient.dateOfBirth).toLocaleDateString() : "N/A"}
                       </p>
                     </div>
-                    <span className="px-2.5 py-1 bg-red-500/10 border border-red-500/25 rounded-md text-[10px] font-black text-red-600 dark:text-red-400 tracking-wider font-mono">
+                    <span className="px-2.5 py-1 bg-red-500/10 border border-red-500/25 rounded text-[10px] font-black text-red-600 dark:text-red-400 tracking-wider font-mono">
                       HSC-{rxPatient.sixDigitId}
                     </span>
                   </div>
 
                   <div className="space-y-4">
-                    <h5 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">Active Prescriptions</h5>
+                    <h5 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider">Active Prescriptions</h5>
                     {rxPatient.prescriptions?.length === 0 ? (
-                      <p className="text-xs text-slate-500 font-medium py-4 text-center">No prescriptions found for this patient at this hospital.</p>
+                      <p className="text-xs text-[var(--text-muted)] font-medium py-4 text-center">No prescriptions found for this patient at this hospital.</p>
                     ) : (
                       <div className="space-y-3">
                         {rxPatient.prescriptions.map((rx: any) => (
-                          <div key={rx.id} className="p-4 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div key={rx.id} className="p-4 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)] flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="space-y-1.5">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-800 dark:text-white">Diagnosis: {rx.diagnosis}</span>
-                                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
+                                <span className="text-xs font-bold text-[var(--text-primary)]">Diagnosis: {rx.diagnosis}</span>
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border tracking-wider ${
                                   rx.status === 'ISSUED' 
-                                    ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20' 
-                                    : 'bg-slate-100 dark:bg-white/[0.05] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/[0.08]'
+                                    ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20' 
+                                    : 'bg-slate-100 dark:bg-white/[0.05] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]'
                                   }`}>
                                   {rx.status}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium font-mono">Meds: {rx.medicines}</p>
-                              {rx.instructions && <p className="text-[10px] text-slate-500 font-medium italic">Instructions: {rx.instructions}</p>}
-                              <p className="text-[10px] text-slate-500 font-semibold">Prescribed by Dr. {rx.doctor?.name || "Medical Practitioner"} on {new Date(rx.date).toLocaleDateString()}</p>
+                              <p className="text-xs text-[var(--text-secondary)] font-medium font-mono">Meds: {rx.medicines}</p>
+                              {rx.instructions && <p className="text-[10px] text-[var(--text-muted)] font-medium italic">Instructions: {rx.instructions}</p>}
+                              <p className="text-[10px] text-[var(--text-muted)] font-semibold font-sans">Prescribed by Dr. {rx.doctor?.name || "Medical Practitioner"} on {new Date(rx.date).toLocaleDateString()}</p>
                             </div>
                             {rx.status === "ISSUED" && (
                               <button
                                 onClick={() => handleDispense(rx.id)}
-                                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black tracking-wider uppercase rounded-lg text-[10px] transition-all active:scale-95 cursor-pointer flex-shrink-0"
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black tracking-wider uppercase rounded-lg text-[10px] transition-all active:scale-95 cursor-pointer flex-shrink-0"
                               >
                                 Dispense Medicines
                               </button>
@@ -659,18 +590,18 @@ export const Dashboard = () => {
           </div>
 
           <div className="lg:col-span-4 space-y-6">
-            <div className="glass-card rounded-2xl border p-6 shadow-xl">
-              <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4">
+            <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-6 shadow-sm">
+              <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-widest mb-4">
                 Pharmacy Monitor Stats
               </h3>
               <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)]">
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Dispensed Today</p>
-                  <p className="text-2xl font-black text-slate-800 dark:text-white mt-1">12 Patients</p>
+                <div className="p-4 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)]">
+                  <p className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">Dispensed Today</p>
+                  <p className="text-xl font-black text-[var(--text-primary)] mt-1">12 Patients</p>
                 </div>
-                <div className="p-4 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)]">
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Formulation Queue</p>
-                  <p className="text-2xl font-black text-red-600 dark:text-red-400 mt-1">{pendingRxCount} Active</p>
+                <div className="p-4 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)]">
+                  <p className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">Active Formulation Queue</p>
+                  <p className="text-xl font-black text-red-600 dark:text-red-400 mt-1">{pendingRxCount} Active</p>
                 </div>
               </div>
             </div>
@@ -683,10 +614,9 @@ export const Dashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 stagger-in">
             
             {/* 1.1 Alert & Emergency Rail (5 Columns) */}
-            <div className="lg:col-span-5 bg-white dark:bg-[#0b0f1a]/80 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-5 shadow-sm dark:shadow-xl relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/[0.02] rounded-full blur-[80px] pointer-events-none" />
+            <div className="lg:col-span-5 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/[0.04] pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3 mb-4">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500" />
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
@@ -705,7 +635,7 @@ export const Dashboard = () => {
                     </div>
                   ) : (
                     criticalAlerts.map((alert, i) => (
-                      <div key={i} className={`p-3 rounded-xl border ${alert.color} relative overflow-hidden`}>
+                      <div key={i} className={`p-3 rounded-lg border ${alert.color} relative overflow-hidden`}>
                         <div className="flex items-center gap-2 justify-between mb-1">
                           <span className="text-[8px] font-black tracking-widest uppercase font-mono">{alert.type}</span>
                           <Link to={alert.path} className="text-[8px] font-black underline uppercase tracking-wider font-mono cursor-pointer">
@@ -721,7 +651,7 @@ export const Dashboard = () => {
               </div>
 
               {/* Code Indicators */}
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.04] text-[9px] font-black font-mono tracking-wider text-center">
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[var(--card-border)] text-[9px] font-black font-mono tracking-wider text-center">
                 <div className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500">
                   CODE RED: NORMAL
                 </div>
@@ -735,9 +665,9 @@ export const Dashboard = () => {
             </div>
 
             {/* 1.2 ICU & Bed Capacity Monitor (4 Columns) */}
-            <div className="lg:col-span-4 bg-white dark:bg-[#0b0f1a]/80 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-5 shadow-sm dark:shadow-xl flex flex-col justify-between">
+            <div className="lg:col-span-4 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/[0.04] pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3 mb-4">
                   <div className="flex items-center gap-2">
                     <Bed className="w-4 h-4 text-emerald-500" />
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
@@ -753,10 +683,10 @@ export const Dashboard = () => {
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
                       <span>ICU Beds</span>
-                      <span className="text-red-500">88% Capacity</span>
+                      <span className="text-red-500">{icuOccupancyRateCount}% Capacity</span>
                     </div>
-                    <div className="h-2 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-red-500" style={{ width: "88%" }} />
+                    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-red-500" style={{ width: `${icuOccupancyRateCount}%` }} />
                     </div>
                   </div>
 
@@ -765,7 +695,7 @@ export const Dashboard = () => {
                       <span>General Wards</span>
                       <span className="text-emerald-500">{occupancyRateCount}% Capacity</span>
                     </div>
-                    <div className="h-2 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-emerald-500" style={{ width: `${occupancyRateCount}%` }} />
                     </div>
                   </div>
@@ -773,45 +703,45 @@ export const Dashboard = () => {
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
                       <span>Emergency Triage Beds</span>
-                      <span className="text-amber-500">92% Capacity</span>
+                      <span className="text-amber-500">{erOccupancyRateCount}% Capacity</span>
                     </div>
-                    <div className="h-2 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-500" style={{ width: "92%" }} />
+                    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-amber-500" style={{ width: `${erOccupancyRateCount}%` }} />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="text-[9px] text-slate-400 font-bold border-t border-slate-100 dark:border-white/[0.04] pt-3 mt-4 flex items-center justify-between">
+              <div className="text-[9px] text-slate-400 font-bold border-t border-[var(--card-border)] pt-3 mt-4 flex items-center justify-between">
                 <span>Avg Triage to Bed Entry</span>
-                <span className="text-slate-700 dark:text-white font-black">~8.5 Mins</span>
+                <span className="text-slate-700 dark:text-white font-black">~{stats?.avgTriageTime ?? 8.5} Mins</span>
               </div>
             </div>
 
             {/* 1.3 Active Telemetry Backlog Counters (3 Columns) */}
             <div className="lg:col-span-3 grid grid-cols-2 gap-4">
               
-              <div className="bg-white dark:bg-[#0b0f1a]/80 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-4 flex flex-col justify-between shadow-sm dark:shadow-xl">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">OPD Queue</span>
-                <p className="text-3xl font-black text-red-500 tracking-tight tabular-nums mt-1">{activeQueueCount}</p>
+                <p className="text-2xl font-black text-red-500 tracking-tight tabular-nums mt-1">{activeQueueCount}</p>
                 <span className="text-[8px] font-bold text-slate-400 mt-2">Waiting Triage</span>
               </div>
 
-              <div className="bg-white dark:bg-[#0b0f1a]/80 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-4 flex flex-col justify-between shadow-sm dark:shadow-xl">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Lab Delays</span>
-                <p className="text-3xl font-black text-amber-500 tracking-tight tabular-nums mt-1">{pendingLabsCount}</p>
+                <p className="text-2xl font-black text-amber-500 tracking-tight tabular-nums mt-1">{pendingLabsCount}</p>
                 <span className="text-[8px] font-bold text-slate-400 mt-2">STAT Backlog</span>
               </div>
 
-              <div className="bg-white dark:bg-[#0b0f1a]/80 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-4 flex flex-col justify-between shadow-sm dark:shadow-xl">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Rx</span>
-                <p className="text-3xl font-black text-blue-500 tracking-tight tabular-nums mt-1">{pendingRxCount}</p>
+                <p className="text-2xl font-black text-blue-500 tracking-tight tabular-nums mt-1">{pendingRxCount}</p>
                 <span className="text-[8px] font-bold text-slate-400 mt-2">To Dispense</span>
               </div>
 
-              <div className="bg-white dark:bg-[#0b0f1a]/80 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-4 flex flex-col justify-between shadow-sm dark:shadow-xl">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Claims</span>
-                <p className="text-3xl font-black text-slate-700 dark:text-white tracking-tight tabular-nums mt-1">{pendingClaimsCount}</p>
+                <p className="text-2xl font-black text-slate-700 dark:text-white tracking-tight tabular-nums mt-1">{pendingClaimsCount}</p>
                 <span className="text-[8px] font-bold text-slate-400 mt-2">Under Review</span>
               </div>
 
@@ -826,8 +756,8 @@ export const Dashboard = () => {
             <div className="lg:col-span-8 space-y-6">
               
               {/* Actions Console */}
-              <div className="bg-white dark:bg-[#0b0f1a]/80 rounded-2xl p-5 border border-slate-200/60 dark:border-white/[0.06] shadow-sm dark:shadow-xl">
-                <div className="mb-4 pb-3 border-b border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm">
+                <div className="mb-4 pb-3 border-b border-[var(--card-border)] flex items-center justify-between">
                   <div>
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
                       Quick Operations Control
@@ -851,9 +781,9 @@ export const Dashboard = () => {
                         setRegisteredPatientInfo(null);
                         setActiveModal(a.id as any);
                       }}
-                      className={`flex flex-col items-center justify-center p-3 border bg-slate-50/50 dark:bg-slate-950/20 rounded-xl transition-all duration-300 hover:-translate-y-0.5 ${a.color} text-center cursor-pointer`}
+                      className={`flex flex-col items-center justify-center p-3 border bg-[var(--inner-bg)] border-[var(--inner-border)] rounded-lg transition-all duration-300 hover:-translate-y-0.5 ${a.color} text-center cursor-pointer`}
                     >
-                      <a.icon className="w-5 h-5 mb-2 transition-transform group-hover:scale-105" />
+                      <a.icon className="w-4 h-4 mb-2 transition-transform group-hover:scale-105" />
                       <span className="text-xs font-bold tracking-tight">{a.label}</span>
                     </button>
                   ))}
@@ -861,8 +791,8 @@ export const Dashboard = () => {
               </div>
 
               {/* Consultation Calendar Roster (Denser layout) */}
-              <div className="bg-white dark:bg-[#0b0f1a]/80 rounded-2xl border border-slate-200/60 dark:border-white/[0.06] overflow-hidden shadow-sm dark:shadow-xl">
-                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-[var(--card-border)] flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <CalendarClock className="w-4 h-4 text-blue-500" />
                     <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">
@@ -874,29 +804,29 @@ export const Dashboard = () => {
                   </span>
                 </div>
 
-                <div className="divide-y divide-slate-100 dark:divide-white/[0.04] max-h-[350px] overflow-y-auto">
+                <div className="divide-y divide-[var(--card-border)] max-h-[350px] overflow-y-auto">
                   {upcomingAppts.length === 0 ? (
                     <div className="px-5 py-12 text-center">
-                      <CalendarClock className="w-7 h-7 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
-                      <p className="text-xs text-slate-400 dark:text-slate-400 font-bold tracking-tight">No Pending Appointments Today</p>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Check-in slot buffer is empty.</p>
+                      <CalendarClock className="w-6 h-6 text-slate-200 dark:text-slate-700 mx-auto mb-2" />
+                      <p className="text-xs text-[var(--text-secondary)] font-bold tracking-tight">No Pending Appointments Today</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-1">Check-in slot buffer is empty.</p>
                     </div>
                   ) : (
                     upcomingAppts.map((apt: any) => (
                       <div
                         key={apt.id}
-                        className="group flex items-center justify-between px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-950/40 transition-colors"
+                        className="group flex items-center justify-between px-5 py-3 hover:bg-[var(--inner-bg)] transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-center font-bold text-xs text-red-500 transition-colors font-mono">
                             #{apt.tokenNumber}
                           </div>
                           <div>
-                            <p className="text-xs font-extrabold text-slate-900 dark:text-white">
+                            <p className="text-xs font-extrabold text-[var(--text-primary)]">
                               {apt.patient?.name}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[9px] text-slate-500 dark:text-slate-500 font-mono font-bold">
+                              <span className="text-[9px] text-[var(--text-muted)] font-mono font-bold">
                                 {apt.time}
                               </span>
                               <span
@@ -913,7 +843,7 @@ export const Dashboard = () => {
                         </div>
                         <button
                           onClick={() => handleCheckIn(apt.id)}
-                          className="px-3 py-1.5 text-[9px] font-black text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-md transition-all active:scale-95 cursor-pointer opacity-0 group-hover:opacity-100 uppercase tracking-widest font-mono"
+                          className="px-3 py-1 text-[9px] font-black text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer opacity-0 group-hover:opacity-100 uppercase tracking-widest font-mono"
                         >
                           Check In
                         </button>
@@ -929,8 +859,8 @@ export const Dashboard = () => {
             <div className="lg:col-span-4 space-y-6">
               
               {/* Admissions Registry */}
-              <div className="bg-white dark:bg-[#0b0f1a]/80 rounded-2xl border border-slate-200/60 dark:border-white/[0.06] p-5 shadow-sm dark:shadow-xl">
-                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-white/[0.04] pb-3 mb-4 justify-between">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3 mb-4 justify-between">
                   <div className="flex items-center gap-2">
                     <Bed className="w-4 h-4 text-blue-500" />
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
@@ -942,13 +872,13 @@ export const Dashboard = () => {
 
                 <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
                   {!stats?.recentAdmissions || stats.recentAdmissions.length === 0 ? (
-                    <p className="text-xs text-slate-500 font-medium py-4 text-center">No recent admissions recorded.</p>
+                    <p className="text-xs text-[var(--text-muted)] font-medium py-4 text-center">No recent admissions recorded.</p>
                   ) : (
                     stats.recentAdmissions.map((adm: any) => (
-                      <div key={adm.id} className="p-3 border rounded-xl bg-slate-50/50 dark:bg-slate-950/20 border-slate-100 dark:border-white/[0.03] flex justify-between items-center gap-2">
+                      <div key={adm.id} className="p-3 border rounded-lg bg-[var(--inner-bg)] border-[var(--inner-border)] flex justify-between items-center gap-2">
                         <div className="space-y-0.5">
-                          <p className="text-xs font-bold text-slate-800 dark:text-white">{adm.patient?.name}</p>
-                          <p className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold">
+                          <p className="text-xs font-bold text-[var(--text-primary)]">{adm.patient?.name}</p>
+                          <p className="text-[9px] text-[var(--text-secondary)] font-semibold">
                             {adm.bed?.room?.name} · Bed {adm.bed?.name}
                           </p>
                         </div>
@@ -962,10 +892,8 @@ export const Dashboard = () => {
               </div>
 
               {/* Live Activity Feed */}
-              <div className="bg-white dark:bg-[#0b0f1a]/80 rounded-2xl border border-slate-200/60 dark:border-white/[0.06] p-5 shadow-sm dark:shadow-xl relative overflow-hidden">
-                <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/[0.02] rounded-full blur-[80px] pointer-events-none" />
-                
-                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-white/[0.04] pb-3 mb-4 justify-between">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm relative overflow-hidden">
+                <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3 mb-4 justify-between">
                   <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-emerald-500" />
                     <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
@@ -976,8 +904,11 @@ export const Dashboard = () => {
                 </div>
 
                 <div className="space-y-3 max-h-[170px] overflow-y-auto pr-1">
+                  {activityFeed.length === 0 && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium py-4 text-center">No recent activity.</p>
+                  )}
                   {activityFeed.map((log) => (
-                    <div key={log.id} className="p-2.5 rounded-lg border border-slate-100 dark:border-white/[0.03] bg-slate-50/50 dark:bg-slate-950/20 flex flex-col gap-1 transition-all duration-200">
+                    <div key={log.id} className="p-2.5 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)] flex flex-col gap-1 transition-all duration-200">
                       <div className="flex justify-between items-center text-[8px] font-black font-mono">
                         <span className={`px-1.5 py-0.5 rounded tracking-widest uppercase ${
                           log.action === "SYS_INIT" ? "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/10" :
@@ -992,7 +923,7 @@ export const Dashboard = () => {
                           {log.createdAt instanceof Date ? log.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A"}
                         </span>
                       </div>
-                      <p className="text-[9px] text-slate-600 dark:text-slate-300 font-semibold leading-normal">{log.details}</p>
+                      <p className="text-[9px] text-[var(--text-secondary)] font-semibold leading-normal">{log.details}</p>
                     </div>
                   ))}
                 </div>
@@ -1006,22 +937,22 @@ export const Dashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* 3.1 Patient Flow Curve (8 Columns) */}
-            <div className="lg:col-span-8 bg-white dark:bg-gradient-to-br dark:from-[#0c1020]/90 dark:to-[#04060e]/95 rounded-2xl overflow-hidden p-5 border border-slate-200/60 dark:border-white/[0.06] shadow-sm dark:shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-3">
+            <div className="lg:col-span-8 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl overflow-hidden p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-[var(--card-border)] pb-3">
                 <div>
-                  <h3 className="text-xs font-black text-slate-900 dark:text-white tracking-widest uppercase">
+                  <h3 className="text-xs font-black text-[var(--text-primary)] tracking-widest uppercase">
                     Weekly Patient Flow analytics
                   </h3>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
                     Admissions and discharges comparison weekly curve
                   </p>
                 </div>
                 <div className="flex gap-4 text-[10px] font-black font-mono">
-                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                     <span className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
                     Admissions
                   </span>
-                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                     <span className="w-2 h-2 bg-emerald-500 rounded-full" />{" "}
                     Discharges
                   </span>
@@ -1033,11 +964,11 @@ export const Dashboard = () => {
                   <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                     <defs>
                       <linearGradient id="admGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="disGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
@@ -1056,47 +987,56 @@ export const Dashboard = () => {
             <div className="lg:col-span-4 space-y-6">
               
               {/* Department Workload pie chart */}
-              <div className="bg-white dark:bg-[#0b0f1a]/80 rounded-2xl border border-slate-200/60 dark:border-white/[0.06] p-5 shadow-sm dark:shadow-xl">
-                <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest mb-3 border-b border-slate-100 dark:border-white/[0.04] pb-2">
+              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm">
+                <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest mb-3 border-b border-[var(--card-border)] pb-2">
                   Department Workload Load
                 </h3>
                 
-                <div className="flex items-center justify-center py-2 relative">
-                  <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-[8px] text-slate-400 dark:text-slate-500 font-black tracking-widest">TOTAL</span>
-                    <span className="text-base font-black text-slate-900 dark:text-white mt-0.5">4 Units</span>
-                  </div>
+                {(() => {
+                  const totalDeptVal = departmentData.reduce((acc, curr) => acc + curr.value, 0);
+                  return (
+                    <>
+                      <div className="flex items-center justify-center py-2 relative">
+                        <div className="absolute flex flex-col items-center justify-center">
+                          <span className="text-[8px] text-[var(--text-muted)] font-black tracking-widest">TOTAL</span>
+                          <span className="text-xs font-black text-[var(--text-primary)] mt-0.5">{totalDeptVal} Appts</span>
+                        </div>
 
-                  <div className="w-28 h-28">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={departmentData} cx="50%" cy="50%" innerRadius={38} outerRadius={46} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                          {departmentData.map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+                        <div className="w-28 h-28">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={departmentData} cx="50%" cy="50%" innerRadius={38} outerRadius={46} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                                {departmentData.map((entry, i) => (
+                                  <Cell key={i} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip content={<CustomTooltip />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
 
-                <div className="space-y-2.5 mt-3">
-                  {departmentData.map((d) => (
-                    <div key={d.name} className="space-y-0.5 text-[10px]">
-                      <div className="flex items-center justify-between font-semibold">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                          {d.name}
-                        </span>
-                        <span className="text-slate-800 dark:text-white font-bold">{d.value}%</span>
+                      <div className="space-y-2.5 mt-3">
+                        {departmentData.map((d) => (
+                          <div key={d.name} className="space-y-0.5 text-[10px]">
+                            <div className="flex items-center justify-between font-semibold">
+                              <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                                {d.name}
+                              </span>
+                              <span className="text-[var(--text-primary)] font-bold">
+                                {totalDeptVal > 0 ? Math.round((d.value / totalDeptVal) * 100) : 0}% ({d.value})
+                              </span>
+                            </div>
+                            <div className="h-1 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ backgroundColor: d.color, width: `${totalDeptVal > 0 ? (d.value / totalDeptVal) * 100 : 0}%` }} />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="h-1 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ backgroundColor: d.color, width: `${d.value}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    </>
+                  );
+                })()}
               </div>
 
             </div>

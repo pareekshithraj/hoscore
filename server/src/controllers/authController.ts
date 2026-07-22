@@ -5,7 +5,7 @@ import type { AuthChallenge, User } from '@prisma/client';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
 import { signUrl } from '../services/r2.js';
-import { sendMsg91Email, verifyMsg91AccessToken as verifyMsg91WidgetAccessToken } from '../services/msg91.js';
+import { sendMsg91Email, sendSmsOtp, verifyMsg91AccessToken as verifyMsg91WidgetAccessToken } from '../services/msg91.js';
 import {
   generateOtp,
   hashOtp,
@@ -14,6 +14,7 @@ import {
   OTP_RESEND_COOLDOWN_MS,
   OTP_MAX_ATTEMPTS,
   OTP_TTL_MS,
+  smsTargetFromPhone,
 } from '../utils/otp.js';
 import { normalizePhone } from '../utils/phone.js';
 
@@ -131,6 +132,7 @@ async function findUserByPhone(phone: string | null | undefined) {
       phone: true,
       password: true,
       isVerified: true,
+      isActive: true,
       emailVerifiedAt: true,
       phoneVerifiedAt: true,
       lastOtpVerifiedAt: true,
@@ -273,17 +275,32 @@ async function createChallenge(
     }).catch(() => false);
   }
 
-  // Phone OTP is delivered by the MSG91 widget on the frontend — backend only stores the hash.
-  // We do NOT call sendSmsOtp() here; the widget handles SMS delivery independently.
-  const phoneDelivered = requestedChannels.phone && Boolean(user.phone);
+  let phoneDelivered = false;
+  if (requestedChannels.phone && user.phone && phoneOtp) {
+    const target = smsTargetFromPhone(user.phone);
+    phoneDelivered = await sendSmsOtp(target || '', phoneOtp).catch(() => false);
+  }
 
-  const requireEmail = requestedChannels.email && emailDelivered;
-  const requirePhone = phoneDelivered;
-  const emailFallback = requestedChannels.email && !emailDelivered;
-  const smsFallback = false; // widget handles SMS; no backend fallback needed
+  let requireEmail = requestedChannels.email && emailDelivered;
+  let requirePhone = phoneDelivered;
+  let emailFallback = requestedChannels.email && !emailDelivered;
+  let smsFallback = requestedChannels.phone && Boolean(user.phone) && !phoneDelivered;
+
+  // On MSG91 Free Tier accounts where direct SMS API requires DLT Template approval:
+  // Allow phone verification via MSG91 Phone Widget on the frontend even if direct SMS is unapproved.
+  if (requestedChannels.phone && Boolean(user.phone) && !phoneDelivered) {
+    requirePhone = true;
+    smsFallback = true;
+  }
+
+  // Fallback for Email OTP so login/registration is never blocked
+  if (requestedChannels.email && !emailDelivered) {
+    requireEmail = true;
+    emailFallback = true;
+  }
 
   if (!requireEmail && !requirePhone) {
-    return { error: 'Could not deliver a verification code. Please try again.', status: 502 as const };
+    return { error: 'Could not initialize verification challenge. Please try again.', status: 502 as const };
   }
 
   await prisma.authChallenge.deleteMany({ where: { userId: user.id, purpose } });
@@ -422,6 +439,10 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+    }
+
     if (!user.isVerified) {
       const issued = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
       if (hasChallengeIssue(issued)) {
@@ -464,6 +485,10 @@ export const startOtpLogin = async (req: Request, res: Response) => {
     const user = await findUserByIdentifier(identifier);
     if (!user) {
       return res.status(404).json({ error: 'No account found for that email or phone number.' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
     }
 
     const purpose: ChallengePurpose = user.isVerified ? 'login' : 'register';
@@ -657,6 +682,7 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
   const accessToken = String(req.body.accessToken || '').trim();
   const email = normalizeEmail(String(req.body.email || ''));
   const identifier = String(req.body.identifier || '').trim();
+  const challengeId = String(req.body.challengeId || '').trim();
 
   if (!accessToken) {
     return res.status(400).json({ error: 'Access token is required' });
@@ -675,20 +701,50 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
       user = await findUserByIdentifier(identifier);
     }
 
-    if (!user) {
-      const fallbackEmail = email || `${String(identifier || 'demo').replace(/[^a-z0-9]+/gi, '').toLowerCase()}@hoscore.demo`;
-      const fallbackPhone = identifier && !identifier.includes('@') ? normalizePhone(identifier) : null;
-      const fallbackPassword = await bcrypt.hash(`hoscore-demo-${Date.now()}`, 10);
+    if (challengeId) {
+      const loaded = await getChallengeOrError(challengeId);
+      if (!hasChallengeIssue(loaded)) {
+        const { challenge } = loaded;
+        const updated = await prisma.authChallenge.update({
+          where: { id: challenge.id },
+          data: {
+            phoneVerified: true,
+            phoneOtpCode: null,
+            phoneOtpExpiresAt: null,
+            phoneOtpAttempts: 0,
+          },
+          include: { user: true },
+        });
 
-      user = await prisma.user.create({
-        data: {
-          email: fallbackEmail,
-          password: fallbackPassword,
-          name: 'Demo User',
-          phone: fallbackPhone || null,
-          isVerified: true,
-        },
-      });
+        const complete = (!updated.requireEmail || updated.emailVerified) && (!updated.requirePhone || updated.phoneVerified);
+        if (!complete) {
+          return res.json({
+            message: 'Phone verified. Verify the remaining channel to continue.',
+            challenge: buildChallengeSummary(updated, updated.user),
+          });
+        }
+
+        const result = await finalizeChallenge(updated.user, updated);
+        if (!result) {
+          return res.status(500).json({ error: 'Failed to complete verification' });
+        }
+
+        if ('resetToken' in result) {
+          return res.json({
+            message: 'Verification complete. Set your new password.',
+            resetToken: result.resetToken,
+          });
+        }
+
+        return res.json(result);
+      }
+    }
+
+    // SECURITY: never auto-create an account from a widget token alone. A valid
+    // MSG91 access token only proves phone-number control, not registration intent.
+    // Phone verification must be tied to an existing user/challenge.
+    if (!user) {
+      return res.status(404).json({ error: 'No account found for this number. Please register first.' });
     }
 
     if (!user.isVerified) {
