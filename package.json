@@ -5,7 +5,8 @@
   "scripts": {
     "postinstall": "npm install --prefix server && npm install --prefix client",
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "build": "npm run build --prefix server && npm run build --prefix client"
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "vercel-build": "npm run vercel-build --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
