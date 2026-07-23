@@ -427,13 +427,13 @@ export const Landing = () => {
 
             {/* Column 4: Standards & Trust */}
             <div className="space-y-4">
-              <h4 className="text-xs font-extrabold uppercase tracking-widest text-white">Trust & Compliance</h4>
+              <h4 className="text-xs font-extrabold uppercase tracking-widest text-white">Gov & Compliance</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><a href="#" className="hover:text-rose-400 transition-colors">Sovereign Data Standard</a></li>
-                <li><a href="#" className="hover:text-rose-400 transition-colors">HIPAA & GDPR Encryption</a></li>
-                <li><a href="#" className="hover:text-rose-400 transition-colors">SLA & Security Uptime</a></li>
-                <li><a href="#" className="hover:text-rose-400 transition-colors">Patient Bill of Rights</a></li>
-                <li><a href="#" className="hover:text-rose-400 transition-colors">Decentralized Vault Tech</a></li>
+                <li><Link to="/gov-guidelines" className="hover:text-rose-400 transition-colors flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" />Gov Mandates Portal</Link></li>
+                <li><Link to="/citizens-charter" className="hover:text-rose-400 transition-colors">Citizen's Charter & SLAs</Link></li>
+                <li><Link to="/security" className="hover:text-rose-400 transition-colors">Security Architecture</Link></li>
+                <li><Link to="/status" className="hover:text-rose-400 transition-colors">Live System Status</Link></li>
+                <li><Link to="/disclosures" className="hover:text-rose-400 transition-colors">Mandatory Disclosures</Link></li>
               </ul>
             </div>
           </div>
@@ -442,11 +442,11 @@ export const Landing = () => {
             <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
               <p>© 2026 HOSCORE Initiative. All rights reserved globally.</p>
               <div className="flex gap-4">
-                <a href="#" className="hover:text-white transition-colors">Privacy Charter</a>
+                <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
                 <span>•</span>
-                <a href="#" className="hover:text-white transition-colors">Registry Terms</a>
+                <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
                 <span>•</span>
-                <a href="#" className="hover:text-white transition-colors">System Status</a>
+                <Link to="/status" className="hover:text-white transition-colors">System Uptime</Link>
               </div>
             </div>
 

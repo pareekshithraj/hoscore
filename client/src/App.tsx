@@ -6,6 +6,7 @@ import { SuperAdminLayout } from './components/SuperAdminLayout';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ScrollToTop } from './components/ScrollToTop';
 import { hasFeature } from './utils/features';
 
 // Public pages
@@ -16,6 +17,13 @@ const ForHospitals = lazy(() => import('./pages/ForHospitals').then((module) => 
 const BookAppointment = lazy(() => import('./pages/BookAppointment').then((module) => ({ default: module.BookAppointment })));
 const HospitalProfile = lazy(() => import('./pages/HospitalProfile').then((module) => ({ default: module.HospitalProfile })));
 const PublicHospitalSearch = lazy(() => import('./pages/PublicHospitalSearch').then((module) => ({ default: module.PublicHospitalSearch })));
+const GovMandateGuidelines = lazy(() => import('./pages/GovMandateGuidelines').then((module) => ({ default: module.GovMandateGuidelines })));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
+const TermsOfService = lazy(() => import('./pages/TermsOfService').then((module) => ({ default: module.TermsOfService })));
+const CitizensCharter = lazy(() => import('./pages/CitizensCharter').then((module) => ({ default: module.CitizensCharter })));
+const SecurityArchitecture = lazy(() => import('./pages/SecurityArchitecture').then((module) => ({ default: module.SecurityArchitecture })));
+const SystemStatus = lazy(() => import('./pages/SystemStatus').then((module) => ({ default: module.SystemStatus })));
+const MandatoryDisclosures = lazy(() => import('./pages/MandatoryDisclosures').then((module) => ({ default: module.MandatoryDisclosures })));
 
 // Hospital dashboard pages
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
@@ -88,6 +96,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <ScrollToTop />
         <Suspense fallback={<PageFallback />}>
           <Routes>
           {/* ========== PUBLIC ROUTES ========== */}
@@ -99,6 +108,24 @@ function App() {
           <Route path="/hospitals/:country/:state/:city" element={<PublicHospitalSearch />} />
           <Route path="/hospitals/:id" element={<HospitalProfile />} />
           <Route path="/book/:hospitalId" element={<PublicBookRedirect />} />
+          
+          {/* Government Mandated Guidelines & Public Trust Routes */}
+          <Route path="/gov-guidelines" element={<GovMandateGuidelines />} />
+          <Route path="/gov-guidelines/:tab" element={<GovMandateGuidelines />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/citizens-charter" element={<CitizensCharter />} />
+          <Route path="/security" element={<SecurityArchitecture />} />
+          <Route path="/data-security" element={<SecurityArchitecture />} />
+          <Route path="/status" element={<SystemStatus />} />
+          <Route path="/system-status" element={<SystemStatus />} />
+          <Route path="/disclosures" element={<MandatoryDisclosures />} />
+          <Route path="/mandatory-disclosures" element={<MandatoryDisclosures />} />
+
+          {/* Alias Redirects */}
+          <Route path="/abdm-guidelines" element={<Navigate to="/gov-guidelines/abdm" replace />} />
+          <Route path="/gigw-compliance" element={<Navigate to="/gov-guidelines/gigw" replace />} />
+          <Route path="/nodal-officer" element={<Navigate to="/gov-guidelines/grievance" replace />} />
 
           {/* ========== HOSPITAL STAFF DASHBOARD ========== */}
           <Route
