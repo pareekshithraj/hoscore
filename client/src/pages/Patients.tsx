@@ -472,17 +472,24 @@ export const Patients = () => {
           </p>
           <div className="flex justify-end gap-2">
             <button
-              onClick={() => { setDuplicateMatch(null); setIsModalOpen(false); }}
-              className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50"
+              onClick={() => {
+                const match = duplicateMatch;
+                setDuplicateMatch(null);
+                setIsModalOpen(false);
+                if (match) {
+                  openBookingModal(match);
+                }
+              }}
+              className="px-4 py-2 border border-slate-200 dark:border-zinc-700 rounded-lg text-sm font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
             >
-              Use Existing
+              Use Existing & Book Slot
             </button>
             <button
               onClick={() => submitPatient(true)}
               disabled={submitting}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all cursor-pointer"
             >
-              {submitting ? 'Creating…' : 'Create New Anyway'}
+              {submitting ? 'Creating…' : 'Create New Chart Anyway'}
             </button>
           </div>
         </div>
