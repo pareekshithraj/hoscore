@@ -182,7 +182,7 @@ export const PublicHospitalSearch = () => {
                 return (
                   <div key={hospital.id} className="rounded-[28px] border border-slate-200 bg-white overflow-hidden hover:border-rose-200 hover:shadow-2xl transition-all duration-300">
                     <div className="grid sm:grid-cols-[180px_1fr]">
-                      <div className={`h-48 sm:min-h-56 relative bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-600 to-red-600' : 'from-blue-600 to-indigo-600'} flex items-center justify-center`}>
+                      <div className={`h-48 sm:h-auto sm:self-stretch relative bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-600 to-red-600' : 'from-blue-600 to-indigo-600'} flex items-center justify-center`}>
                         {cardImage && (
                           <img
                             src={cardImage}

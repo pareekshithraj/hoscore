@@ -18,7 +18,7 @@ const HospitalCardBanner = ({ hospital, index }: { hospital: any; index: number 
   const hasValidLogo = hospital.logo && !logoFailed;
 
   return (
-    <div className={`w-full h-48 sm:w-44 sm:min-h-full flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
+    <div className={`w-full h-48 sm:w-44 sm:h-auto sm:self-stretch flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
       {hasValidBg && (
         <img
           src={cardImage}
