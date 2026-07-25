@@ -5,6 +5,51 @@ import { useAuth } from '../context/AuthContext';
 
 import { BASE_URL } from '../utils/apiConfig';
 
+const HospitalCardBanner = ({ hospital, index }: { hospital: any; index: number }) => {
+  const [bgFailed, setBgFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  const photos = Array.isArray(hospital.photos)
+    ? hospital.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url && typeof photo.url === 'string')
+    : [];
+  const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || (typeof hospital.logo === 'string' ? hospital.logo : null);
+  const ratingVal = hospital.rating && Number(hospital.rating) > 0 ? hospital.rating : 4.8;
+  const hasValidBg = cardImage && !bgFailed;
+  const hasValidLogo = hospital.logo && !logoFailed;
+
+  return (
+    <div className={`w-full h-48 sm:w-44 sm:min-h-full flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
+      {hasValidBg && (
+        <img
+          src={cardImage}
+          alt={hospital.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={() => setBgFailed(true)}
+        />
+      )}
+      <div className={`absolute inset-0 ${hasValidBg ? 'bg-slate-950/35' : 'opacity-10'}`} style={hasValidBg ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 p-4 z-10">
+        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 overflow-hidden shadow-md">
+          {hasValidLogo ? (
+            <img
+              src={hospital.logo}
+              alt={hospital.name}
+              className="w-full h-full object-cover bg-white"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <Building2 className="w-8 h-8 text-white" />
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 bg-white/25 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-white/20">
+          <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+          <span className="text-xs font-black text-white">{ratingVal}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Landing = () => {
   const [hospitals, setHospitals] = useState<any[]>([]);
   const { activeContext } = useAuth();
@@ -229,46 +274,12 @@ export const Landing = () => {
               { id: 'h1', name: 'St. Vincent Medical Center', rating: 4.9, description: 'Elite tertiary care hospital with advanced robotic surgery and state-of-the-art cardiology.', city: 'Mumbai', state: 'Maharashtra' },
               { id: 'h2', name: 'Apollo General Hospital', rating: 4.8, description: 'World-renowned medical expertise and research-driven treatments for complex cases.', city: 'Delhi', state: 'Delhi' },
             ]).map((h: any, i: number) => {
-              const photos = Array.isArray(h.photos)
-                ? h.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url && typeof photo.url === 'string')
-                : [];
-              const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || (typeof h.logo === 'string' ? h.logo : null);
               const location = [h.city, h.state, h.country].filter(Boolean).join(', ');
-              const ratingVal = h.rating && Number(h.rating) > 0 ? h.rating : 4.8;
               return (
               <div key={h.id || i} className="relative group rounded-[28px] bg-white border border-slate-200/60 hover:border-rose-200 hover:shadow-2xl transition-all duration-500 overflow-hidden">
                 <div className="flex flex-col sm:flex-row">
                   {/* Logo / Photo Banner Area */}
-                  <div className={`w-full h-48 sm:w-44 sm:min-h-full flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${i % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
-                    {/* Grid pattern overlay */}
-                    {cardImage && (
-                      <img
-                        src={cardImage}
-                        alt={h.name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    )}
-                    <div className={`absolute inset-0 ${cardImage ? 'bg-slate-950/35' : 'opacity-10'}`} style={cardImage ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 p-4 z-10">
-                      <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 overflow-hidden shadow-md">
-                        {h.logo ? (
-                          <img
-                            src={h.logo}
-                            alt={h.name}
-                            className="w-full h-full object-cover bg-white"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        ) : (
-                          <Building2 className="w-8 h-8 text-white" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-white/25 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-white/20">
-                        <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                        <span className="text-xs font-black text-white">{ratingVal}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <HospitalCardBanner hospital={h} index={i} />
 
                   {/* Content */}
                   <div className="flex-1 p-5 sm:p-7 space-y-4">
