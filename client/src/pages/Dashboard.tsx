@@ -441,22 +441,70 @@ export const Dashboard = () => {
     color: "border-amber-500/30 bg-amber-500/10 text-amber-400"
   });
 
+  // Role-based theme configuration helper for "New Era" multi-color dashboard aesthetics
+  const getRoleTheme = (userRole?: string) => {
+    switch (userRole) {
+      case 'ADMIN':
+        return {
+          heroGradient: 'from-indigo-900/30 via-purple-900/10 to-slate-900/40',
+          badgeBg: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400',
+          accentColor: 'indigo',
+          clockText: 'text-indigo-500 dark:text-indigo-400',
+        };
+      case 'DOCTOR':
+      case 'NURSE':
+        return {
+          heroGradient: 'from-emerald-900/30 via-teal-900/10 to-slate-900/40',
+          badgeBg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+          accentColor: 'emerald',
+          clockText: 'text-emerald-500 dark:text-emerald-400',
+        };
+      case 'PHARMACIST':
+      case 'LAB_TECH':
+        return {
+          heroGradient: 'from-purple-900/30 via-pink-900/10 to-slate-900/40',
+          badgeBg: 'bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400',
+          accentColor: 'purple',
+          clockText: 'text-purple-500 dark:text-purple-400',
+        };
+      case 'RECEPTIONIST':
+      case 'STAFF':
+        return {
+          heroGradient: 'from-amber-900/30 via-orange-900/10 to-slate-900/40',
+          badgeBg: 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400',
+          accentColor: 'amber',
+          clockText: 'text-amber-500 dark:text-amber-400',
+        };
+      default:
+        return {
+          heroGradient: 'from-blue-900/30 via-indigo-900/10 to-slate-900/40',
+          badgeBg: 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400',
+          accentColor: 'blue',
+          clockText: 'text-blue-500 dark:text-blue-400',
+        };
+    }
+  };
+
+  const themeConfig = getRoleTheme(role);
+
   return (
     <div className="space-y-6 pb-10 animate-fade-in-up">
+
       
-      {/* 1. Command Center Header Panel */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl relative overflow-hidden transition-all duration-300 shadow-sm">
+      {/* 1. Command Center Header Panel — Modern New Era Dashboard Styling */}
+      <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 border border-[var(--card-border)] bg-gradient-to-r ${themeConfig.heroGradient} rounded-2xl relative overflow-hidden backdrop-blur-xl transition-all duration-300 shadow-xl shadow-black/5`}>
+        <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
         <div className="relative z-10 space-y-1.5">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-blue-500/60 animate-ping opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 animate-ping opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
             </span>
-            <h2 className="text-lg lg:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
+            <h2 className="text-xl lg:text-2xl font-black tracking-tight flex items-center gap-2 text.primary">
               Clinical Operations Command Center
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              Live System Active
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border ${themeConfig.badgeBg}`}>
+              {role || 'STAFF'} PORTAL · LIVE
             </span>
           </div>
           <p className="text-xs font-semibold text-[var(--text-secondary)]">
@@ -471,9 +519,9 @@ export const Dashboard = () => {
         </div>
 
         {/* Global Clock & Live simulator toggle */}
-        <div className="flex flex-wrap items-center gap-4 relative z-10">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border border-[var(--card-border)] bg-[var(--inner-bg)] text-[var(--text-secondary)]">
-            <Clock className="w-3.5 h-3.5 text-blue-500" />
+        <div className="flex flex-wrap items-center gap-3 relative z-10">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs border border-[var(--card-border)] bg-[var(--card-bg)]/80 backdrop-blur-md text-[var(--text-secondary)] shadow-sm">
+            <Clock className={`w-4 h-4 ${themeConfig.clockText}`} />
             <span className="text-[9px] font-black uppercase tracking-wider font-mono text-[var(--text-muted)]">SYSTEM TIME</span>
             <span className="font-mono font-bold tracking-widest tabular-nums text-[var(--text-primary)]">
               {formatTime(currentTime)}
@@ -481,13 +529,14 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/dashboard/simulator"
-            className="px-4 py-2 border border-[var(--card-border)] hover:bg-[var(--inner-bg)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-sm bg-[var(--card-bg)]"
+            className="px-4 py-2 border border-[var(--card-border)] hover:bg-[var(--inner-bg)] text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-md bg-[var(--card-bg)]"
           >
-            <Activity className="w-4 h-4" />
+            <Activity className="w-4 h-4 text-emerald-500" />
             Simulation Control
           </Link>
         </div>
       </div>
+
 
       {/* Role-based Pharmacist Dashboard OR Layered Hospital Command Center */}
       {role === "PHARMACIST" ? (

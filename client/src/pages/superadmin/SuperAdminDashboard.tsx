@@ -119,33 +119,34 @@ export const SuperAdminDashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Page Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl relative overflow-hidden">
+      {/* Page Title — High-Tech Cyber Crimson Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 border border-[var(--card-border)] bg-gradient-to-r from-red-950/40 via-rose-950/20 to-zinc-950/80 backdrop-blur-xl rounded-2xl relative overflow-hidden shadow-2xl shadow-red-500/5">
+        <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+          <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
           <div>
-            <h1 className="text-xl lg:text-2xl font-black tracking-tight font-sans text-[var(--text-primary)]">Platform Admin Dashboard</h1>
-            <p className="text-xs font-semibold mt-1 text-[var(--text-secondary)]">Multi-Tenant Network Administration Console</p>
+            <h1 className="text-xl lg:text-2xl font-black tracking-tight font-sans text-[var(--text-primary)]">Platform Admin Console</h1>
+            <p className="text-xs font-semibold mt-1 text-[var(--text-secondary)]">Multi-Tenant Network Administration & Telemetry</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 border border-[var(--card-border)] bg-[var(--inner-bg)] rounded-lg relative z-10 font-mono text-[10px] font-bold text-[var(--text-secondary)]">
-          SYSTEM STATUS: <span className="text-emerald-500 dark:text-emerald-400 font-black">ONLINE</span>
+        <div className="flex items-center gap-2 px-3.5 py-1.5 border border-red-500/20 bg-red-500/10 rounded-xl relative z-10 font-mono text-[10px] font-bold text-red-600 dark:text-red-400">
+          SYSTEM STATUS: <span className="text-emerald-500 dark:text-emerald-400 font-black flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> ONLINE</span>
         </div>
       </div>
 
       {/* KPI Cards Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 stagger-in">
         {/* Primary Metric Panel: Revenue Control */}
-        <div className="lg:col-span-5 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-6 relative overflow-hidden group transition-all duration-300 shadow-sm">
+        <div className="lg:col-span-5 border border-red-500/20 bg-gradient-to-br from-red-900/20 via-zinc-900/40 to-slate-900/40 backdrop-blur-xl rounded-2xl p-6 relative overflow-hidden group transition-all duration-300 shadow-xl shadow-red-500/5">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <span className="text-[10px] text-[var(--text-muted)] font-extrabold uppercase tracking-widest block mb-1">PLATFORM REVENUE</span>
+              <span className="text-[10px] text-red-400 font-extrabold uppercase tracking-widest block mb-1">PLATFORM REVENUE</span>
               <h2 className="text-3xl font-black tracking-tight leading-none mt-2 font-mono text-[var(--text-primary)]">
                 ₹{revenueCount.toLocaleString()}
               </h2>
             </div>
-            <div className="w-10 h-10 border border-[var(--card-border)] bg-[var(--inner-bg)] rounded-lg flex items-center justify-center text-[var(--text-primary)] shadow-sm">
-              <IndianRupee className="w-5 h-5" />
+            <div className="w-12 h-12 border border-red-500/30 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 shadow-inner">
+              <IndianRupee className="w-6 h-6" />
             </div>
           </div>
           
@@ -155,11 +156,12 @@ export const SuperAdminDashboard = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Direct Subscription Billings Active
             </span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
               +14.8% MoM
             </span>
           </div>
         </div>
+
 
         {/* Secondary Grid of metrics (4 cards - 7 columns) */}
         <div className="lg:col-span-7 grid grid-cols-2 gap-6">

@@ -275,32 +275,35 @@ export const PatientDashboard = () => {
       {/* Hero Header & Identity Section (Asymmetric layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: HOSCORE digital healthcare card (4 columns) */}
-        <div className="lg:col-span-4 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-6 relative overflow-hidden transition-all duration-300 shadow-sm">
+        <div className="lg:col-span-4 border border-[var(--card-border)] bg-gradient-to-br from-cyan-900/20 via-sky-900/10 to-slate-900/40 backdrop-blur-xl rounded-2xl p-6 relative overflow-hidden transition-all duration-300 shadow-xl shadow-cyan-500/5">
           <div className="flex items-center justify-between mb-8 border-b border-[var(--card-border)] pb-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <div className="w-2.5 h-2.5 bg-cyan-500 rounded-full animate-pulse" />
               <span className="text-[10px] font-black text-[var(--text-secondary)] tracking-widest uppercase font-mono">DIGITAL HEALTH ID</span>
             </div>
-            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 tracking-widest font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 dark:border-emerald-500/10">VERIFIED</span>
+            <span className="text-[9px] font-black text-cyan-600 dark:text-cyan-400 tracking-widest font-mono bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20 dark:border-cyan-500/10 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-cyan-500" /> VERIFIED
+            </span>
           </div>
 
           <div className="flex items-start gap-4 mb-6">
-            <div className="w-12 h-12 border border-[var(--card-border)] bg-[var(--inner-bg)] rounded-lg flex items-center justify-center text-[var(--text-secondary)]">
-              <User className="w-6 h-6" />
+            <div className="w-14 h-14 border border-[var(--card-border)] bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-2xl flex items-center justify-center text-cyan-500 shadow-inner">
+              <User className="w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-base font-black leading-tight tracking-tight text-[var(--text-primary)]">
+              <h2 className="text-lg font-black leading-tight tracking-tight text-[var(--text-primary)]">
                 {data.profile?.name || user?.name || 'Patient'}
               </h2>
               {data.profile?.sixDigitId && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <span className="text-[10px] font-mono font-black text-blue-600 dark:text-sky-400 tracking-widest bg-blue-500/10 px-2.5 py-0.5 rounded border border-blue-500/20 dark:border-blue-500/10">
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className="text-xs font-mono font-black text-cyan-600 dark:text-cyan-400 tracking-widest bg-cyan-500/10 px-3 py-1 rounded-xl border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm">
                     HSC-{data.profile.sixDigitId}
                   </span>
                 </div>
               )}
             </div>
           </div>
+
 
           <div className="grid grid-cols-2 gap-y-4 gap-x-2 border-t border-[var(--card-border)] pt-5">
             <div>
