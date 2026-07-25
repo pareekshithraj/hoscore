@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { pick } from '../utils/pick.js';
+
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -223,11 +225,19 @@ export const updatePatient = async (req: Request, res: Response) => {
       }
     }
 
-    const patient = await prisma.patient.update({ where: { id: String(patientId) }, data: req.body });
+    const safeData = pick(req.body, [
+      'name', 'contact', 'email', 'dateOfBirth', 'gender', 'medicalHistory',
+      'bloodGroup', 'address', 'city', 'state', 'country', 'manualCareNote',
+      'emergencyContact', 'allergies',
+    ]);
+
+
+    const patient = await prisma.patient.update({ where: { id: String(patientId) }, data: safeData });
     await logAudit(req, 'UPDATE', 'Patient', patient.id, `Updated patient ${patient.name}`);
     res.json(patient);
   } catch { res.status(500).json({ error: 'Failed to update patient' }); }
 };
+
 
 export const convertManualPatientToHoscore = async (req: Request, res: Response) => {
   try {

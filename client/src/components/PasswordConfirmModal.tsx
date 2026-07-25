@@ -6,7 +6,7 @@ import { fetchJson } from '../utils/fetchJson';
 interface PasswordConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (password: string) => Promise<void> | void;
   targetRoleLabel: string;
 }
 
@@ -34,28 +34,15 @@ export const PasswordConfirmModal = ({
     setError('');
 
     try {
-      const token = localStorage.getItem('token');
-      const { data, response } = await fetchJson<{ error?: string }>(`${BASE_URL}/auth/verify-switch-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ password }),
-      });
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Incorrect password');
-      }
-
+      await onConfirm(password);
       setPassword('');
-      onConfirm();
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setError(err.message || 'Incorrect password. Context switch denied.');
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">

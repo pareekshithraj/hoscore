@@ -51,13 +51,14 @@ export const DashboardSwitcher = () => {
     setOpen(false);
   };
 
-  const handleConfirmSwitch = async () => {
+  const handleConfirmSwitch = async (password: string) => {
     if (!pendingCtx) return;
     const target = pendingCtx;
+    await switchContext(target, password);
     setPendingCtx(null);
-    await switchContext(target);
     navigate(getContextRoute(target));
   };
+
 
   const role = activeContext?.role || 'STAFF';
   const Icon = roleIcons[role] || User;

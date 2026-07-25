@@ -106,7 +106,7 @@ export async function sendMsg91Email({ to, toName, subject, html, otp }: EmailAr
   }
 }
 
-export async function verifyMsg91AccessToken(accessToken: string): Promise<{ verified: boolean; response?: any; error?: string }> {
+export async function verifyMsg91AccessToken(accessToken: string): Promise<{ verified: boolean; verifiedPhone?: string; response?: any; error?: string }> {
   if (!accessToken?.trim()) {
     return { verified: false, error: 'Access token is required' };
   }
@@ -141,8 +141,13 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
       };
     }
 
+    const verifiedPhone = String(
+      payload?.mobile || payload?.phone || payload?.identifier || payload?.data?.mobile || payload?.data?.phone || ''
+    ).trim();
+
     return {
       verified: true,
+      verifiedPhone: verifiedPhone || undefined,
       response: payload,
     };
 
@@ -165,3 +170,5 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
     };
   }
 }
+
+export const verifyMsg91WidgetAccessToken = verifyMsg91AccessToken;

@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { ALL_FEATURES, permissionsForRole } from '../utils/features.js';
@@ -10,6 +11,12 @@ import {
   assertCanAddUser,
 } from '../services/subscriptionService.js';
 import { signUrl, signHospitalPhotos } from '../services/r2.js';
+import { createChallenge, buildSession } from './authController.js';
+import { pick } from '../utils/pick.js';
+
+
+const JWT_SECRET = process.env.JWT_SECRET as string;
+
 
 const normalizePermissions = (permissions: unknown) => {
   if (!Array.isArray(permissions)) return undefined;
@@ -77,6 +84,181 @@ export const getHospital = async (req: Request, res: Response) => {
 };
 
 // Register a new hospital (self-service or authenticated)
+// Initiate unauthenticated hospital registration -> creates user (unverified), stashes payload, returns OTP challenge
+export const initiateHospitalRegistration = async (req: Request, res: Response) => {
+  const { hospitalName, address, country, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
+  const cleanEmail = String(adminEmail || '').trim().toLowerCase();
+
+  if (!cleanEmail || !adminPassword || !adminName || !hospitalName) {
+    return res.status(400).json({ error: 'Hospital name, admin name, email, and password are required.' });
+  }
+
+  try {
+    let user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (user) {
+      const isMatch = await bcrypt.compare(adminPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'An account with this email already exists. Please log in first or check your password.' });
+      }
+    } else {
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      user = await prisma.user.create({
+        data: {
+          name: adminName,
+          email: cleanEmail,
+          password: hashedPassword,
+          phone: adminPhone || null,
+          isActive: true,
+          isVerified: false,
+        },
+      });
+    }
+
+    const pendingHospitalToken = jwt.sign(
+      {
+        hospitalName,
+        address,
+        country,
+        city,
+        state,
+        contact,
+        description,
+        userId: user.id,
+      },
+      JWT_SECRET,
+      { expiresIn: '30m' }
+    );
+
+    const challengeRes = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
+    if ('error' in challengeRes) {
+      return res.status(challengeRes.status || 400).json({ error: challengeRes.error });
+    }
+
+    return res.status(200).json({
+      message: 'Hospital registration initiated. Verify OTP to complete.',
+      challenge: challengeRes.challenge,
+      pendingHospitalToken,
+    });
+  } catch (error: any) {
+    console.error('Initiate hospital registration error:', error);
+    return res.status(500).json({ error: 'Failed to initiate hospital registration' });
+  }
+};
+
+// Complete unauthenticated hospital registration after OTP verification
+export const completeHospitalRegistration = async (req: Request, res: Response) => {
+  const { challengeId, pendingHospitalToken } = req.body;
+
+  if (!challengeId || !pendingHospitalToken) {
+    return res.status(400).json({ error: 'Challenge ID and pending hospital token are required.' });
+  }
+
+  try {
+    let decoded: any;
+    try {
+      decoded = jwt.verify(pendingHospitalToken, JWT_SECRET);
+    } catch {
+      return res.status(400).json({ error: 'Invalid or expired hospital registration session. Please start again.' });
+    }
+
+    const challenge = await prisma.authChallenge.findUnique({
+      where: { id: challengeId },
+      include: { user: true },
+    });
+
+    if (!challenge || challenge.userId !== decoded.userId) {
+      return res.status(400).json({ error: 'Invalid challenge or registration mismatch.' });
+    }
+
+    const isFullyVerified = (!challenge.requireEmail || challenge.emailVerified) && (!challenge.requirePhone || challenge.phoneVerified);
+    if (!isFullyVerified) {
+      return res.status(400).json({ error: 'OTP verification is incomplete. Please verify all required channels.' });
+    }
+
+    const user = challenge.user;
+
+    // Deduplicate hospital creation
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+    let hospital = await prisma.hospital.findFirst({
+      where: {
+        name: { equals: decoded.hospitalName, mode: 'insensitive' },
+        createdAt: { gte: fiveMinsAgo },
+        memberships: { some: { userId: user.id, role: 'ADMIN' } },
+      },
+    });
+
+    if (!hospital) {
+      const baseSlug = decoded.hospitalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      let slug = baseSlug || 'hospital';
+      let counter = 1;
+      while (await prisma.hospital.findUnique({ where: { slug } })) {
+        slug = `${baseSlug}-${counter++}`;
+      }
+
+      hospital = await prisma.hospital.create({
+        data: {
+          name: decoded.hospitalName,
+          slug,
+          address: decoded.address,
+          country: decoded.country,
+          city: decoded.city,
+          state: decoded.state,
+          contact: decoded.contact,
+          description: decoded.description,
+          isPartnered: true,
+          isActive: true,
+        },
+      });
+
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+      await prisma.subscription.create({
+        data: {
+          hospitalId: hospital.id,
+          plan: 'STARTER',
+          pricePerUser: 150,
+          maxUsers: 50,
+          billedSeats: 0,
+          status: 'TRIAL',
+          trialEndsAt,
+          endDate: new Date(trialEndsAt),
+        },
+      });
+
+      await prisma.membership.create({
+        data: {
+          userId: user.id,
+          hospitalId: hospital.id,
+          role: 'ADMIN',
+          department: 'Administration',
+          permissions: permissionsForRole('ADMIN'),
+          status: 'ACTIVE',
+        },
+      });
+
+      await logAudit(req, 'CREATE', 'Hospital', hospital.id, `Registered hospital ${hospital.name} after OTP verification`);
+    }
+
+    // Delete completed challenge and mark user verified
+    await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { isVerified: true, emailVerifiedAt: new Date(), lastOtpVerifiedAt: new Date() },
+    });
+
+    const session = await buildSession(user.id);
+    return res.status(201).json({
+      message: 'Hospital registration completed successfully',
+      hospital: { id: hospital.id, name: hospital.name, slug: hospital.slug },
+      ...session,
+    });
+  } catch (error: any) {
+    console.error('Complete hospital registration error:', error);
+    return res.status(500).json({ error: 'Failed to complete hospital registration' });
+  }
+};
+
+// Register a new hospital (authenticated path requires password confirm)
 export const registerHospital = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   const { hospitalName, address, country, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
@@ -86,6 +268,12 @@ export const registerHospital = async (req: AuthRequest, res: Response) => {
     if (userId) {
       user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) return res.status(404).json({ error: 'User not found' });
+      if (adminPassword) {
+        const isMatch = await bcrypt.compare(adminPassword, user.password);
+        if (!isMatch) {
+          return res.status(401).json({ error: 'Incorrect password. Password verification required to register hospital.' });
+        }
+      }
     } else {
       const cleanEmail = String(adminEmail || '').trim().toLowerCase();
       if (!cleanEmail || !adminPassword || !adminName) {
@@ -116,7 +304,7 @@ export const registerHospital = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Fix 5: Deduplicate hospital creation if registered by same user within 5 mins
+    // Deduplicate hospital creation if registered by same user within 5 mins
     const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
     const existingHospital = await prisma.hospital.findFirst({
       where: {
@@ -209,9 +397,13 @@ export const updateHospital = async (req: AuthRequest, res: Response) => {
   if (!hospitalId) return res.status(403).json({ error: 'Hospital context required' });
 
   try {
+    const safeData = pick(req.body, [
+      'name', 'address', 'country', 'city', 'state', 'contact', 'description', 'logo', 'photos',
+    ]);
+
     const hospital = await prisma.hospital.update({
       where: { id: hospitalId },
-      data: req.body,
+      data: safeData,
     });
     await logAudit(req, 'UPDATE', 'Hospital', hospital.id, `Updated hospital ${hospital.name}`);
     
@@ -222,6 +414,7 @@ export const updateHospital = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to update hospital' });
   }
 };
+
 
 export const getHospitalUsageTelemetry = async (req: AuthRequest, res: Response) => {
   try {

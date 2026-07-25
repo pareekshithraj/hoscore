@@ -35,10 +35,14 @@ export const createInventoryItem = async (req: Request, res: Response) => {
 
 export const updateInventoryStock = async (req: Request, res: Response) => {
   try {
-    const item = await prisma.inventory.update({ where: { id: req.params.id }, data: { stock: req.body.stock } });
+    const existing = await prisma.inventory.findFirst({ where: { id: req.params.id, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Inventory item not found or access denied' });
+
+    const item = await prisma.inventory.update({ where: { id: existing.id }, data: { stock: Number(req.body.stock) } });
     res.json(item);
   } catch { res.status(500).json({ error: 'Failed to update inventory stock' }); }
 };
+
 
 export const getAllStaff = async (req: Request, res: Response) => {
   try {

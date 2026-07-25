@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { pick } from '../utils/pick.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -21,13 +22,22 @@ export const create = async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'Self-action forbidden: Doctors cannot prescribe medications to themselves.' });
       }
     }
+    const safeData = pick(req.body, ['patientId', 'patientName', 'doctorId', 'doctorName', 'diagnosis', 'instructions', 'status', 'validUntil']);
+    const medicinesData = req.body.medicines || req.body.medications || [];
+    
     // @ts-ignore
-    const rx = await prisma.prescription.create({ data: { ...req.body, hospitalId: hid(req) }, include: { patient: true } });
+    const rx = await prisma.prescription.create({
+      data: {
+        ...safeData,
+        medicines: medicinesData,
+        hospitalId: hid(req),
+      },
+      include: { patient: true },
+    });
     await logAudit(req, 'CREATE', 'Prescription', rx.id, `Prescribed to patient`);
     res.status(201).json(rx);
   } catch (err) { res.status(500).json({ error: 'Failed to create prescription' }); }
 };
-
 
 export const updateStatus = async (req: Request, res: Response) => {
   try {
@@ -36,7 +46,7 @@ export const updateStatus = async (req: Request, res: Response) => {
     if (!existing) return res.status(404).json({ error: 'Prescription not found' });
     
     const newStatus = req.body.status;
-    const rx = await prisma.prescription.update({ where: { id: req.params.id! }, data: { status: newStatus } });
+    const rx = await prisma.prescription.update({ where: { id: existing.id }, data: { status: newStatus } });
 
     // Auto-deduct matching medicine items from Inventory when status transitions to DISPENSED
     if (newStatus === 'DISPENSED' && existing.status !== 'DISPENSED' && existing.medicines) {
@@ -77,7 +87,7 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const existing = await prisma.prescription.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
     if (!existing) return res.status(404).json({ error: 'Prescription not found' });
-    await prisma.prescription.delete({ where: { id: req.params.id! } });
+    await prisma.prescription.delete({ where: { id: existing.id } });
     await logAudit(req, 'DELETE', 'Prescription', req.params.id);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete prescription' }); }

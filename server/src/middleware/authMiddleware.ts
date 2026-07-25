@@ -24,8 +24,9 @@ export interface AuthRequest extends Request {
 import { permissionsForRole } from '../utils/features.js';
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = (req as any).cookies?.token || req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
@@ -63,8 +64,9 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 };
 
 export const optionalAuthenticate = async (req: AuthRequest, _res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = (req as any).cookies?.token || req.headers.authorization?.split(' ')[1];
   if (!token) return next();
+
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;

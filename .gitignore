@@ -19,3 +19,6 @@ outputs/
 
 .vercel
 .env*
+client/.env.production
+client/.env*.local
+server/.env*.local

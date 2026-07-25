@@ -16,6 +16,24 @@ export const getAllAppointments = async (req: Request, res: Response) => {
   } catch (error) { res.status(500).json({ error: 'Failed to fetch appointments' }); }
 };
 
+async function getNextAppointmentToken(hospitalId: string, appointmentDate: Date): Promise<number> {
+  const startOfDay = new Date(appointmentDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(appointmentDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const highest = await prisma.appointment.findFirst({
+    where: {
+      hospitalId,
+      date: { gte: startOfDay, lte: endOfDay },
+    },
+    orderBy: { tokenNumber: 'desc' },
+    select: { tokenNumber: true },
+  });
+
+  return (highest?.tokenNumber || 0) + 1;
+}
+
 export const createAppointment = async (req: Request, res: Response) => {
   const { hospitalId, patientName, doctorId, time, date, contact, email, isHoscoreUser, manualCareNote } = req.body;
   const activeHospitalId = hospitalId || hid(req);
@@ -36,16 +54,17 @@ export const createAppointment = async (req: Request, res: Response) => {
           name: patientName,
           email: email || undefined,
           contact: contact || undefined,
-          hospitalId: hospitalId || hid(req),
+          hospitalId: activeHospitalId,
           isHoscoreUser: shouldCreateHoscoreId,
           registrationMode: shouldCreateHoscoreId ? 'HOSCORE' : 'WALK_IN_MANUAL',
           manualCareNote: shouldCreateHoscoreId ? null : manualCareNote || 'Patient does not use phone/app. Continue manual care workflow.',
         },
       });
     }
-    const tokenNumber = Math.floor(Math.random() * 50) + 1;
+    const apptDate = new Date(date);
+    const tokenNumber = await getNextAppointmentToken(activeHospitalId, apptDate);
     const appointment = await prisma.appointment.create({
-      data: { hospitalId: hospitalId || hid(req), patientId: patient.id, doctorId: doctorId || null, time, date: new Date(date), tokenNumber, status: 'PENDING' },
+      data: { hospitalId: activeHospitalId, patientId: patient.id, doctorId: doctorId || null, time, date: apptDate, tokenNumber, status: 'PENDING' },
     });
     res.status(201).json(appointment);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to create appointment' }); }
@@ -77,14 +96,15 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
       targetPatientId = dependent.id;
     }
 
-    const tokenNumber = Math.floor(Math.random() * 50) + 1;
+    const apptDate = new Date(date);
+    const tokenNumber = await getNextAppointmentToken(hospitalId, apptDate);
     const appointment = await prisma.appointment.create({
       data: {
         hospitalId,
         patientId: targetPatientId,
         doctorId: doctorId || null,
         time,
-        date: new Date(date),
+        date: apptDate,
         tokenNumber,
         status: 'PENDING',
       },
@@ -98,6 +118,7 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
     res.status(500).json({ error: 'Failed to create appointment' });
   }
 };
+
 
 export const checkInAppointment = async (req: Request, res: Response) => {
   try {

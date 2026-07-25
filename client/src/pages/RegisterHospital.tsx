@@ -81,32 +81,81 @@ export const RegisterHospital = () => {
     }
   };
 
+  const [challengeId, setChallengeId] = useState('');
+  const [pendingHospitalToken, setPendingHospitalToken] = useState('');
+
   const handleStartOtpStep = async () => {
-    setStep(4);
-    await sendOtp();
+    setIsLoading(true);
+    setError('');
+    try {
+      const { data, response } = await fetchJson<{
+        message?: string;
+        error?: string;
+        challenge?: { id: string };
+        pendingHospitalToken?: string;
+      }>(`${BASE_URL}/hospitals/register/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+
+      if (!response.ok) throw new Error(data.error || 'Failed to initiate hospital registration');
+
+      if (data.challenge?.id && data.pendingHospitalToken) {
+        setChallengeId(data.challenge.id);
+        setPendingHospitalToken(data.pendingHospitalToken);
+      }
+      setOtpSent(true);
+      setStep(4);
+      setOtpCooldown(30);
+      const timer = setInterval(() => {
+        setOtpCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'Error initiating registration');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!otpCode || otpCode.length < 6) {
-      setError('Please enter the 6-digit OTP code sent to your email/phone.');
+      setError('Please enter the 6-digit OTP code sent to your email.');
+      return;
+    }
+    if (!challengeId || !pendingHospitalToken) {
+      setError('Registration session expired. Please go back and try again.');
       return;
     }
 
     setIsLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const { data, response } = await fetchJson<{ error?: string }>(`${BASE_URL}/hospitals/register`, {
+      // Step 1: Verify OTP on challenge
+      const otpRes = await fetchJson<{ error?: string }>(`${BASE_URL}/auth/verify-otp`, {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ ...form, otpCode }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId, channel: 'email', otpCode }),
+      });
+      if (!otpRes.response.ok) throw new Error(otpRes.data.error || 'Invalid OTP code');
+
+      // Step 2: Complete hospital registration
+      const { data, response } = await fetchJson<{ error?: string; token?: string }>(`${BASE_URL}/hospitals/register/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId, pendingHospitalToken }),
       });
 
-      if (!response.ok) throw new Error(data.error || 'Registration failed');
+      if (!response.ok) throw new Error(data.error || 'Failed to complete registration');
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
       try {
         sessionStorage.removeItem('hoscore_hospital_register_draft');
       } catch (_err) {
@@ -114,11 +163,12 @@ export const RegisterHospital = () => {
       }
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }
   };
+
 
   if (success) {
     return (

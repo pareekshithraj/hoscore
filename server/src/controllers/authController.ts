@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import type { AuthChallenge, User } from '@prisma/client';
 import { prisma } from '../index.js';
 import { permissionsForRole } from '../utils/features.js';
+import { logAudit } from '../utils/auditLogger.js';
 import { signUrl } from '../services/r2.js';
+
 import { sendMsg91Email, sendSmsOtp, verifyMsg91AccessToken as verifyMsg91WidgetAccessToken } from '../services/msg91.js';
 import {
   generateOtp,
@@ -157,7 +159,8 @@ function needsOtpStepUp(user: Pick<User, 'lastOtpVerifiedAt'>): boolean {
   return Date.now() - user.lastOtpVerifiedAt.getTime() >= OTP_REVERIFY_WINDOW_MS;
 }
 
-async function buildSession(userId: string) {
+export async function buildSession(userId: string) {
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { patientProfile: true },
@@ -239,11 +242,12 @@ async function ensurePatientProfile(user: { id: string; name: string; email: str
   });
 }
 
-async function createChallenge(
+export async function createChallenge(
   user: Pick<User, 'id' | 'name' | 'email' | 'phone'>,
   purpose: ChallengePurpose,
   requestedChannels: { email: boolean; phone: boolean }
 ): Promise<ChallengeResult> {
+
   const existing = await prisma.authChallenge.findFirst({
     where: { userId: user.id, purpose, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: 'desc' },
@@ -701,10 +705,25 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
       user = await findUserByIdentifier(identifier);
     }
 
+    // Require that verifiedPhone matches the user's registered phone number
+    if (verification.verifiedPhone && user?.phone) {
+      if (normalizePhone(verification.verifiedPhone) !== normalizePhone(user.phone)) {
+        return res.status(403).json({ error: 'Verified phone does not match this account.' });
+      }
+    }
+
     if (challengeId) {
       const loaded = await getChallengeOrError(challengeId);
       if (!hasChallengeIssue(loaded)) {
         const { challenge } = loaded;
+
+        // If challenge user has phone, verify it matches
+        if (verification.verifiedPhone && challenge.user.phone) {
+          if (normalizePhone(verification.verifiedPhone) !== normalizePhone(challenge.user.phone)) {
+            return res.status(403).json({ error: 'Verified phone does not match this account.' });
+          }
+        }
+
         const updated = await prisma.authChallenge.update({
           where: { id: challenge.id },
           data: {
@@ -747,6 +766,7 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No account found for this number. Please register first.' });
     }
 
+
     if (!user.isVerified) {
       await prisma.user.update({
         where: { id: user.id },
@@ -769,8 +789,12 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
 };
 
 export const switchContext = async (req: Request, res: Response) => {
-  const { contextType, hospitalId } = req.body;
+  const { contextType, hospitalId, password } = req.body;
   const userId = (req as any).user?.userId;
+
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required to switch context' });
+  }
 
   try {
     const user = await prisma.user.findUnique({
@@ -779,9 +803,16 @@ export const switchContext = async (req: Request, res: Response) => {
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      await logAudit(req, 'CONTEXT_SWITCH_FAILED', 'User', user.id, `Failed password verification for context switch to ${contextType}`);
+      return res.status(401).json({ error: 'Incorrect password. Context switch denied.' });
+    }
+
     let role = 'PATIENT';
     let activeHospitalId: string | null = null;
     let permissions: string[] = [];
+
 
     if (contextType === 'superadmin') {
       if (!user.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });

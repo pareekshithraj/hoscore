@@ -36,8 +36,9 @@ interface AuthContextType {
   activeContext: ContextItem | null;
   login: (userData: User, token: string, contexts: ContextItem[], activeContext: ContextItem) => void;
   logout: () => void;
-  switchContext: (ctx: ContextItem) => Promise<void>;
+  switchContext: (ctx: ContextItem, password?: string) => Promise<boolean>;
   isLoading: boolean;
+
   selectedPatientId: string | null;
   setSelectedPatientId: (id: string | null) => void;
   theme: 'light' | 'dark';
@@ -210,13 +211,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('selectedPatientId');
   };
 
-  const switchContext = async (ctx: ContextItem) => {
-    if (!token) return;
+  const switchContext = async (ctx: ContextItem, password?: string): Promise<boolean> => {
+    if (!token) return false;
     try {
       const res = await fetch(`${BASE_URL}/auth/switch-context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ contextType: ctx.type, hospitalId: ctx.hospitalId }),
+        body: JSON.stringify({ contextType: ctx.type, hospitalId: ctx.hospitalId, password }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -224,11 +225,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setActiveContext(ctx);
         localStorage.setItem('token', data.token);
         localStorage.setItem('activeContext', JSON.stringify(ctx));
+        return true;
       }
-    } catch (err) {
+      throw new Error(data.error || 'Failed to switch context');
+    } catch (err: any) {
       console.error('Switch context failed', err);
+      throw err;
     }
   };
+
 
   return (
     <AuthContext.Provider value={{

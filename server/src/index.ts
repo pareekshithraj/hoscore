@@ -12,6 +12,8 @@ import { initWebSocket } from './services/websocket.js';
 import routes from './routes/index.js';
 import { handlePaymentWebhook } from './controllers/paymentController.js';
 import { validateEnv } from './utils/validateEnv.js';
+import { cleanupExpiredChallenges } from './services/challengeCleanup.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -116,7 +118,9 @@ app.use('/api/auth/forgot-password', otpSendLimiter);
 app.use('/api/auth/resend-otp', otpSendLimiter);
 app.use('/api/auth/verify-otp', otpVerifyLimiter);
 app.use('/api/auth/reset-password', otpVerifyLimiter);
+app.use('/api/auth/verify-msg91-access-token', otpVerifyLimiter);
 app.use('/api/auth', authLimiter);
+
 
 // API Routes
 app.use('/api', routes);
@@ -255,11 +259,15 @@ async function ensurePatientSixDigitIds() {
 
 if (!isServerless) {
   server.listen(port, () => {
+
     console.log(`🏥 HOSCORE API running on port ${port} (${process.env.NODE_ENV || 'development'})`);
     console.log(`🔌 WebSocket available at ws://localhost:${port}/ws`);
     ensurePatientSixDigitIds();
+    cleanupExpiredChallenges();
+    setInterval(cleanupExpiredChallenges, 60 * 60 * 1000);
   });
 }
+
 
 export { app, prisma };
 export default app;
