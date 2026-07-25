@@ -19,15 +19,15 @@ async function generateSixDigitId() {
 async function checkDoctorAccess(patientId: string, hospitalId: string | undefined, doctorEmail: string | undefined): Promise<boolean> {
   if (!hospitalId) return false;
 
-  // If we have the doctor's email, check if access has been revoked
+  // Fix 2: Check revocation for all doctor records associated with this email & hospital
   if (doctorEmail) {
-    const doctor = await prisma.doctor.findFirst({
+    const doctors = await prisma.doctor.findMany({
       where: { email: doctorEmail, hospitalId }
     });
-    if (doctor) {
+    for (const d of doctors) {
       const grant = await prisma.patientAccessGrant.findUnique({
         where: {
-          patientId_doctorId: { patientId, doctorId: doctor.id }
+          patientId_doctorId: { patientId, doctorId: d.id }
         }
       });
       if (grant && grant.status === 'REVOKED') {
@@ -35,6 +35,7 @@ async function checkDoctorAccess(patientId: string, hospitalId: string | undefin
       }
     }
   }
+
 
   // Check appointments
   const appt = await prisma.appointment.findFirst({

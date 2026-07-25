@@ -68,7 +68,12 @@ export const uploadDocuments = async (req: Request, res: Response) => {
 export const deleteFile = async (req: Request, res: Response) => {
   try {
     const { key } = req.body;
-    if (!key) return res.status(400).json({ error: 'File key required' });
+    if (!key || typeof key !== 'string') return res.status(400).json({ error: 'Valid file key required' });
+
+    // Prevent path traversal attacks
+    if (key.includes('..') || key.startsWith('/') || key.startsWith('\\')) {
+      return res.status(400).json({ error: 'Invalid file key' });
+    }
 
     await deleteFromR2(key);
     res.json({ success: true, message: 'File deleted' });
@@ -77,3 +82,4 @@ export const deleteFile = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message || 'Delete failed' });
   }
 };
+

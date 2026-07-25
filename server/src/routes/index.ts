@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, requireFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
+import { authenticate, optionalAuthenticate, requireFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
 import * as authController from '../controllers/authController.js';
 import * as hospitalController from '../controllers/hospitalController.js';
 import * as superAdminController from '../controllers/superAdminController.js';
@@ -60,6 +60,7 @@ router.post('/payments/demo-order', paymentController.createDemoPaymentOrder);
 router.post('/payments/demo-verify', paymentController.verifyDemoPaymentOrder);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
+router.post('/hospitals/register', optionalAuthenticate, validate(hospitalRegisterSchema), hospitalController.registerHospital);
 
 // ================= AUTHENTICATED ROUTES =================
 router.use(authenticate);
@@ -73,10 +74,8 @@ router.delete('/upload/file', requireFeature(FEATURES.PATIENTS), uploadControlle
 router.get('/auth/me', authController.getMe);
 router.get('/auth/contexts', authController.getMyContexts);
 router.post('/auth/switch-context', authController.switchContext);
+router.post('/auth/verify-switch-password', authController.verifySwitchPassword);
 
-// Hospital registration — attaches an ADMIN membership to the LOGGED-IN identity.
-// Never creates a separate account (requires authentication).
-router.post('/hospitals/register', validate(hospitalRegisterSchema), hospitalController.registerHospital);
 
 // ================= PAYMENTS / SUBSCRIPTIONS =================
 // (webhook is registered separately in index.ts with a raw body parser)

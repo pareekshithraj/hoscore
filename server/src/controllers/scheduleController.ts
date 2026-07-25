@@ -77,8 +77,11 @@ export const upsertScheduleOverride = async (req: Request, res: Response) => {
 
 export const deleteScheduleOverride = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.schedule.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Schedule override not found' });
     const schedule = await prisma.schedule.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'ScheduleOverride', schedule.id, `Deleted schedule override for ${schedule.date.toISOString().slice(0, 10)}`);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete schedule override' }); }
 };
+

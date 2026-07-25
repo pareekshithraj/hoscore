@@ -26,6 +26,9 @@ export const RegisterHospital = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
 
   const [form, setForm] = useState<RegisterHospitalForm>(() => {
     try {
@@ -50,15 +53,59 @@ export const RegisterHospital = () => {
     return updated;
   });
 
-  const handleSubmit = async () => {
+  const sendOtp = async () => {
     setIsLoading(true);
     setError('');
     try {
-      const { data, response } = await fetchJson<{ error?: string }>(`${BASE_URL}/hospitals/register`, {
+      const { data, response } = await fetchJson<{ message?: string; error?: string }>(`${BASE_URL}/auth/start-otp-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ identifier: form.adminEmail || form.adminPhone }),
       });
+      if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
+      setOtpSent(true);
+      setOtpCooldown(30);
+      const timer = setInterval(() => {
+        setOtpCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'Error sending OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartOtpStep = async () => {
+    setStep(4);
+    await sendOtp();
+  };
+
+  const handleSubmit = async () => {
+    if (!otpCode || otpCode.length < 6) {
+      setError('Please enter the 6-digit OTP code sent to your email/phone.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const { data, response } = await fetchJson<{ error?: string }>(`${BASE_URL}/hospitals/register`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...form, otpCode }),
+      });
+
       if (!response.ok) throw new Error(data.error || 'Registration failed');
       try {
         sessionStorage.removeItem('hoscore_hospital_register_draft');
@@ -103,10 +150,10 @@ export const RegisterHospital = () => {
 
         {/* Step Indicator */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3].map(s => (
+          {[1, 2, 3, 4].map(s => (
             <div key={s} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step >= s ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-500'}`}>{s}</div>
-              {s < 3 && <div className={`w-8 h-0.5 ${step > s ? 'bg-rose-600' : 'bg-slate-200'}`} />}
+              {s < 4 && <div className={`w-8 h-0.5 ${step > s ? 'bg-rose-600' : 'bg-slate-200'}`} />}
             </div>
           ))}
         </div>
@@ -224,8 +271,50 @@ export const RegisterHospital = () => {
                 <button onClick={() => setStep(2)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button onClick={handleSubmit} disabled={isLoading} className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-xl hover:from-rose-700 hover:to-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {isLoading ? 'Registering...' : 'Start Free Trial'}
+                <button onClick={handleStartOtpStep} disabled={isLoading} className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-xl hover:from-rose-700 hover:to-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {isLoading ? 'Sending OTP...' : 'Proceed to OTP Verification'} <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800 mb-1">Verify OTP</h2>
+                <p className="text-xs text-slate-500">We have sent a 6-digit verification code to <strong>{form.adminEmail}</strong>.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Enter 6-Digit OTP Code</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/[^\d]/g, ''))}
+                  placeholder="123456"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Didn't receive code?</span>
+                <button
+                  type="button"
+                  onClick={sendOtp}
+                  disabled={otpCooldown > 0 || isLoading}
+                  className="text-rose-600 hover:underline font-bold disabled:opacity-50"
+                >
+                  {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend OTP'}
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setStep(3)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2">
+                  <ArrowLeft className="w-4 h-4" /> Back
+                </button>
+                <button onClick={handleSubmit} disabled={isLoading || otpCode.length < 6} className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold rounded-xl hover:from-rose-700 hover:to-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {isLoading ? 'Verifying...' : 'Verify & Start Trial'}
                 </button>
               </div>
             </div>
@@ -238,3 +327,4 @@ export const RegisterHospital = () => {
     </div>
   );
 };
+

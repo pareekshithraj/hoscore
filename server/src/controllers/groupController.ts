@@ -22,6 +22,8 @@ export const createGroup = async (req: Request, res: Response) => {
 
 export const updateGroup = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.staffGroup.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Group not found' });
     const group = await prisma.staffGroup.update({ where: { id: req.params.id! }, data: req.body });
     await logAudit(req, 'UPDATE', 'StaffGroup', group.id, `Updated staff group ${group.name}`);
     res.json(group);
@@ -30,6 +32,8 @@ export const updateGroup = async (req: Request, res: Response) => {
 
 export const deleteGroup = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.staffGroup.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Group not found' });
     const group = await prisma.staffGroup.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'StaffGroup', group.id, `Deleted staff group ${group.name}`);
     res.json({ success: true });
@@ -39,6 +43,8 @@ export const deleteGroup = async (req: Request, res: Response) => {
 export const addMember = async (req: Request, res: Response) => {
   try {
     const { groupId, staffId, doctorId, memberName, role } = req.body;
+    const group = await prisma.staffGroup.findFirst({ where: { id: groupId, hospitalId: hid(req) } });
+    if (!group) return res.status(404).json({ error: 'Target staff group not found' });
     const member = await prisma.groupMember.create({ data: { groupId, staffId, doctorId, memberName, role } });
     await logAudit(req, 'CREATE', 'GroupMember', member.id, `Added ${memberName} to group`);
     res.status(201).json(member);
@@ -47,8 +53,13 @@ export const addMember = async (req: Request, res: Response) => {
 
 export const removeMember = async (req: Request, res: Response) => {
   try {
-    const member = await prisma.groupMember.delete({ where: { id: req.params.id! } });
+    const member = await prisma.groupMember.findFirst({
+      where: { id: req.params.id!, group: { hospitalId: hid(req) } }
+    });
+    if (!member) return res.status(404).json({ error: 'Group member not found' });
+    await prisma.groupMember.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'GroupMember', member.id, `Removed ${member.memberName} from group`);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to remove member' }); }
 };
+

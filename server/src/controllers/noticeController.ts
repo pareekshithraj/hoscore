@@ -24,6 +24,8 @@ export const createNotice = async (req: Request, res: Response) => {
 
 export const updateNotice = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.notice.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Notice not found' });
     const notice = await prisma.notice.update({ where: { id: req.params.id! }, data: req.body });
     await logAudit(req, 'UPDATE', 'Notice', notice.id, `Updated notice ${notice.title}`);
     res.json(notice);
@@ -32,8 +34,11 @@ export const updateNotice = async (req: Request, res: Response) => {
 
 export const deleteNotice = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.notice.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Notice not found' });
     const notice = await prisma.notice.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'Notice', notice.id, `Deleted notice ${notice.title}`);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete notice' }); }
 };
+

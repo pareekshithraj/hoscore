@@ -137,6 +137,9 @@ export const addToQueue = async (req: Request, res: Response) => {
 
 export const updateQueueStatus = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.oPDQueue.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Queue entry not found' });
+
     const { status } = req.body;
     const data: any = { status };
     if (status === 'IN_CONSULTATION') data.calledAt = new Date();
@@ -172,6 +175,9 @@ export const updateQueueStatus = async (req: Request, res: Response) => {
 
 export const deleteFromQueue = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.oPDQueue.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Queue entry not found' });
+
     const entry = await prisma.oPDQueue.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'OPDQueue', entry.id, `Deleted token ${entry.tokenNumber} for ${entry.patientName}`);
     
@@ -181,3 +187,4 @@ export const deleteFromQueue = async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to remove from queue' }); }
 };
+

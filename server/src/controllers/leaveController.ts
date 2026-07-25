@@ -27,6 +27,8 @@ export const createLeave = async (req: Request, res: Response) => {
 
 export const updateLeaveStatus = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.leaveRequest.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Leave request not found' });
     const leave = await prisma.leaveRequest.update({ where: { id: req.params.id! }, data: { status: req.body.status, reviewedBy: req.body.reviewedBy } });
     await logAudit(req, 'UPDATE', 'LeaveRequest', leave.id, `Updated leave request for ${leave.staffName} to ${leave.status}`);
     res.json(leave);
@@ -35,8 +37,11 @@ export const updateLeaveStatus = async (req: Request, res: Response) => {
 
 export const deleteLeave = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.leaveRequest.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Leave request not found' });
     const leave = await prisma.leaveRequest.delete({ where: { id: req.params.id! } });
     await logAudit(req, 'DELETE', 'LeaveRequest', leave.id, `Deleted leave request for ${leave.staffName}`);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete leave request' }); }
 };
+

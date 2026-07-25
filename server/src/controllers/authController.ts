@@ -783,7 +783,8 @@ export const switchContext = async (req: Request, res: Response) => {
     let activeHospitalId: string | null = null;
     let permissions: string[] = [];
 
-    if (contextType === 'superadmin' && user.isSuperAdmin) {
+    if (contextType === 'superadmin') {
+      if (!user.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });
       role = 'SUPER_ADMIN';
       permissions = permissionsForRole(role);
     } else if (contextType === 'hospital' && hospitalId) {
@@ -798,7 +799,10 @@ export const switchContext = async (req: Request, res: Response) => {
     } else if (contextType === 'patient') {
       role = 'PATIENT';
       permissions = [];
+    } else {
+      return res.status(400).json({ error: 'Invalid context type or missing hospital ID' });
     }
+
 
     const token = jwt.sign(
       {
@@ -830,6 +834,28 @@ export const switchContext = async (req: Request, res: Response) => {
   }
 };
 
+export const verifySwitchPassword = async (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  const { password } = req.body;
+
+  if (!password) return res.status(400).json({ error: 'Password is required' });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Incorrect password. Context switch denied.' });
+    }
+
+    return res.json({ success: true, message: 'Password verified successfully' });
+  } catch (error) {
+    console.error('Password switch verification error:', error);
+    return res.status(500).json({ error: 'Failed to verify password' });
+  }
+};
+
 export const getMyContexts = async (req: Request, res: Response) => {
   const userId = (req as any).user?.userId;
   try {
@@ -851,13 +877,26 @@ export const getMe = async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, phone: true, isSuperAdmin: true, avatar: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        isSuperAdmin: true,
+        avatar: true,
+        lastOtpVerifiedAt: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
+      },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const verificationWindowMs = 60 * 24 * 60 * 60 * 1000; // 60 days
+    const isVerificationDue = !user.lastOtpVerifiedAt || (Date.now() - new Date(user.lastOtpVerifiedAt).getTime() > verificationWindowMs);
+
     const signedAvatar = user.avatar ? await signUrl(user.avatar) : null;
-    return res.json({ ...user, avatar: signedAvatar });
+    return res.json({ ...user, avatar: signedAvatar, isVerificationDue });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to get user' });
   }
-};
+};

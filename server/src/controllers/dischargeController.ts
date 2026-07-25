@@ -25,7 +25,16 @@ export const create = async (req: Request, res: Response) => {
       }
     });
 
+    const userId = (req as any).user?.userId;
+    if (admission && userId) {
+      const patientObj = await prisma.patient.findUnique({ where: { id: admission.patientId }, select: { userId: true } });
+      if (patientObj && patientObj.userId === userId) {
+        return res.status(403).json({ error: 'Self-action forbidden: Doctors/Staff cannot discharge themselves.' });
+      }
+    }
+
     const isSigned = status === 'SIGNED' || status === 'FINAL' || !status;
+
     if (admission && isSigned) {
       const billing = await prisma.billing.findFirst({ where: { admissionId: admission.id } });
       if (billing && billing.status === 'PENDING' && !req.body.bypassBillingCheck) {

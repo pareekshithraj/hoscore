@@ -23,6 +23,8 @@ export const createShift = async (req: Request, res: Response) => {
 
 export const updateShift = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.shiftSchedule.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Shift schedule not found' });
     const shift = await prisma.shiftSchedule.update({ where: { id: req.params.id! }, data: req.body });
     res.json(shift);
   } catch (err) { res.status(500).json({ error: 'Failed to update shift' }); }
@@ -30,7 +32,10 @@ export const updateShift = async (req: Request, res: Response) => {
 
 export const deleteShift = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.shiftSchedule.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Shift schedule not found' });
     await prisma.shiftSchedule.delete({ where: { id: req.params.id! } });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete shift' }); }
 };
+

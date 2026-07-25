@@ -27,10 +27,13 @@ function getContextRoute(ctx: ContextItem): string {
   return '/dashboard';
 }
 
+import { PasswordConfirmModal } from './PasswordConfirmModal';
+
 export const DashboardSwitcher = () => {
   const { contexts, activeContext, switchContext } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [pendingCtx, setPendingCtx] = useState<ContextItem | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,15 +46,23 @@ export const DashboardSwitcher = () => {
 
   if (contexts.length <= 1) return null;
 
-  const handleSwitch = async (ctx: ContextItem) => {
-    await switchContext(ctx);
+  const handleSelectContext = (ctx: ContextItem) => {
+    setPendingCtx(ctx);
     setOpen(false);
-    navigate(getContextRoute(ctx));
+  };
+
+  const handleConfirmSwitch = async () => {
+    if (!pendingCtx) return;
+    const target = pendingCtx;
+    setPendingCtx(null);
+    await switchContext(target);
+    navigate(getContextRoute(target));
   };
 
   const role = activeContext?.role || 'STAFF';
   const Icon = roleIcons[role] || User;
   const bgColor = roleColors[role] || 'bg-slate-500';
+
 
   return (
     <div className="relative" ref={ref}>
@@ -88,7 +99,7 @@ export const DashboardSwitcher = () => {
               return (
                 <button
                   key={i}
-                  onClick={() => !isActive && handleSwitch(ctx)}
+                  onClick={() => !isActive && handleSelectContext(ctx)}
                   className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-left cursor-pointer border ${
                     isActive 
                       ? 'bg-blue-50/40 dark:bg-zinc-900 border-blue-200 dark:border-zinc-800 text-blue-700 dark:text-white font-bold' 
@@ -115,6 +126,14 @@ export const DashboardSwitcher = () => {
           </div>
         </div>
       )}
+
+      <PasswordConfirmModal
+        isOpen={Boolean(pendingCtx)}
+        onClose={() => setPendingCtx(null)}
+        onConfirm={handleConfirmSwitch}
+        targetRoleLabel={pendingCtx ? getContextLabel(pendingCtx) : ''}
+      />
     </div>
   );
 };
+

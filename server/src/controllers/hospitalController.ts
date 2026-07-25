@@ -76,18 +76,61 @@ export const getHospital = async (req: Request, res: Response) => {
   }
 };
 
-// Register a new hospital (self-service)
-// Register a hospital under the CURRENTLY AUTHENTICATED identity.
-// Never creates a new account — it attaches an ADMIN membership to req.user.
+// Register a new hospital (self-service or authenticated)
 export const registerHospital = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
-  if (!userId) return res.status(401).json({ error: 'You must be logged in to register a hospital.' });
-
-  const { hospitalName, address, country, city, state, contact, description } = req.body;
+  const { hospitalName, address, country, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    let user;
+    if (userId) {
+      user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+    } else {
+      const cleanEmail = String(adminEmail || '').trim().toLowerCase();
+      if (!cleanEmail || !adminPassword || !adminName) {
+        return res.status(400).json({ error: 'Admin name, email, and password are required for hospital registration.' });
+      }
+      if (adminPassword.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+      }
+
+      const existingUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
+      if (existingUser) {
+        const isMatch = await bcrypt.compare(adminPassword, existingUser.password);
+        if (!isMatch) {
+          return res.status(400).json({ error: 'An account with this email already exists. Please log in first or check your password.' });
+        }
+        user = existingUser;
+      } else {
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        user = await prisma.user.create({
+          data: {
+            name: adminName,
+            email: cleanEmail,
+            password: hashedPassword,
+            phone: adminPhone || null,
+            isActive: true,
+          },
+        });
+      }
+    }
+
+    // Fix 5: Deduplicate hospital creation if registered by same user within 5 mins
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingHospital = await prisma.hospital.findFirst({
+      where: {
+        name: { equals: hospitalName, mode: 'insensitive' },
+        createdAt: { gte: fiveMinsAgo },
+        memberships: { some: { userId: user.id, role: 'ADMIN' } },
+      },
+    });
+    if (existingHospital) {
+      return res.status(200).json({
+        message: 'Hospital registered successfully',
+        hospital: { id: existingHospital.id, name: existingHospital.name, slug: existingHospital.slug },
+      });
+    }
 
     // Generate a unique slug from the hospital name.
     const baseSlug = hospitalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -112,6 +155,7 @@ export const registerHospital = async (req: AuthRequest, res: Response) => {
       },
     });
 
+
     // 30-day trial — add team first, then pay per user on the Subscription page.
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 30);
@@ -128,8 +172,7 @@ export const registerHospital = async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Attach the ADMIN membership to the existing identity; avoid duplicates if the
-    // hospital was registered already by the same user.
+    // Attach the ADMIN membership to the identity; avoid duplicates if already attached
     const existingMembership = await prisma.membership.findFirst({
       where: { userId: user.id, hospitalId: hospital.id },
     });
@@ -158,6 +201,7 @@ export const registerHospital = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Hospital registration failed' });
   }
 };
+
 
 // Update hospital (admin of that hospital)
 export const updateHospital = async (req: AuthRequest, res: Response) => {
@@ -204,22 +248,23 @@ export const inviteStaff = async (req: AuthRequest, res: Response) => {
     // Attach the role to the existing identity if the email is already known,
     // never creating a duplicate account.
     let user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      // New invitee: ensure phone (if provided) isn't taken, then create an
-      // admin-vouched identity with a random password. They sign in via OTP /
-      // password reset — we never store a shared default password.
+      // Fix 4: If phone number belongs to an existing account, attach membership to that user
       if (phone) {
         const phoneClash = await prisma.user.findUnique({ where: { phone } });
-        if (phoneClash) return res.status(400).json({ error: 'Phone number already registered to another user.' });
+        if (phoneClash) {
+          user = phoneClash;
+        }
       }
-      const initialPassword = password && password.length >= 6
-        ? password
-        : crypto.randomBytes(24).toString('hex');
-      const hashedPassword = await bcrypt.hash(initialPassword, 10);
-      user = await prisma.user.create({
-        data: { name, email, password: hashedPassword, phone: phone || null, isVerified: true },
-      });
-    }
+      if (!user) {
+        const initialPassword = password && password.length >= 6
+          ? password
+          : crypto.randomBytes(24).toString('hex');
+        const hashedPassword = await bcrypt.hash(initialPassword, 10);
+        user = await prisma.user.create({
+          data: { name, email, password: hashedPassword, phone: phone || null, isVerified: true },
+        });
+      }
+
 
     // Check for existing membership
     const existing = await prisma.membership.findFirst({

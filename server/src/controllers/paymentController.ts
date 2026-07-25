@@ -357,10 +357,13 @@ async function activatePayment(orderId: string, paymentId?: string, signature?: 
       orderBy: { createdAt: 'desc' },
     });
 
-    const newBilledSeats =
+    const activeStaff = await countActiveUsers(fresh.hospitalId);
+    const newBilledSeats = Math.max(
+      activeStaff,
       fresh.paymentType === 'RENEWAL' && sub
         ? sub.billedSeats + fresh.userCount
-        : fresh.userCount;
+        : fresh.userCount
+    );
 
     const planConfig = PLANS[fresh.plan as keyof typeof PLANS];
     await tx.subscription.updateMany({
@@ -375,6 +378,7 @@ async function activatePayment(orderId: string, paymentId?: string, signature?: 
         maxUsers: planConfig?.maxUsers ?? 50,
       },
     });
+
   });
 }
 

@@ -35,6 +35,15 @@ export const createAdmission = async (req: Request, res: Response) => {
       pid = patient.id;
     }
 
+    const userId = (req as any).user?.userId;
+    if (pid && userId) {
+      const patientObj = await prisma.patient.findUnique({ where: { id: pid }, select: { userId: true } });
+      if (patientObj && patientObj.userId === userId) {
+        return res.status(403).json({ error: 'Self-action forbidden: Doctors/Staff cannot admit themselves as patients.' });
+      }
+    }
+
+
     const roomRate = targetBed.room?.basePrice || 500;
     const isIcu = targetBed.room?.type?.toUpperCase().includes('ICU') || targetBed.room?.name?.toUpperCase().includes('ICU');
     const bedStatus = isIcu ? 'OCCUPIED_ICU' : 'OCCUPIED';

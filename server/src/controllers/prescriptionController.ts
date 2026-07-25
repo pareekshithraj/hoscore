@@ -13,12 +13,21 @@ export const getAll = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user?.userId;
+    const { patientId } = req.body;
+    if (patientId && userId) {
+      const patient = await prisma.patient.findUnique({ where: { id: patientId }, select: { userId: true } });
+      if (patient && patient.userId === userId) {
+        return res.status(403).json({ error: 'Self-action forbidden: Doctors cannot prescribe medications to themselves.' });
+      }
+    }
     // @ts-ignore
     const rx = await prisma.prescription.create({ data: { ...req.body, hospitalId: hid(req) }, include: { patient: true } });
     await logAudit(req, 'CREATE', 'Prescription', rx.id, `Prescribed to patient`);
     res.status(201).json(rx);
   } catch (err) { res.status(500).json({ error: 'Failed to create prescription' }); }
 };
+
 
 export const updateStatus = async (req: Request, res: Response) => {
   try {

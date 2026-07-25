@@ -22,7 +22,10 @@ export const recordVitals = async (req: Request, res: Response) => {
 
 export const deleteVital = async (req: Request, res: Response) => {
   try {
+    const existing = await prisma.vitalRecord.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Vital record not found' });
     await prisma.vitalRecord.delete({ where: { id: req.params.id! } });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete vital' }); }
 };
+

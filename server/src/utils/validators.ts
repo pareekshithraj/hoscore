@@ -37,8 +37,7 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-// Hospital Registration — the admin is the authenticated user, so no admin account
-// fields are accepted here. Any legacy admin* fields in the body are ignored.
+// Hospital Registration — accepts hospital details and admin account details for public/self-service registration.
 export const hospitalRegisterSchema = z.object({
   hospitalName: z.string().min(3, 'Hospital name must be at least 3 characters'),
   address: z.string().optional(),
@@ -47,7 +46,12 @@ export const hospitalRegisterSchema = z.object({
   state: z.string().optional(),
   contact: z.string().optional(),
   description: z.string().optional(),
+  adminName: z.string().optional(),
+  adminEmail: z.string().optional(),
+  adminPassword: z.string().optional(),
+  adminPhone: z.string().optional(),
 }).passthrough();
+
 
 // Appointment Booking
 export const appointmentSchema = z.object({
