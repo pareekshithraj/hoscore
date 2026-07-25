@@ -194,6 +194,9 @@ router.patch('/admissions/:id/discharge', requireFeature(FEATURES.ADMISSIONS), a
 router.get('/billing', requireFeature(FEATURES.BILLING), billingController.getAllBillings);
 router.post('/billing', requireFeature(FEATURES.BILLING), billingController.createBilling);
 router.patch('/billing/:id/status', requireFeature(FEATURES.BILLING), billingController.updateBillingStatus);
+router.put('/billing/:id/pay-offline', requireFeature(FEATURES.BILLING), billingController.payOffline);
+router.post('/billing/:id/razorpay-order', requireFeature(FEATURES.BILLING), billingController.createRazorpayOrder);
+router.post('/billing/razorpay-verify', requireFeature(FEATURES.BILLING), billingController.verifyRazorpayPayment);
 router.delete('/billing/:id', requireFeature(FEATURES.BILLING), billingController.deleteBilling);
 
 // Doctors

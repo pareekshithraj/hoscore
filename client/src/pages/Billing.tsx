@@ -33,11 +33,14 @@ export const Billing = () => {
   }, []);
 
   const handleMarkPaid = async (id: string) => {
+    const method = window.prompt('Enter Payment Method (CASH, UPI, CARD)', 'CASH');
+    if (!method) return;
     try {
-      await api.patch(`/billing/${id}/status`, { status: 'Paid' });
+      await api.put(`/billing/${id}/pay-offline`, { paymentMethod: method });
       fetchBillings();
     } catch (err) {
       console.error(err);
+      alert('Failed to process offline payment.');
     }
   };
 
@@ -145,10 +148,25 @@ export const Billing = () => {
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md" title="View Invoice"><Eye className="w-4 h-4" /></button>
-                    <button className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md" title="Download PDF"><Download className="w-4 h-4" /></button>
-                    {bill.status !== 'Paid' && (
-                      <button onClick={() => handleMarkPaid(bill.id)} className="px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700">Mark Paid</button>
-                    )}
+                    {(!bill.receiptUrl) && <button className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md" title="Download PDF"><Download className="w-4 h-4" /></button>}
+                    {bill.status === 'PENDING' || bill.status === 'Pending' ? (
+                      <button
+                        onClick={() => handleMarkPaid(bill.id)}
+                        className="px-3 py-1 bg-white border border-emerald-200 text-emerald-700 font-bold rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                      >
+                        Mark Paid
+                      </button>
+                    ) : null}
+                    {(bill.status === 'PAID' || bill.status === 'Paid') && bill.receiptUrl ? (
+                      <a
+                        href={bill.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Receipt
+                      </a>
+                    ) : null}
                   </div>
                 </td>
               </tr>
