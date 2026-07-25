@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
+import { pick } from '../utils/pick.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -62,7 +63,8 @@ export const create = async (req: Request, res: Response) => {
       req.body.patientId = admission.patientId;
     }
 
-    const summary = await prisma.dischargeSummary.create({ data: { ...req.body, hospitalId: hid(req) } });
+    const safeData = pick(req.body, ['admissionId', 'patientId', 'patientName', 'admissionDate', 'dischargeDate', 'diagnosis', 'treatment', 'medications', 'instructions', 'status', 'doctorName', 'doctorId']);
+    const summary = await prisma.dischargeSummary.create({ data: { ...safeData, hospitalId: hid(req) } });
     res.status(201).json(summary);
   } catch (err) {
     console.error(err);
@@ -75,7 +77,8 @@ export const update = async (req: Request, res: Response) => {
     const existing = await prisma.dischargeSummary.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
     if (!existing) return res.status(404).json({ error: 'Discharge summary not found' });
     
-    const summary = await prisma.dischargeSummary.update({ where: { id: req.params.id! }, data: req.body });
+    const safeData = pick(req.body, ['patientName', 'admissionDate', 'dischargeDate', 'diagnosis', 'treatment', 'medications', 'instructions', 'status', 'doctorName', 'doctorId']);
+    const summary = await prisma.dischargeSummary.update({ where: { id: req.params.id! }, data: safeData });
     
     const isSigned = req.body.status === 'SIGNED' || req.body.status === 'FINAL';
     if (isSigned && summary.patientName) {

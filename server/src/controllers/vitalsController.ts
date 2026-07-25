@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
+import { pick } from '../utils/pick.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -15,7 +16,8 @@ export const getVitals = async (req: Request, res: Response) => {
 
 export const recordVitals = async (req: Request, res: Response) => {
   try {
-    const vital = await prisma.vitalRecord.create({ data: { ...req.body, hospitalId: hid(req), recordedAt: new Date() } });
+    const safeData = pick(req.body, ['patientId', 'patientName', 'temperature', 'bloodPressure', 'heartRate', 'respiratoryRate', 'oxygenSaturation', 'notes', 'recordedBy']);
+    const vital = await prisma.vitalRecord.create({ data: { ...safeData, hospitalId: hid(req), recordedAt: new Date() } });
     res.status(201).json(vital);
   } catch (err) { res.status(500).json({ error: 'Failed to record vitals' }); }
 };

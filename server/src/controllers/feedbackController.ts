@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
+import { pick } from '../utils/pick.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -12,7 +13,8 @@ export const getAll = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
-    const fb = await prisma.feedback.create({ data: { ...req.body, hospitalId: hid(req) } });
+    const safeData = pick(req.body, ['patientId', 'patientName', 'type', 'rating', 'comments', 'status']);
+    const fb = await prisma.feedback.create({ data: { ...safeData, hospitalId: hid(req) } });
     res.status(201).json(fb);
   } catch (err) { res.status(500).json({ error: 'Failed to create feedback' }); }
 };
