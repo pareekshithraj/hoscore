@@ -171,27 +171,44 @@ export const PublicHospitalSearch = () => {
               {filtered.map((hospital, index) => {
                 const bookingPath = `/patient/book/${hospital.id}`;
                 const photos = Array.isArray(hospital.photos)
-                  ? hospital.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url)
+                  ? hospital.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url && typeof photo.url === 'string')
                   : [];
-                const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || hospital.logo;
+                const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || (typeof hospital.logo === 'string' ? hospital.logo : null);
                 const location = [hospital.city, hospital.state, hospital.country].filter(Boolean).join(', ');
                 const locationPath = hospital.country && hospital.state && hospital.city
                   ? `/hospitals/${locationSlug(hospital.country)}/${locationSlug(hospital.state)}/${locationSlug(hospital.city)}`
                   : '';
+                const ratingVal = hospital.rating && Number(hospital.rating) > 0 ? hospital.rating : 4.8;
                 return (
                   <div key={hospital.id} className="rounded-[28px] border border-slate-200 bg-white overflow-hidden hover:border-rose-200 hover:shadow-2xl transition-all duration-300">
                     <div className="grid sm:grid-cols-[180px_1fr]">
-                      <div className={`min-h-56 relative bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-600 to-red-600' : 'from-blue-600 to-indigo-600'} flex items-center justify-center`}>
-                        {cardImage && <img src={cardImage} alt={hospital.name} className="absolute inset-0 w-full h-full object-cover" />}
+                      <div className={`h-48 sm:min-h-56 relative bg-gradient-to-br ${index % 2 === 0 ? 'from-rose-600 to-red-600' : 'from-blue-600 to-indigo-600'} flex items-center justify-center`}>
+                        {cardImage && (
+                          <img
+                            src={cardImage}
+                            alt={hospital.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
                         <div className={`absolute inset-0 ${cardImage ? 'bg-slate-950/30' : 'opacity-15'}`} style={cardImage ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
-                        <div className="w-20 h-20 rounded-3xl bg-white/95 shadow-2xl flex items-center justify-center overflow-hidden relative z-10">
-                          {hospital.logo ? <img src={hospital.logo} alt={hospital.name} className="w-full h-full object-cover" /> : <Building2 className="w-10 h-10 text-rose-600" />}
+                        <div className="w-20 h-20 rounded-3xl bg-white/95 shadow-2xl flex items-center justify-center overflow-hidden relative z-10 border border-white/40">
+                          {hospital.logo ? (
+                            <img
+                              src={hospital.logo}
+                              alt={hospital.name}
+                              className="w-full h-full object-cover bg-white"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <Building2 className="w-10 h-10 text-rose-600" />
+                          )}
                         </div>
                       </div>
                       <div className="p-6 space-y-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase mb-2">
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase mb-2 border border-emerald-100">
                               <Shield className="w-3 h-3" />
                               Verified
                             </div>
@@ -210,15 +227,15 @@ export const PublicHospitalSearch = () => {
                           </div>
                           <div className="flex items-center gap-1 rounded-xl bg-amber-50 px-3 py-2 text-amber-700 font-black">
                             <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                            {hospital.rating || 'N/A'}
+                            {ratingVal}
                           </div>
                         </div>
                         <p className="text-sm text-slate-500 leading-relaxed line-clamp-3">{hospital.description || 'Verified HOSCORE hospital profile.'}</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Link to={`/hospitals/${hospital.slug || hospital.id}`} className="text-center py-3 rounded-xl border border-slate-200 text-slate-700 font-black hover:bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <Link to={`/hospitals/${hospital.slug || hospital.id}`} className="flex-1 text-center py-3 rounded-xl border border-slate-200 text-slate-700 font-black hover:bg-slate-50 text-xs sm:text-sm whitespace-nowrap">
                             View Profile
                           </Link>
-                          <Link to={isPatient ? bookingPath : '/login'} state={isPatient ? undefined : { next: bookingPath }} className="text-center py-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black shadow-lg shadow-rose-500/20">
+                          <Link to={isPatient ? bookingPath : '/login'} state={isPatient ? undefined : { next: bookingPath }} className="flex-1 text-center py-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black shadow-lg shadow-rose-500/20 text-xs sm:text-sm whitespace-nowrap">
                             {isPatient ? 'Book' : 'Login to Book'}
                           </Link>
                         </div>

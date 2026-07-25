@@ -230,51 +230,79 @@ export const Landing = () => {
               { id: 'h2', name: 'Apollo General Hospital', rating: 4.8, description: 'World-renowned medical expertise and research-driven treatments for complex cases.', city: 'Delhi', state: 'Delhi' },
             ]).map((h: any, i: number) => {
               const photos = Array.isArray(h.photos)
-                ? h.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url)
+                ? h.photos.map((photo: any) => typeof photo === 'string' ? { url: photo, isCover: false } : photo).filter((photo: any) => photo?.url && typeof photo.url === 'string')
                 : [];
-              const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || h.logo;
+              const cardImage = photos.find((photo: any) => photo.isCover)?.url || photos[0]?.url || (typeof h.logo === 'string' ? h.logo : null);
               const location = [h.city, h.state, h.country].filter(Boolean).join(', ');
+              const ratingVal = h.rating && Number(h.rating) > 0 ? h.rating : 4.8;
               return (
               <div key={h.id || i} className="relative group rounded-[28px] bg-white border border-slate-200/60 hover:border-rose-200 hover:shadow-2xl transition-all duration-500 overflow-hidden">
-                <div className="flex">
-                  {/* Square Logo / Photo Area */}
-                  <div className={`w-40 min-h-full flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${i % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
+                <div className="flex flex-col sm:flex-row">
+                  {/* Logo / Photo Banner Area */}
+                  <div className={`w-full h-48 sm:w-44 sm:min-h-full flex-shrink-0 relative overflow-hidden bg-gradient-to-br ${i % 2 === 0 ? 'from-rose-500 via-red-500 to-rose-600' : 'from-blue-500 via-indigo-500 to-blue-600'}`}>
                     {/* Grid pattern overlay */}
-                    {cardImage && <img src={cardImage} alt={h.name} className="absolute inset-0 w-full h-full object-cover" />}
+                    {cardImage && (
+                      <img
+                        src={cardImage}
+                        alt={h.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
                     <div className={`absolute inset-0 ${cardImage ? 'bg-slate-950/35' : 'opacity-10'}`} style={cardImage ? undefined : { backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
-                      <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 p-4 z-10">
+                      <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 overflow-hidden shadow-md">
                         {h.logo ? (
-                          <img src={h.logo} alt={h.name} className="w-full h-full object-cover bg-white" />
+                          <img
+                            src={h.logo}
+                            alt={h.name}
+                            className="w-full h-full object-cover bg-white"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
                         ) : (
                           <Building2 className="w-8 h-8 text-white" />
                         )}
                       </div>
-                      <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                      <div className="flex items-center gap-1.5 bg-white/25 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-white/20">
                         <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                        <span className="text-sm font-bold text-white">{h.rating}</span>
+                        <span className="text-xs font-black text-white">{ratingVal}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 p-7 space-y-4">
+                  <div className="flex-1 p-5 sm:p-7 space-y-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider border border-emerald-100">
                           <Shield className="w-3 h-3" /> Verified
                         </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-black uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-black uppercase tracking-wider border border-blue-100">
                           <Heart className="w-3 h-3" /> Top Rated
                         </span>
                       </div>
-                      <h3 className="text-xl font-black text-slate-900 group-hover:text-rose-600 transition-colors leading-tight">{h.name}</h3>
-                      {location && <p className="text-sm text-slate-400 mt-1.5 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{location}</p>}
+                      <h3 className="text-lg sm:text-xl font-black text-slate-900 group-hover:text-rose-600 transition-colors leading-tight">{h.name}</h3>
+                      {location && <p className="text-xs sm:text-sm text-slate-400 mt-1.5 flex items-center gap-1 font-semibold"><MapPin className="w-3.5 h-3.5" />{location}</p>}
                     </div>
-                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{h.description}</p>
-                    <div className="flex gap-2.5 pt-1">
-                      <Link to={isPatient ? `/patient/book/${h.id}` : '/login'} state={isPatient ? undefined : { next: `/patient/book/${h.id}` }} className={`flex-1 text-center py-3 font-bold rounded-xl active:scale-[0.97] transition-all text-sm ${i % 2 === 0 ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white hover:from-rose-700 hover:to-red-700 shadow-lg shadow-rose-500/20' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/20'}`}>Book Appointment</Link>
-                      <Link to={`/hospitals/${h.slug || h.id}`} className="px-5 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-sm">Details</Link>
+                    <p className="text-xs sm:text-sm text-slate-500 leading-relaxed line-clamp-2">{h.description || 'Verified multi-specialty healthcare institution connected to HOSCORE.'}</p>
+                    <div className="flex items-center gap-2.5 pt-1">
+                      <Link
+                        to={isPatient ? `/patient/book/${h.id}` : '/login'}
+                        state={isPatient ? undefined : { next: `/patient/book/${h.id}` }}
+                        className={`flex-1 text-center py-3 px-3.5 font-bold rounded-xl active:scale-[0.97] transition-all text-xs sm:text-sm whitespace-nowrap shadow-md ${
+                          i % 2 === 0
+                            ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white hover:from-rose-700 hover:to-red-700 shadow-rose-500/20'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/20'
+                        }`}
+                      >
+                        Book Appointment
+                      </Link>
+                      <Link
+                        to={`/hospitals/${h.slug || h.id}`}
+                        className="px-4 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all text-xs sm:text-sm whitespace-nowrap text-center"
+                      >
+                        Details
+                      </Link>
                     </div>
                   </div>
                 </div>
