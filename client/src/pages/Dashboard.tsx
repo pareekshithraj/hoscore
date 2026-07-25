@@ -166,15 +166,15 @@ export const Dashboard = () => {
         prev
           ? {
               ...prev,
-              upcomingAppointments: prev.upcomingAppointments.filter(
-                (a: any) => a.id !== appointmentId,
-              ),
+              upcomingAppointments: Array.isArray(prev.upcomingAppointments)
+                ? prev.upcomingAppointments.filter((a: any) => a.id !== appointmentId)
+                : [],
             }
           : null,
       );
       setActivityFeed(prev => [
         {
-          id: Math.random().toString(),
+          id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           action: "CHECKIN",
           entity: "Patient",
           details: "Upcoming appointment patient checked in & queued.",
@@ -187,6 +187,7 @@ export const Dashboard = () => {
       console.error(err);
     }
   };
+
 
   // Quick Action form handlers
   const handleRegisterPatient = async (e: React.FormEvent) => {
@@ -203,7 +204,7 @@ export const Dashboard = () => {
       setFormSuccess("Patient registered successfully!");
       setActivityFeed(prev => [
         {
-          id: Math.random().toString(),
+          id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           action: "REGISTER",
           entity: "Patient",
           details: `Registered new patient ${res.name} (HSC-${res.sixDigitId}).`,
@@ -242,7 +243,7 @@ export const Dashboard = () => {
       setFormSuccess(`Appointment confirmed! Token #${res.tokenNumber} generated.`);
       setActivityFeed(prev => [
         {
-          id: Math.random().toString(),
+          id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           action: "APPOINTMENT",
           entity: "Booking",
           details: `Booked appointment for ${selectedPt?.name} with Dr. ${selectedDoc?.name} (Token #${res.tokenNumber}).`,
@@ -275,7 +276,7 @@ export const Dashboard = () => {
       setFormSuccess("Vitals recorded successfully!");
       setActivityFeed(prev => [
         {
-          id: Math.random().toString(),
+          id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           action: "VITALS",
           entity: "Clinical",
           details: `Recorded vitals for ${vitalsForm.patientName}: BP ${vitalsForm.bloodPressure}, SpO2 ${vitalsForm.oxygenSaturation}%.`,
@@ -311,7 +312,7 @@ export const Dashboard = () => {
       setFormSuccess("Prescription issued successfully!");
       setActivityFeed(prev => [
         {
-          id: Math.random().toString(),
+          id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           action: "PRESCRIPTION",
           entity: "E-Rx",
           details: `Dr. ${selectedDoc?.name} issued Rx for ${selectedPt?.name}: ${prescriptionForm.diagnosis}.`,

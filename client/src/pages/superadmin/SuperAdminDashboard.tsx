@@ -90,10 +90,11 @@ export const SuperAdminDashboard = () => {
   ];
 
   const systemHealth = [
-    { label: "Neon Storage Used", value: formatBytes(stats?.usage?.neon.storageBytes), icon: HardDrive, color: "text-sky-400" },
-    { label: "R2 Storage Used", value: stats?.usage?.r2.isConfigured ? formatBytes(stats?.usage?.r2.storageBytes) : "Not configured", icon: Cpu, color: "text-emerald-400" },
-    { label: "Storage Cost Est.", value: `$${((stats?.usage?.neon.estimatedStorageCostUsd || 0) + (stats?.usage?.r2.estimatedStorageCostUsd || 0)).toFixed(4)}/mo`, icon: ShieldAlert, color: "text-violet-400" },
+    { label: "Neon Storage Used", value: formatBytes(stats?.usage?.neon?.storageBytes || 0), icon: HardDrive, color: "text-sky-400" },
+    { label: "R2 Storage Used", value: stats?.usage?.r2?.isConfigured ? formatBytes(stats?.usage?.r2?.storageBytes || 0) : "Not configured", icon: Cpu, color: "text-emerald-400" },
+    { label: "Storage Cost Est.", value: `$${((stats?.usage?.neon?.estimatedStorageCostUsd || 0) + (stats?.usage?.r2?.estimatedStorageCostUsd || 0)).toFixed(4)}/mo`, icon: ShieldAlert, color: "text-violet-400" },
   ];
+
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
