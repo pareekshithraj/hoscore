@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,8 +13,8 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
   const { theme } = useAuth();
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
       <div className={`glass-card w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl animate-fade-in-up duration-300 ${
         theme === 'dark' ? 'border-white/[0.08]' : 'border-slate-200'
       }`}>
@@ -36,6 +37,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, Eye, EyeOff, ShieldCheck, X } from 'lucide-react';
 import { BASE_URL } from '../utils/apiConfig';
 import { fetchJson } from '../utils/fetchJson';
@@ -43,10 +44,9 @@ export const PasswordConfirmModal = ({
     }
   };
 
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-zinc-950 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-800 p-6 relative">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+      <div className="bg-white dark:bg-zinc-950 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-800 p-6 relative animate-scale-in">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
@@ -113,6 +113,7 @@ export const PasswordConfirmModal = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

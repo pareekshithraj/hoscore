@@ -852,6 +852,49 @@ export const Dashboard = () => {
                 </div>
               </div>
 
+              {/* Patient flow */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Patient flow</h3>
+                    <p className="text-[13px] text-[var(--text-muted)] mt-0.5">Admissions vs. discharges this week</p>
+                  </div>
+                  <div className="flex gap-4 text-[13px] font-medium">
+                    <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rt.primary }} />
+                      Admissions
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rt.secondary }} />
+                      Discharges
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="admGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={rt.primary} stopOpacity={0.18} />
+                          <stop offset="95%" stopColor={rt.primary} stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="disGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={rt.secondary} stopOpacity={0.18} />
+                          <stop offset="95%" stopColor={rt.secondary} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.12)" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} dy={8} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="admissions" stroke={rt.primary} strokeWidth={2.5} fillOpacity={1} fill="url(#admGrad)" dot={false} activeDot={{ r: 4, fill: rt.primary, strokeWidth: 2, stroke: "#fff" }} />
+                      <Area type="monotone" dataKey="discharges" stroke={rt.secondary} strokeWidth={2.5} fillOpacity={1} fill="url(#disGrad)" dot={false} activeDot={{ r: 4, fill: rt.secondary, strokeWidth: 2, stroke: "#fff" }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
             </div>
 
             {/* Sidebar column */}
@@ -967,108 +1010,60 @@ export const Dashboard = () => {
                 </div>
               </div>
 
-            </div>
-          </div>
+              {/* Department workload */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Department workload</h3>
 
-          {/* ==================== ANALYTICS ==================== */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-            {/* Patient flow */}
-            <div className="lg:col-span-8 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <div>
-                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Patient flow</h3>
-                  <p className="text-[13px] text-[var(--text-muted)] mt-0.5">Admissions vs. discharges this week</p>
-                </div>
-                <div className="flex gap-4 text-[13px] font-medium">
-                  <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rt.primary }} />
-                    Admissions
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rt.secondary }} />
-                    Discharges
-                  </span>
-                </div>
-              </div>
-
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="admGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={rt.primary} stopOpacity={0.18} />
-                        <stop offset="95%" stopColor={rt.primary} stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="disGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={rt.secondary} stopOpacity={0.18} />
-                        <stop offset="95%" stopColor={rt.secondary} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.12)" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} dy={8} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="admissions" stroke={rt.primary} strokeWidth={2.5} fillOpacity={1} fill="url(#admGrad)" dot={false} activeDot={{ r: 4, fill: rt.primary, strokeWidth: 2, stroke: "#fff" }} />
-                    <Area type="monotone" dataKey="discharges" stroke={rt.secondary} strokeWidth={2.5} fillOpacity={1} fill="url(#disGrad)" dot={false} activeDot={{ r: 4, fill: rt.secondary, strokeWidth: 2, stroke: "#fff" }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Department workload */}
-            <div className="lg:col-span-4 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Department workload</h3>
-
-              {(() => {
-                const totalDeptVal = departmentData.reduce((acc, curr) => acc + curr.value, 0);
-                if (totalDeptVal === 0) {
-                  return <p className="text-sm text-[var(--text-muted)] py-8 text-center">No appointment data yet.</p>;
-                }
-                return (
-                  <>
-                    <div className="flex items-center justify-center py-2 relative">
-                      <div className="absolute flex flex-col items-center justify-center">
-                        <span className="text-[11px] text-[var(--text-muted)]">Total</span>
-                        <span className="text-lg font-bold text-[var(--text-primary)] tabular-nums">{totalDeptVal}</span>
-                      </div>
-                      <div className="w-32 h-32">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={departmentData} cx="50%" cy="50%" innerRadius={44} outerRadius={56} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                              {departmentData.map((entry, i) => (
-                                <Cell key={i} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip content={<CustomTooltip />} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 mt-4">
-                      {departmentData.map((d) => (
-                        <div key={d.name} className="space-y-1">
-                          <div className="flex items-center justify-between text-[13px]">
-                            <span className="text-[var(--text-secondary)] flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                              {d.name}
-                            </span>
-                            <span className="text-[var(--text-primary)] font-medium tabular-nums">
-                              {Math.round((d.value / totalDeptVal) * 100)}%
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-[var(--inner-bg)] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ backgroundColor: d.color, width: `${(d.value / totalDeptVal) * 100}%` }} />
-                          </div>
+                {(() => {
+                  const totalDeptVal = departmentData.reduce((acc, curr) => acc + curr.value, 0);
+                  if (totalDeptVal === 0) {
+                    return <p className="text-sm text-[var(--text-muted)] py-8 text-center">No appointment data yet.</p>;
+                  }
+                  return (
+                    <>
+                      <div className="flex items-center justify-center py-2 relative">
+                        <div className="absolute flex flex-col items-center justify-center">
+                          <span className="text-[11px] text-[var(--text-muted)]">Total</span>
+                          <span className="text-lg font-bold text-[var(--text-primary)] tabular-nums">{totalDeptVal}</span>
                         </div>
-                      ))}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
+                        <div className="w-32 h-32">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={departmentData} cx="50%" cy="50%" innerRadius={44} outerRadius={56} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                                {departmentData.map((entry, i) => (
+                                  <Cell key={i} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip content={<CustomTooltip />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
 
+                      <div className="space-y-3 mt-4">
+                        {departmentData.map((d) => (
+                          <div key={d.name} className="space-y-1">
+                            <div className="flex items-center justify-between text-[13px]">
+                              <span className="text-[var(--text-secondary)] flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                                {d.name}
+                              </span>
+                              <span className="text-[var(--text-primary)] font-medium tabular-nums">
+                                {Math.round((d.value / totalDeptVal) * 100)}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-[var(--inner-bg)] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ backgroundColor: d.color, width: `${(d.value / totalDeptVal) * 100}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+            </div>
           </div>
 
         </div>
