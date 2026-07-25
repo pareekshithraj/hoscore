@@ -6,23 +6,12 @@ import {
   Activity,
   CalendarClock,
   HeartPulse,
-  ShieldCheck,
-  Zap,
   Clock,
-  CreditCard,
   PlusCircle,
   Search,
   ArrowRight,
-  TrendingUp,
-  AlertTriangle,
   FileText,
   Pill,
-  Heart,
-  Plus,
-  RefreshCw,
-  UserCheck,
-  History,
-  User
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -41,9 +30,104 @@ import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 import { useAuth } from "../context/AuthContext";
 import { Modal } from "../components/Modal";
 
+// ============================================================================
+//  PER-ROLE THEME SYSTEM
+//  Each user role gets a distinct, cohesive multi-hue palette. Accents layer on
+//  top of the neutral surface tokens (--card-bg / --inner-bg) so light & dark
+//  modes both stay clean — only the colour family changes per role.
+// ============================================================================
+type RoleTheme = {
+  label: string;
+  gradient: string;   // hero wash
+  chip: string;       // portal pill
+  iconWrap: string;   // tinted square behind section/KPI icons
+  dot: string;        // status dot
+  clock: string;      // clock icon tint
+  primary: string;    // main chart / accent hex
+  secondary: string;  // secondary chart hex
+  chart: string[];    // cohesive ramp for the department breakdown
+};
+
+const ROLE_THEMES: Record<string, RoleTheme> = {
+  ADMIN: {
+    label: "Admin",
+    gradient: "from-indigo-500/[0.12] via-violet-500/[0.06] to-transparent",
+    chip: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 ring-1 ring-inset ring-indigo-500/20",
+    iconWrap: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+    dot: "bg-indigo-500",
+    clock: "text-indigo-500 dark:text-indigo-400",
+    primary: "#6366f1",
+    secondary: "#8b5cf6",
+    chart: ["#6366f1", "#818cf8", "#a78bfa", "#c4b5fd", "#8b5cf6", "#7c3aed"],
+  },
+  CLINICAL: {
+    label: "Clinical",
+    gradient: "from-emerald-500/[0.12] via-teal-500/[0.06] to-transparent",
+    chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-1 ring-inset ring-emerald-500/20",
+    iconWrap: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    dot: "bg-emerald-500",
+    clock: "text-emerald-500 dark:text-emerald-400",
+    primary: "#10b981",
+    secondary: "#14b8a6",
+    chart: ["#10b981", "#14b8a6", "#0d9488", "#34d399", "#2dd4bf", "#5eead4"],
+  },
+  LAB: {
+    label: "Pharmacy & Lab",
+    gradient: "from-violet-500/[0.12] via-fuchsia-500/[0.06] to-transparent",
+    chip: "bg-violet-500/10 text-violet-600 dark:text-violet-300 ring-1 ring-inset ring-violet-500/20",
+    iconWrap: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    dot: "bg-violet-500",
+    clock: "text-violet-500 dark:text-violet-400",
+    primary: "#8b5cf6",
+    secondary: "#d946ef",
+    chart: ["#8b5cf6", "#a855f7", "#c084fc", "#d946ef", "#e879f9", "#9333ea"],
+  },
+  FRONT: {
+    label: "Front desk",
+    gradient: "from-amber-500/[0.12] via-orange-500/[0.06] to-transparent",
+    chip: "bg-amber-500/10 text-amber-600 dark:text-amber-300 ring-1 ring-inset ring-amber-500/20",
+    iconWrap: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    dot: "bg-amber-500",
+    clock: "text-amber-500 dark:text-amber-400",
+    primary: "#f59e0b",
+    secondary: "#fb923c",
+    chart: ["#f59e0b", "#fb923c", "#f97316", "#fbbf24", "#fdba74", "#ea580c"],
+  },
+  DEFAULT: {
+    label: "Staff",
+    gradient: "from-blue-500/[0.12] via-sky-500/[0.06] to-transparent",
+    chip: "bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-1 ring-inset ring-blue-500/20",
+    iconWrap: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    dot: "bg-blue-500",
+    clock: "text-blue-500 dark:text-blue-400",
+    primary: "#3b82f6",
+    secondary: "#0ea5e9",
+    chart: ["#3b82f6", "#0ea5e9", "#38bdf8", "#60a5fa", "#818cf8", "#2563eb"],
+  },
+};
+
+const resolveRoleTheme = (role?: string): RoleTheme => {
+  switch (role) {
+    case "ADMIN":
+      return ROLE_THEMES.ADMIN;
+    case "DOCTOR":
+    case "NURSE":
+      return ROLE_THEMES.CLINICAL;
+    case "PHARMACIST":
+    case "LAB_TECH":
+      return ROLE_THEMES.LAB;
+    case "RECEPTIONIST":
+    case "STAFF":
+      return ROLE_THEMES.FRONT;
+    default:
+      return ROLE_THEMES.DEFAULT;
+  }
+};
+
 export const Dashboard = () => {
-  const { activeContext, theme } = useAuth();
+  const { user, activeContext } = useAuth();
   const role = activeContext?.role; // ADMIN, DOCTOR, NURSE, RECEPTIONIST, PHARMACIST, etc.
+  const rt = resolveRoleTheme(role);
 
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -61,14 +145,12 @@ export const Dashboard = () => {
   const [rxError, setRxError] = useState("");
   const [rxSuccessMsg, setRxSuccessMsg] = useState("");
 
-  // Live Activity Feed state
-  const [activityFeed, setActivityFeed] = useState<any[]>([
-    { id: "1", action: "SYS_INIT", entity: "System", details: "Clinical Command center online.", createdAt: new Date() },
-  ]);
+  // Live Activity Feed — starts empty; populated from real audit logs.
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
 
   // Quick Action modal states
   const [activeModal, setActiveModal] = useState<"PATIENT" | "APPOINTMENT" | "VITALS" | "PRESCRIPTION" | null>(null);
-  
+
   // Quick Action form states
   const [patientForm, setPatientForm] = useState({ name: "", email: "", contact: "", dateOfBirth: "", gender: "Male", bloodGroup: "O+" });
   const [registeredPatientInfo, setRegisteredPatientInfo] = useState<any>(null);
@@ -149,7 +231,7 @@ export const Dashboard = () => {
   const handleDispense = async (rxId: string) => {
     try {
       await api.patch(`/prescriptions/${rxId}/status`, { status: "DISPENSED" });
-      setRxSuccessMsg("Prescription successfully dispensed!");
+      setRxSuccessMsg("Prescription successfully dispensed.");
       // Refresh patient prescriptions data
       const updatedPatient = await api.get(`/patients/search/${rxSearchId}`);
       setRxPatient(updatedPatient);
@@ -201,7 +283,7 @@ export const Dashboard = () => {
         dateOfBirth: patientForm.dateOfBirth ? new Date(patientForm.dateOfBirth).toISOString() : undefined
       });
       setRegisteredPatientInfo(res);
-      setFormSuccess("Patient registered successfully!");
+      setFormSuccess("Patient registered successfully.");
       setActivityFeed(prev => [
         {
           id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -228,7 +310,7 @@ export const Dashboard = () => {
     try {
       const selectedPt = patients.find(p => p.id === appointmentForm.patientId);
       const selectedDoc = doctors.find(d => d.id === appointmentForm.doctorId);
-      
+
       const payload = {
         patientName: selectedPt?.name || "Unknown Patient",
         email: selectedPt?.email || undefined,
@@ -238,9 +320,9 @@ export const Dashboard = () => {
         time: appointmentForm.time,
         isHoscoreUser: selectedPt ? selectedPt.isHoscoreUser : true
       };
-      
+
       const res = await api.post("/appointments", payload);
-      setFormSuccess(`Appointment confirmed! Token #${res.tokenNumber} generated.`);
+      setFormSuccess(`Appointment confirmed. Token #${res.tokenNumber} generated.`);
       setActivityFeed(prev => [
         {
           id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -273,7 +355,7 @@ export const Dashboard = () => {
         oxygenSaturation: Number(vitalsForm.oxygenSaturation)
       };
       await api.post("/vitals", payload);
-      setFormSuccess("Vitals recorded successfully!");
+      setFormSuccess("Vitals recorded successfully.");
       setActivityFeed(prev => [
         {
           id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -307,9 +389,9 @@ export const Dashboard = () => {
         patientId: prescriptionForm.patientId,
         doctorId: prescriptionForm.doctorId
       };
-      
+
       await api.post("/prescriptions", payload);
-      setFormSuccess("Prescription issued successfully!");
+      setFormSuccess("Prescription issued successfully.");
       setActivityFeed(prev => [
         {
           id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -343,45 +425,53 @@ export const Dashboard = () => {
   const activeQueueCount = useAnimatedCounter(stats?.telemetry?.activeQueue || 0);
   const pendingLabsCount = useAnimatedCounter(stats?.telemetry?.pendingLabs || 0);
   const pendingRxCount = useAnimatedCounter(stats?.telemetry?.pendingRx || 0);
-  const todaysShiftsCount = useAnimatedCounter(stats?.telemetry?.todaysShifts || 0);
 
   const occupancyRateCount = useAnimatedCounter(stats?.occupancyRate || 0);
   const icuOccupancyRateCount = useAnimatedCounter(stats?.icuOccupancyRate ?? 0);
   const erOccupancyRateCount = useAnimatedCounter(stats?.erOccupancyRate ?? 0);
-  const pendingClaimsCount = useAnimatedCounter(stats?.telemetry?.pendingClaims || 0);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-slate-200 border-t-[#0ea5e9] rounded-full animate-spin" />
-          <p className="text-slate-400 font-bold text-xs tracking-wider animate-pulse">
-            Loading Dashboard data...
+          <div
+            className="w-10 h-10 border-4 border-[var(--card-border)] rounded-full animate-spin"
+            style={{ borderTopColor: rt.primary }}
+          />
+          <p className="text-[var(--text-muted)] font-semibold text-sm animate-pulse">
+            Loading your dashboard…
           </p>
         </div>
       </div>
     );
   }
 
-  const DEPT_COLORS = ["#6366f1", "#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185"];
   const weeklyData = (stats?.weeklyData?.length ? stats.weeklyData : []) as any[];
   const departmentData = ((stats?.departmentData?.length ? stats.departmentData : []) as any[])
-    .map((d: any, i: number) => ({ ...d, color: d.color || DEPT_COLORS[i % DEPT_COLORS.length] }));
+    .map((d: any, i: number) => ({ ...d, color: d.color || rt.chart[i % rt.chart.length] }));
 
   const upcomingAppts = stats?.upcomingAppointments || [];
+
+  const greeting = (() => {
+    const h = currentTime.getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  })();
+  const firstName = user?.name ? user.name.split(" ")[0] : "";
+  const hospitalName = activeContext?.hospitalName;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-[#080d1e]/95 border border-white/[0.08] text-white px-4 py-3 rounded-xl shadow-2xl backdrop-blur-xl">
-          <p className="text-xs font-bold text-slate-500 mb-1.5">{label}</p>
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] px-3.5 py-2.5 rounded-xl shadow-lg">
+          <p className="text-[11px] font-semibold text-[var(--text-muted)] mb-1.5">{label}</p>
           {payload.map((entry: any, i: number) => (
             <p
               key={i}
-              className="text-xs font-extrabold flex items-center gap-1.5 mt-1"
-              style={{ color: entry.color }}
+              className="text-xs font-semibold flex items-center gap-1.5 mt-1 text-[var(--text-primary)]"
             >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
               {entry.name}: {entry.value}
             </p>
           ))}
@@ -391,164 +481,143 @@ export const Dashboard = () => {
     return null;
   };
 
-  // Compile active alerts (Persistent Critical Alerts Panel)
+  // Real, threshold-driven alerts only — nothing fabricated.
   const criticalAlerts: any[] = [];
-  
+
   if (stats?.telemetry?.activeQueue > 8) {
     criticalAlerts.push({
       id: "queue_overload",
-      type: "CRITICAL",
-      title: "OPD Queue Saturation",
-      message: `${stats.telemetry.activeQueue} patients currently waiting. Check-in backlog detected.`,
-      actionLabel: "Clear Queue",
+      type: "Attention",
+      title: "OPD queue is building up",
+      message: `${stats.telemetry.activeQueue} patients are waiting. Consider opening another counter.`,
+      actionLabel: "Manage queue",
       path: "/dashboard/queue",
-      color: "border-red-500/30 bg-red-500/10 text-red-400"
+      tone: "text-rose-600 dark:text-rose-400 bg-rose-500/[0.07] border-rose-500/20",
     });
   }
-  
+
   if (stats?.occupancyRate > 75) {
     criticalAlerts.push({
       id: "occupancy_warning",
-      type: "WARNING",
-      title: "Capacity Limit Warning",
-      message: `Bed occupancy rate at ${stats.occupancyRate}%. Coordinate general ward discharges.`,
-      actionLabel: "Manage Wards",
+      type: "Capacity",
+      title: "Beds are filling up",
+      message: `Occupancy is at ${stats.occupancyRate}%. Review pending discharges to free capacity.`,
+      actionLabel: "Manage wards",
       path: "/dashboard/admissions",
-      color: "border-amber-500/30 bg-amber-500/10 text-amber-400"
+      tone: "text-amber-600 dark:text-amber-400 bg-amber-500/[0.07] border-amber-500/20",
     });
   }
 
   if (stats?.telemetry?.pendingLabs > 5) {
     criticalAlerts.push({
       id: "labs_delay",
-      type: "INFO",
-      title: "STAT Lab Assay Backlog",
-      message: `${stats.telemetry.pendingLabs} samples waiting processing. Check with laboratory.`,
-      actionLabel: "View Orders",
+      type: "Labs",
+      title: "Lab results are backing up",
+      message: `${stats.telemetry.pendingLabs} samples are awaiting processing.`,
+      actionLabel: "View orders",
       path: "/dashboard/labs",
-      color: "border-sky-500/30 bg-sky-500/10 text-sky-400"
+      tone: "text-sky-600 dark:text-sky-400 bg-sky-500/[0.07] border-sky-500/20",
     });
   }
 
-  // Simulated static/clinical alert to guarantee at least one persistent alert
-  criticalAlerts.push({
-    id: "low_supplies",
-    type: "WARNING",
-    title: "Critical Supplies Low",
-    message: "Reorder level reached for: Saline IV Bags. Remaining stock under 15 units.",
-    actionLabel: "Verify Stock",
-    path: "/dashboard/inventory",
-    color: "border-amber-500/30 bg-amber-500/10 text-amber-400"
-  });
+  const kpis = [
+    {
+      label: "OPD queue",
+      sub: "Patients waiting",
+      value: activeQueueCount,
+      icon: Users,
+      urgent: (stats?.telemetry?.activeQueue || 0) > 8,
+    },
+    {
+      label: "Lab backlog",
+      sub: "Samples pending",
+      value: pendingLabsCount,
+      icon: Activity,
+      urgent: (stats?.telemetry?.pendingLabs || 0) > 5,
+    },
+    {
+      label: "Active prescriptions",
+      sub: "Awaiting dispense",
+      value: pendingRxCount,
+      icon: Pill,
+      urgent: false,
+    },
+    {
+      label: "Bed occupancy",
+      sub: `${stats?.occupiedBeds || 0} of ${stats?.totalBeds || 0} beds`,
+      value: `${occupancyRateCount}%`,
+      icon: Bed,
+      urgent: (stats?.occupancyRate || 0) > 85,
+    },
+  ];
 
-  // Role-based theme configuration helper for "New Era" multi-color dashboard aesthetics
-  const getRoleTheme = (userRole?: string) => {
-    switch (userRole) {
-      case 'ADMIN':
-        return {
-          heroGradient: 'from-indigo-900/30 via-purple-900/10 to-slate-900/40',
-          badgeBg: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400',
-          accentColor: 'indigo',
-          clockText: 'text-indigo-500 dark:text-indigo-400',
-        };
-      case 'DOCTOR':
-      case 'NURSE':
-        return {
-          heroGradient: 'from-emerald-900/30 via-teal-900/10 to-slate-900/40',
-          badgeBg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
-          accentColor: 'emerald',
-          clockText: 'text-emerald-500 dark:text-emerald-400',
-        };
-      case 'PHARMACIST':
-      case 'LAB_TECH':
-        return {
-          heroGradient: 'from-purple-900/30 via-pink-900/10 to-slate-900/40',
-          badgeBg: 'bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400',
-          accentColor: 'purple',
-          clockText: 'text-purple-500 dark:text-purple-400',
-        };
-      case 'RECEPTIONIST':
-      case 'STAFF':
-        return {
-          heroGradient: 'from-amber-900/30 via-orange-900/10 to-slate-900/40',
-          badgeBg: 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400',
-          accentColor: 'amber',
-          clockText: 'text-amber-500 dark:text-amber-400',
-        };
-      default:
-        return {
-          heroGradient: 'from-blue-900/30 via-indigo-900/10 to-slate-900/40',
-          badgeBg: 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400',
-          accentColor: 'blue',
-          clockText: 'text-blue-500 dark:text-blue-400',
-        };
-    }
-  };
-
-  const themeConfig = getRoleTheme(role);
+  const quickActions = [
+    { id: "PATIENT", label: "Register patient", icon: PlusCircle, roles: ["ADMIN", "RECEPTIONIST", "STAFF"] },
+    { id: "APPOINTMENT", label: "Book a slot", icon: CalendarClock, roles: ["ADMIN", "RECEPTIONIST", "DOCTOR", "NURSE", "STAFF"] },
+    { id: "VITALS", label: "Record vitals", icon: HeartPulse, roles: ["ADMIN", "NURSE", "RECEPTIONIST", "DOCTOR"] },
+    { id: "PRESCRIPTION", label: "Write e-prescription", icon: FileText, roles: ["ADMIN", "DOCTOR"] },
+  ].filter(a => !role || a.roles.includes(role));
 
   return (
     <div className="space-y-6 pb-10 animate-fade-in-up">
 
-      
-      {/* 1. Command Center Header Panel — Modern New Era Dashboard Styling */}
-      <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 border border-[var(--card-border)] bg-gradient-to-r ${themeConfig.heroGradient} rounded-2xl relative overflow-hidden backdrop-blur-xl transition-all duration-300 shadow-xl shadow-black/5`}>
-        <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
-        <div className="relative z-10 space-y-1.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 animate-ping opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+      {/* ==================== HERO ==================== */}
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 sm:p-8 shadow-sm">
+        <div className={`absolute inset-0 bg-gradient-to-br ${rt.gradient} pointer-events-none`} />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2.5">
+            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${rt.chip}`}>
+              <span className="relative flex h-1.5 w-1.5">
+                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${rt.dot} opacity-75`} />
+                <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${rt.dot}`} />
+              </span>
+              {rt.label} portal
             </span>
-            <h2 className="text-xl lg:text-2xl font-black tracking-tight flex items-center gap-2 text.primary">
-              Clinical Operations Command Center
-            </h2>
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest font-mono border ${themeConfig.badgeBg}`}>
-              {role || 'STAFF'} PORTAL · LIVE
-            </span>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+              {greeting}{firstName ? `, ${firstName}` : ""}
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {hospitalName ? `${hospitalName} · ` : ""}
+              {currentTime.toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
           </div>
-          <p className="text-xs font-semibold text-[var(--text-secondary)]">
-            Real-time multi-department operational overview · {" "}
-            {currentTime.toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </p>
-        </div>
 
-        {/* Global Clock & Live simulator toggle */}
-        <div className="flex flex-wrap items-center gap-3 relative z-10">
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs border border-[var(--card-border)] bg-[var(--card-bg)]/80 backdrop-blur-md text-[var(--text-secondary)] shadow-sm">
-            <Clock className={`w-4 h-4 ${themeConfig.clockText}`} />
-            <span className="text-[9px] font-black uppercase tracking-wider font-mono text-[var(--text-muted)]">SYSTEM TIME</span>
-            <span className="font-mono font-bold tracking-widest tabular-nums text-[var(--text-primary)]">
-              {formatTime(currentTime)}
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2.5 rounded-2xl border border-[var(--card-border)] bg-[var(--bg-secondary)] px-4 py-2.5">
+              <Clock className={`h-4 w-4 ${rt.clock}`} />
+              <div className="leading-tight">
+                <p className="text-[11px] text-[var(--text-muted)]">Local time</p>
+                <p className="font-mono text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                  {formatTime(currentTime)}
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/dashboard/simulator"
+              className="flex items-center gap-2 rounded-2xl border border-[var(--card-border)] bg-[var(--bg-secondary)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--inner-bg)] active:scale-[0.98]"
+            >
+              <Activity className={`h-4 w-4 ${rt.clock}`} />
+              Simulator
+            </Link>
           </div>
-          <Link
-            to="/dashboard/simulator"
-            className="px-4 py-2 border border-[var(--card-border)] hover:bg-[var(--inner-bg)] text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-md bg-[var(--card-bg)]"
-          >
-            <Activity className="w-4 h-4 text-emerald-500" />
-            Simulation Control
-          </Link>
         </div>
       </div>
 
-
-      {/* Role-based Pharmacist Dashboard OR Layered Hospital Command Center */}
       {role === "PHARMACIST" ? (
+        /* ==================== PHARMACIST PORTAL ==================== */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in-up">
-          {/* Pharmacist Dispenser Hub */}
           <div className="lg:col-span-8 space-y-6">
-            <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-6 relative overflow-hidden shadow-sm">
-              <h3 className="text-lg font-black text-[var(--text-primary)] tracking-tight mb-1">
-                Prescription Dispensing Portal
+            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] tracking-tight">
+                Dispense prescriptions
               </h3>
-              <p className="text-xs text-[var(--text-secondary)] mb-6 font-semibold">
-                Verify patient identity and dispense authorized prescriptions. Enter the patient's unique 6-digit Patient ID.
+              <p className="mt-1 text-sm text-[var(--text-secondary)] mb-6">
+                Enter the patient's 6-digit ID to verify identity and dispense their authorized prescriptions.
               </p>
 
               <form onSubmit={handleRxSearch} className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -558,75 +627,78 @@ export const Dashboard = () => {
                     maxLength={6}
                     value={rxSearchId}
                     onChange={(e) => setRxSearchId(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Enter 6-digit Patient ID (e.g. 123456)"
-                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-lg pl-11 pr-4 py-3 text-slate-900 dark:text-white placeholder-slate-500 font-bold focus:outline-none focus:border-blue-500 font-mono tracking-widest text-center text-lg"
+                    placeholder="Patient ID e.g. 123456"
+                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-11 pr-4 py-3 text-[var(--text-primary)] placeholder-[var(--text-muted)] font-semibold focus:outline-none focus:ring-2 font-mono tracking-[0.3em] text-center text-lg"
+                    style={{ outlineColor: rt.primary }}
                   />
-                  <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                  <Search className="absolute left-4 top-3.5 w-4 h-4 text-[var(--text-muted)]" />
                 </div>
                 <button
                   type="submit"
                   disabled={rxLoading}
-                  className="px-5 py-3 bg-[var(--text-primary)] hover:opacity-90 text-[var(--bg-secondary)] font-black tracking-wider uppercase rounded-lg active:scale-95 transition-all text-xs cursor-pointer disabled:opacity-55"
+                  className="px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-55"
+                  style={{ backgroundColor: rt.primary }}
                 >
-                  {rxLoading ? "Retrieving..." : "Retrieve Patient Rx"}
+                  {rxLoading ? "Retrieving…" : "Retrieve"}
                 </button>
               </form>
 
               {rxError && (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold mb-4">
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm font-medium mb-4">
                   {rxError}
                 </div>
               )}
 
               {rxSuccessMsg && (
-                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold mb-4">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-4">
                   {rxSuccessMsg}
                 </div>
               )}
 
               {rxPatient && (
                 <div className="space-y-6 animate-fade-in-up mt-6 border-t border-[var(--card-border)] pt-6">
-                  <div className="flex justify-between items-start bg-[var(--inner-bg)] p-4 rounded-lg border border-[var(--inner-border)]">
+                  <div className="flex justify-between items-start bg-[var(--inner-bg)] p-4 rounded-xl border border-[var(--inner-border)]">
                     <div>
-                      <h4 className="text-sm font-extrabold text-[var(--text-primary)]">{rxPatient.name}</h4>
-                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 font-semibold">
-                        Gender: {rxPatient.gender || "Unspecified"} · DOB: {rxPatient.dateOfBirth ? new Date(rxPatient.dateOfBirth).toLocaleDateString() : "N/A"}
+                      <h4 className="text-base font-semibold text-[var(--text-primary)]">{rxPatient.name}</h4>
+                      <p className="text-[13px] text-[var(--text-secondary)] mt-1">
+                        {rxPatient.gender || "Unspecified"} · DOB {rxPatient.dateOfBirth ? new Date(rxPatient.dateOfBirth).toLocaleDateString() : "N/A"}
                       </p>
                     </div>
-                    <span className="px-2.5 py-1 bg-red-500/10 border border-red-500/25 rounded text-[10px] font-black text-red-600 dark:text-red-400 tracking-wider font-mono">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-semibold font-mono" style={{ backgroundColor: `${rt.primary}1a`, color: rt.primary }}>
                       HSC-{rxPatient.sixDigitId}
                     </span>
                   </div>
 
                   <div className="space-y-4">
-                    <h5 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider">Active Prescriptions</h5>
+                    <h5 className="text-sm font-semibold text-[var(--text-secondary)]">Active prescriptions</h5>
                     {rxPatient.prescriptions?.length === 0 ? (
-                      <p className="text-xs text-[var(--text-muted)] font-medium py-4 text-center">No prescriptions found for this patient at this hospital.</p>
+                      <p className="text-sm text-[var(--text-muted)] py-4 text-center">No prescriptions found for this patient at this hospital.</p>
                     ) : (
                       <div className="space-y-3">
                         {rxPatient.prescriptions.map((rx: any) => (
-                          <div key={rx.id} className="p-4 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div key={rx.id} className="p-4 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)] flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="space-y-1.5">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-[var(--text-primary)]">Diagnosis: {rx.diagnosis}</span>
-                                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border tracking-wider ${
-                                  rx.status === 'ISSUED' 
-                                    ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20' 
-                                    : 'bg-slate-100 dark:bg-white/[0.05] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]'
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">{rx.diagnosis}</span>
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                                  rx.status === 'ISSUED'
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                                   }`}>
                                   {rx.status}
                                 </span>
                               </div>
-                              <p className="text-xs text-[var(--text-secondary)] font-medium font-mono">Meds: {rx.medicines}</p>
-                              {rx.instructions && <p className="text-[10px] text-[var(--text-muted)] font-medium italic">Instructions: {rx.instructions}</p>}
-                              <p className="text-[10px] text-[var(--text-muted)] font-semibold font-sans">Prescribed by Dr. {rx.doctor?.name || "Medical Practitioner"} on {new Date(rx.date).toLocaleDateString()}</p>
+                              <p className="text-sm text-[var(--text-secondary)] font-mono">{rx.medicines}</p>
+                              {rx.instructions && <p className="text-[13px] text-[var(--text-muted)] italic">{rx.instructions}</p>}
+                              <p className="text-[13px] text-[var(--text-muted)]">Prescribed by Dr. {rx.doctor?.name || "Medical Practitioner"} · {new Date(rx.date).toLocaleDateString()}</p>
                             </div>
                             {rx.status === "ISSUED" && (
                               <button
                                 onClick={() => handleDispense(rx.id)}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black tracking-wider uppercase rounded-lg text-[10px] transition-all active:scale-95 cursor-pointer flex-shrink-0"
+                                className="px-4 py-2 text-white font-semibold rounded-xl text-sm transition-all active:scale-95 flex-shrink-0"
+                                style={{ backgroundColor: rt.primary }}
                               >
-                                Dispense Medicines
+                                Dispense
                               </button>
                             )}
                           </div>
@@ -640,250 +712,126 @@ export const Dashboard = () => {
           </div>
 
           <div className="lg:col-span-4 space-y-6">
-            <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-6 shadow-sm">
-              <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-widest mb-4">
-                Pharmacy Monitor Stats
-              </h3>
+            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Pharmacy overview</h3>
               <div className="space-y-4">
-                <div className="p-4 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)]">
-                  <p className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">Dispensed Today</p>
-                  <p className="text-xl font-black text-[var(--text-primary)] mt-1">12 Patients</p>
+                <div className="p-4 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)]">
+                  <p className="text-[13px] text-[var(--text-muted)]">Awaiting dispense</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)] mt-1 tabular-nums">{pendingRxCount}</p>
                 </div>
-                <div className="p-4 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)]">
-                  <p className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">Active Formulation Queue</p>
-                  <p className="text-xl font-black text-red-600 dark:text-red-400 mt-1">{pendingRxCount} Active</p>
+                <div className="p-4 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)]">
+                  <p className="text-[13px] text-[var(--text-muted)]">Lab samples pending</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)] mt-1 tabular-nums">{pendingLabsCount}</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
-          
-          {/* ==================== LAYER 1: CRITICAL INFORMATION (TOP LAYER) ==================== */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 stagger-in">
-            
-            {/* 1.1 Alert & Emergency Rail (5 Columns) */}
-            <div className="lg:col-span-5 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500" />
-                    <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
-                      Live Triage Alerts Rail
-                    </h3>
-                  </div>
-                  <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/25 rounded-md text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest font-mono">
-                    System Control
-                  </span>
-                </div>
+        <div className="space-y-6">
 
-                <div className="space-y-3 max-h-[190px] overflow-y-auto pr-1">
-                  {criticalAlerts.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-slate-400">
-                      No active clinical triage emergencies detected.
-                    </div>
-                  ) : (
-                    criticalAlerts.map((alert, i) => (
-                      <div key={i} className={`p-3 rounded-lg border ${alert.color} relative overflow-hidden`}>
-                        <div className="flex items-center gap-2 justify-between mb-1">
-                          <span className="text-[8px] font-black tracking-widest uppercase font-mono">{alert.type}</span>
-                          <Link to={alert.path} className="text-[8px] font-black underline uppercase tracking-wider font-mono cursor-pointer">
-                            {alert.actionLabel} →
-                          </Link>
-                        </div>
-                        <p className="text-xs font-bold dark:text-white">{alert.title}</p>
-                        <p className="text-[9px] dark:text-slate-300 leading-normal font-semibold opacity-85 mt-0.5">{alert.message}</p>
-                      </div>
-                    ))
+          {/* ==================== KPI ROW ==================== */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 stagger-in">
+            {kpis.map((kpi, i) => (
+              <div key={i} className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm transition-all hover:-translate-y-0.5">
+                <div className="flex items-start justify-between">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${rt.iconWrap}`}>
+                    <kpi.icon className="h-5 w-5" />
+                  </div>
+                  {kpi.urgent && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                      Needs attention
+                    </span>
                   )}
                 </div>
+                <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums text-[var(--text-primary)]">
+                  {kpi.value}
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{kpi.label}</p>
+                <p className="text-[13px] text-[var(--text-muted)]">{kpi.sub}</p>
               </div>
-
-              {/* Code Indicators */}
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[var(--card-border)] text-[9px] font-black font-mono tracking-wider text-center">
-                <div className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500">
-                  CODE RED: NORMAL
-                </div>
-                <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
-                  CODE BLUE: 1 ACT
-                </div>
-                <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500">
-                  CODE GOLD: NORMAL
-                </div>
-              </div>
-            </div>
-
-            {/* 1.2 ICU & Bed Capacity Monitor (4 Columns) */}
-            <div className="lg:col-span-4 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Bed className="w-4 h-4 text-emerald-500" />
-                    <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
-                      Bed Capacity Monitor
-                    </h3>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                    {stats?.occupiedBeds || 0} / {stats?.totalBeds || 0} Occupied
-                  </span>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-                      <span>ICU Beds</span>
-                      <span className="text-red-500">{icuOccupancyRateCount}% Capacity</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-red-500" style={{ width: `${icuOccupancyRateCount}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-                      <span>General Wards</span>
-                      <span className="text-emerald-500">{occupancyRateCount}% Capacity</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${occupancyRateCount}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-                      <span>Emergency Triage Beds</span>
-                      <span className="text-amber-500">{erOccupancyRateCount}% Capacity</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-500" style={{ width: `${erOccupancyRateCount}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-[9px] text-slate-400 font-bold border-t border-[var(--card-border)] pt-3 mt-4 flex items-center justify-between">
-                <span>Avg Triage to Bed Entry</span>
-                <span className="text-slate-700 dark:text-white font-black">~{stats?.avgTriageTime ?? 8.5} Mins</span>
-              </div>
-            </div>
-
-            {/* 1.3 Active Telemetry Backlog Counters (3 Columns) */}
-            <div className="lg:col-span-3 grid grid-cols-2 gap-4">
-              
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">OPD Queue</span>
-                <p className="text-2xl font-black text-red-500 tracking-tight tabular-nums mt-1">{activeQueueCount}</p>
-                <span className="text-[8px] font-bold text-slate-400 mt-2">Waiting Triage</span>
-              </div>
-
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Lab Delays</span>
-                <p className="text-2xl font-black text-amber-500 tracking-tight tabular-nums mt-1">{pendingLabsCount}</p>
-                <span className="text-[8px] font-bold text-slate-400 mt-2">STAT Backlog</span>
-              </div>
-
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Rx</span>
-                <p className="text-2xl font-black text-blue-500 tracking-tight tabular-nums mt-1">{pendingRxCount}</p>
-                <span className="text-[8px] font-bold text-slate-400 mt-2">To Dispense</span>
-              </div>
-
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-4 flex flex-col justify-between shadow-sm">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Claims</span>
-                <p className="text-2xl font-black text-slate-700 dark:text-white tracking-tight tabular-nums mt-1">{pendingClaimsCount}</p>
-                <span className="text-[8px] font-bold text-slate-400 mt-2">Under Review</span>
-              </div>
-
-            </div>
-
+            ))}
           </div>
 
-          {/* ==================== LAYER 2: OPERATIONS CONSOLE (MIDDLE LAYER) ==================== */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* 2.1 OPD Flow & Quick Actions Console (8 Columns) */}
-            <div className="lg:col-span-8 space-y-6">
-              
-              {/* Actions Console */}
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm">
-                <div className="mb-4 pb-3 border-b border-[var(--card-border)] flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
-                      Quick Operations Control
-                    </h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Direct entry portal for clinician check-ins and logs</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {[
-                    { id: "PATIENT", label: "Register Patient", icon: PlusCircle, color: "hover:border-red-500/30 hover:bg-red-500/5 text-red-500 border-slate-200 dark:border-white/[0.04]", roles: ["ADMIN", "RECEPTIONIST", "STAFF"] },
-                    { id: "APPOINTMENT", label: "Book Queue Slot", icon: CalendarClock, color: "hover:border-blue-500/30 hover:bg-blue-500/5 text-blue-500 border-slate-200 dark:border-white/[0.04]", roles: ["ADMIN", "RECEPTIONIST", "DOCTOR", "NURSE", "STAFF"] },
-                    { id: "VITALS", label: "Record Vitals", icon: HeartPulse, color: "hover:border-indigo-500/30 hover:bg-indigo-500/5 text-indigo-500 border-slate-200 dark:border-white/[0.04]", roles: ["ADMIN", "NURSE", "RECEPTIONIST", "DOCTOR"] },
-                    { id: "PRESCRIPTION", label: "Write E-Prescription", icon: FileText, color: "hover:border-amber-500/30 hover:bg-amber-500/5 text-amber-500 border-slate-200 dark:border-white/[0.04]", roles: ["ADMIN", "DOCTOR"] },
-                  ].filter(a => !role || a.roles.includes(role)).map((a, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setFormError("");
-                        setFormSuccess("");
-                        setRegisteredPatientInfo(null);
-                        setActiveModal(a.id as any);
-                      }}
-                      className={`flex flex-col items-center justify-center p-3 border bg-[var(--inner-bg)] border-[var(--inner-border)] rounded-lg transition-all duration-300 hover:-translate-y-0.5 ${a.color} text-center cursor-pointer`}
-                    >
-                      <a.icon className="w-4 h-4 mb-2 transition-transform group-hover:scale-105" />
-                      <span className="text-xs font-bold tracking-tight">{a.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          {/* ==================== OPERATIONS ==================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-              {/* Consultation Calendar Roster (Denser layout) */}
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-[var(--card-border)] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <CalendarClock className="w-4 h-4 text-blue-500" />
-                    <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">
-                      Active consultations Queue & appointments
-                    </h3>
+            <div className="lg:col-span-8 space-y-6">
+
+              {/* Quick actions */}
+              {quickActions.length > 0 && (
+                <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Quick actions</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {quickActions.map((a, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setFormError("");
+                          setFormSuccess("");
+                          setRegisteredPatientInfo(null);
+                          setActiveModal(a.id as any);
+                        }}
+                        className="group flex flex-col items-start gap-3 rounded-xl border border-[var(--inner-border)] bg-[var(--inner-bg)] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--card-hover-border)]"
+                      >
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${rt.iconWrap}`}>
+                          <a.icon className="h-5 w-5" />
+                        </span>
+                        <span className="text-sm font-medium text-[var(--text-primary)]">{a.label}</span>
+                      </button>
+                    ))}
                   </div>
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-wider font-mono">
-                    {upcomingAppts.length} PENDING INBOX
+                </div>
+              )}
+
+              {/* Appointments */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-[var(--card-border)] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${rt.iconWrap}`}>
+                      <CalendarClock className="h-4 w-4" />
+                    </span>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Today's appointments</h3>
+                  </div>
+                  <span className="text-[13px] font-medium text-[var(--text-muted)]">
+                    {upcomingAppts.length} waiting
                   </span>
                 </div>
 
                 <div className="divide-y divide-[var(--card-border)] max-h-[350px] overflow-y-auto">
                   {upcomingAppts.length === 0 ? (
-                    <div className="px-5 py-12 text-center">
-                      <CalendarClock className="w-6 h-6 text-slate-200 dark:text-slate-700 mx-auto mb-2" />
-                      <p className="text-xs text-[var(--text-secondary)] font-bold tracking-tight">No Pending Appointments Today</p>
-                      <p className="text-[10px] text-[var(--text-muted)] mt-1">Check-in slot buffer is empty.</p>
+                    <div className="px-6 py-14 text-center">
+                      <CalendarClock className="w-7 h-7 text-[var(--text-muted)] mx-auto mb-3 opacity-40" />
+                      <p className="text-sm text-[var(--text-secondary)] font-medium">No appointments waiting</p>
+                      <p className="text-[13px] text-[var(--text-muted)] mt-1">You're all caught up.</p>
                     </div>
                   ) : (
                     upcomingAppts.map((apt: any) => (
                       <div
                         key={apt.id}
-                        className="group flex items-center justify-between px-5 py-3 hover:bg-[var(--inner-bg)] transition-colors"
+                        className="group flex items-center justify-between px-6 py-3.5 hover:bg-[var(--inner-bg)] transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-center font-bold text-xs text-red-500 transition-colors font-mono">
+                        <div className="flex items-center gap-3.5">
+                          <div
+                            className="flex h-10 w-10 items-center justify-center rounded-xl font-semibold text-sm font-mono"
+                            style={{ backgroundColor: `${rt.primary}14`, color: rt.primary }}
+                          >
                             #{apt.tokenNumber}
                           </div>
                           <div>
-                            <p className="text-xs font-extrabold text-[var(--text-primary)]">
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">
                               {apt.patient?.name}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[9px] text-[var(--text-muted)] font-mono font-bold">
+                              <span className="text-[13px] text-[var(--text-muted)] font-mono">
                                 {apt.time}
                               </span>
                               <span
-                                className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded border tracking-wider font-mono ${
+                                className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${
                                   apt.isRepeat
-                                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20"
-                                    : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20"
+                                    ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                 }`}
                               >
                                 {apt.isRepeat ? "Follow-up" : "New"}
@@ -893,9 +841,10 @@ export const Dashboard = () => {
                         </div>
                         <button
                           onClick={() => handleCheckIn(apt.id)}
-                          className="px-3 py-1 text-[9px] font-black text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer opacity-0 group-hover:opacity-100 uppercase tracking-widest font-mono"
+                          className="px-4 py-1.5 text-[13px] font-semibold text-white rounded-lg transition-all active:scale-95 sm:opacity-0 sm:group-hover:opacity-100"
+                          style={{ backgroundColor: rt.primary }}
                         >
-                          Check In
+                          Check in
                         </button>
                       </div>
                     ))
@@ -905,34 +854,86 @@ export const Dashboard = () => {
 
             </div>
 
-            {/* 2.2 Admissions & System Feed (4 Columns) */}
+            {/* Sidebar column */}
             <div className="lg:col-span-4 space-y-6">
-              
-              {/* Admissions Registry */}
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3 mb-4 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bed className="w-4 h-4 text-blue-500" />
-                    <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
-                      Recent Active Admissions
-                    </h3>
-                  </div>
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+
+              {/* Alerts */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Needs attention</h3>
+                <div className="space-y-3">
+                  {criticalAlerts.length === 0 ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3.5">
+                      <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">All clear — nothing needs attention.</p>
+                    </div>
+                  ) : (
+                    criticalAlerts.map((alert) => (
+                      <div key={alert.id} className={`rounded-xl border p-4 ${alert.tone}`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{alert.type}</span>
+                          <Link to={alert.path} className="inline-flex items-center gap-1 text-[13px] font-semibold hover:underline">
+                            {alert.actionLabel} <ArrowRight className="h-3 w-3" />
+                          </Link>
+                        </div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{alert.title}</p>
+                        <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 leading-relaxed">{alert.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Bed capacity */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Bed capacity</h3>
+                  <span className="text-[13px] text-[var(--text-muted)]">
+                    {stats?.occupiedBeds || 0} / {stats?.totalBeds || 0}
+                  </span>
                 </div>
 
+                <div className="space-y-4">
+                  {[
+                    { label: "ICU beds", value: icuOccupancyRateCount, color: "#f43f5e" },
+                    { label: "General wards", value: occupancyRateCount, color: "#10b981" },
+                    { label: "Emergency triage", value: erOccupancyRateCount, color: "#f59e0b" },
+                  ].map((row) => (
+                    <div key={row.label} className="space-y-1.5">
+                      <div className="flex justify-between text-[13px] font-medium text-[var(--text-secondary)]">
+                        <span>{row.label}</span>
+                        <span className="tabular-nums" style={{ color: row.color }}>{row.value}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--inner-bg)] overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${row.value}%`, backgroundColor: row.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex items-center justify-between border-t border-[var(--card-border)] pt-4 text-[13px]">
+                  <span className="text-[var(--text-muted)]">Avg. triage to bed</span>
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {stats?.avgTriageTime != null ? `${stats.avgTriageTime} min` : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Recent admissions */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Recent admissions</h3>
                 <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
                   {!stats?.recentAdmissions || stats.recentAdmissions.length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)] font-medium py-4 text-center">No recent admissions recorded.</p>
+                    <p className="text-sm text-[var(--text-muted)] py-4 text-center">No recent admissions.</p>
                   ) : (
                     stats.recentAdmissions.map((adm: any) => (
-                      <div key={adm.id} className="p-3 border rounded-lg bg-[var(--inner-bg)] border-[var(--inner-border)] flex justify-between items-center gap-2">
+                      <div key={adm.id} className="p-3.5 rounded-xl bg-[var(--inner-bg)] border border-[var(--inner-border)] flex justify-between items-center gap-2">
                         <div className="space-y-0.5">
-                          <p className="text-xs font-bold text-[var(--text-primary)]">{adm.patient?.name}</p>
-                          <p className="text-[9px] text-[var(--text-secondary)] font-semibold">
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{adm.patient?.name}</p>
+                          <p className="text-[13px] text-[var(--text-muted)]">
                             {adm.bed?.room?.name} · Bed {adm.bed?.name}
                           </p>
                         </div>
-                        <span className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[8px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest font-mono">
+                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-semibold" style={{ backgroundColor: `${rt.primary}14`, color: rt.primary }}>
                           {adm.status}
                         </span>
                       </div>
@@ -941,154 +942,131 @@ export const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Live Activity Feed */}
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm relative overflow-hidden">
-                <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3 mb-4 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-500" />
-                    <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest">
-                      Live Hospital Operations Log
-                    </h3>
-                  </div>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                </div>
-
-                <div className="space-y-3 max-h-[170px] overflow-y-auto pr-1">
-                  {activityFeed.length === 0 && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium py-4 text-center">No recent activity.</p>
-                  )}
-                  {activityFeed.map((log) => (
-                    <div key={log.id} className="p-2.5 rounded-lg border border-[var(--inner-border)] bg-[var(--inner-bg)] flex flex-col gap-1 transition-all duration-200">
-                      <div className="flex justify-between items-center text-[8px] font-black font-mono">
-                        <span className={`px-1.5 py-0.5 rounded tracking-widest uppercase ${
-                          log.action === "SYS_INIT" ? "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/10" :
-                          log.action === "CHECKIN" ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20" :
-                          log.action === "PRESCRIPTION" ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20" :
-                          log.action === "REGISTER" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20" :
-                          "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20"
-                        }`}>
-                          {log.action}
-                        </span>
-                        <span className="text-slate-400 dark:text-slate-500 tabular-nums font-bold">
-                          {log.createdAt instanceof Date ? log.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A"}
-                        </span>
+              {/* Activity */}
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Recent activity</h3>
+                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                  {activityFeed.length === 0 ? (
+                    <p className="text-sm text-[var(--text-muted)] py-4 text-center">No recent activity yet.</p>
+                  ) : (
+                    activityFeed.map((log) => (
+                      <div key={log.id} className="flex gap-3">
+                        <div className="flex flex-col items-center pt-1">
+                          <span className={`h-2 w-2 rounded-full ${rt.dot}`} />
+                          <span className="w-px flex-1 bg-[var(--card-border)] mt-1" />
+                        </div>
+                        <div className="pb-1 min-w-0">
+                          <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{log.details}</p>
+                          <p className="text-[11px] text-[var(--text-muted)] mt-0.5 tabular-nums">
+                            {log.createdAt instanceof Date ? log.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-[9px] text-[var(--text-secondary)] font-semibold leading-normal">{log.details}</p>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
             </div>
-
           </div>
 
-          {/* ==================== LAYER 3: ANALYTICS & MONITORING (BOTTOM LAYER) ==================== */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* 3.1 Patient Flow Curve (8 Columns) */}
-            <div className="lg:col-span-8 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl overflow-hidden p-5 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-[var(--card-border)] pb-3">
+          {/* ==================== ANALYTICS ==================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            {/* Patient flow */}
+            <div className="lg:col-span-8 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h3 className="text-xs font-black text-[var(--text-primary)] tracking-widest uppercase">
-                    Weekly Patient Flow analytics
-                  </h3>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                    Admissions and discharges comparison weekly curve
-                  </p>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Patient flow</h3>
+                  <p className="text-[13px] text-[var(--text-muted)] mt-0.5">Admissions vs. discharges this week</p>
                 </div>
-                <div className="flex gap-4 text-[10px] font-black font-mono">
+                <div className="flex gap-4 text-[13px] font-medium">
                   <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full" />{" "}
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rt.primary }} />
                     Admissions
                   </span>
                   <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full" />{" "}
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rt.secondary }} />
                     Discharges
                   </span>
                 </div>
               </div>
 
-              <div className="h-60 w-full">
+              <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="admGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        <stop offset="5%" stopColor={rt.primary} stopOpacity={0.18} />
+                        <stop offset="95%" stopColor={rt.primary} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="disGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor={rt.secondary} stopOpacity={0.18} />
+                        <stop offset="95%" stopColor={rt.secondary} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.08)" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: 700 }} dy={8} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: 700 }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.12)" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} dy={8} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="admissions" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#admGrad)" dot={false} activeDot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }} />
-                    <Area type="monotone" dataKey="discharges" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#disGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }} />
+                    <Area type="monotone" dataKey="admissions" stroke={rt.primary} strokeWidth={2.5} fillOpacity={1} fill="url(#admGrad)" dot={false} activeDot={{ r: 4, fill: rt.primary, strokeWidth: 2, stroke: "#fff" }} />
+                    <Area type="monotone" dataKey="discharges" stroke={rt.secondary} strokeWidth={2.5} fillOpacity={1} fill="url(#disGrad)" dot={false} activeDot={{ r: 4, fill: rt.secondary, strokeWidth: 2, stroke: "#fff" }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* 3.2 Department Workload & Financial Operations (4 Columns) */}
-            <div className="lg:col-span-4 space-y-6">
-              
-              {/* Department Workload pie chart */}
-              <div className="border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl p-5 shadow-sm">
-                <h3 className="text-xs font-black text-slate-700 dark:text-white uppercase tracking-widest mb-3 border-b border-[var(--card-border)] pb-2">
-                  Department Workload Load
-                </h3>
-                
-                {(() => {
-                  const totalDeptVal = departmentData.reduce((acc, curr) => acc + curr.value, 0);
-                  return (
-                    <>
-                      <div className="flex items-center justify-center py-2 relative">
-                        <div className="absolute flex flex-col items-center justify-center">
-                          <span className="text-[8px] text-[var(--text-muted)] font-black tracking-widest">TOTAL</span>
-                          <span className="text-xs font-black text-[var(--text-primary)] mt-0.5">{totalDeptVal} Appts</span>
-                        </div>
+            {/* Department workload */}
+            <div className="lg:col-span-4 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Department workload</h3>
 
-                        <div className="w-28 h-28">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie data={departmentData} cx="50%" cy="50%" innerRadius={38} outerRadius={46} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                                {departmentData.map((entry, i) => (
-                                  <Cell key={i} fill={entry.color} />
-                                ))}
-                              </Pie>
-                              <Tooltip content={<CustomTooltip />} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
+              {(() => {
+                const totalDeptVal = departmentData.reduce((acc, curr) => acc + curr.value, 0);
+                if (totalDeptVal === 0) {
+                  return <p className="text-sm text-[var(--text-muted)] py-8 text-center">No appointment data yet.</p>;
+                }
+                return (
+                  <>
+                    <div className="flex items-center justify-center py-2 relative">
+                      <div className="absolute flex flex-col items-center justify-center">
+                        <span className="text-[11px] text-[var(--text-muted)]">Total</span>
+                        <span className="text-lg font-bold text-[var(--text-primary)] tabular-nums">{totalDeptVal}</span>
                       </div>
+                      <div className="w-32 h-32">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={departmentData} cx="50%" cy="50%" innerRadius={44} outerRadius={56} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                              {departmentData.map((entry, i) => (
+                                <Cell key={i} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip content={<CustomTooltip />} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
 
-                      <div className="space-y-2.5 mt-3">
-                        {departmentData.map((d) => (
-                          <div key={d.name} className="space-y-0.5 text-[10px]">
-                            <div className="flex items-center justify-between font-semibold">
-                              <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                                {d.name}
-                              </span>
-                              <span className="text-[var(--text-primary)] font-bold">
-                                {totalDeptVal > 0 ? Math.round((d.value / totalDeptVal) * 100) : 0}% ({d.value})
-                              </span>
-                            </div>
-                            <div className="h-1 bg-slate-100 dark:bg-white/[0.03] rounded-full overflow-hidden">
-                              <div className="h-full rounded-full" style={{ backgroundColor: d.color, width: `${totalDeptVal > 0 ? (d.value / totalDeptVal) * 100 : 0}%` }} />
-                            </div>
+                    <div className="space-y-3 mt-4">
+                      {departmentData.map((d) => (
+                        <div key={d.name} className="space-y-1">
+                          <div className="flex items-center justify-between text-[13px]">
+                            <span className="text-[var(--text-secondary)] flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                              {d.name}
+                            </span>
+                            <span className="text-[var(--text-primary)] font-medium tabular-nums">
+                              {Math.round((d.value / totalDeptVal) * 100)}%
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-
+                          <div className="h-1.5 bg-[var(--inner-bg)] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ backgroundColor: d.color, width: `${(d.value / totalDeptVal) * 100}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
           </div>
@@ -1096,9 +1074,9 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* QUICK ACTIONS MODALS */}
+      {/* ==================== QUICK ACTION MODALS ==================== */}
 
-      {/* 1. Modal: Register Patient */}
+      {/* 1. Register Patient */}
       <Modal isOpen={activeModal === "PATIENT"} onClose={() => { setActiveModal(null); setRegisteredPatientInfo(null); }} title="Register Walk-in Patient">
         <form onSubmit={handleRegisterPatient} className="space-y-4">
           {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
@@ -1230,7 +1208,7 @@ export const Dashboard = () => {
         </form>
       </Modal>
 
-      {/* 2. Modal: Book Slot */}
+      {/* 2. Book Slot */}
       <Modal isOpen={activeModal === "APPOINTMENT"} onClose={() => setActiveModal(null)} title="Book Consultation Queue Slot">
         <form onSubmit={handleBookAppointment} className="space-y-4">
           {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
@@ -1309,11 +1287,11 @@ export const Dashboard = () => {
         </form>
       </Modal>
 
-      {/* 3. Modal: Record Vitals */}
+      {/* 3. Record Vitals */}
       <Modal isOpen={activeModal === "VITALS"} onClose={() => setActiveModal(null)} title="Record Vitals Log">
         <form onSubmit={handleRecordVitals} className="space-y-4">
           {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
-          
+
           <div>
             <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Patient Name</label>
             <input
@@ -1396,11 +1374,11 @@ export const Dashboard = () => {
         </form>
       </Modal>
 
-      {/* 4. Modal: E-Prescription */}
+      {/* 4. E-Prescription */}
       <Modal isOpen={activeModal === "PRESCRIPTION"} onClose={() => setActiveModal(null)} title="Write E-Prescription Formulation">
         <form onSubmit={handleWritePrescription} className="space-y-4">
           {formError && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold">{formError}</div>}
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Select Patient</label>

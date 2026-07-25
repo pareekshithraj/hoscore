@@ -2,20 +2,10 @@ import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { pick } from '../utils/pick.js';
+import { generateSixDigitId, resolveIdentity, findExistingPatient } from '../utils/patientResolver.js';
 
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
-
-async function generateSixDigitId() {
-  let uniqueId = '';
-  let isUnique = false;
-  while (!isUnique) {
-    uniqueId = Math.floor(100000 + Math.random() * 900000).toString();
-    const existing = await prisma.patient.findUnique({ where: { sixDigitId: uniqueId } });
-    if (!existing) isUnique = true;
-  }
-  return uniqueId;
-}
 
 // Helper to check if doctor has an active/past appointment or admission with the patient at their hospital
 async function checkDoctorAccess(patientId: string, hospitalId: string | undefined, doctorEmail: string | undefined): Promise<boolean> {
@@ -88,29 +78,55 @@ export const getAllPatients = async (req: Request, res: Response) => {
 
 export const createPatient = async (req: Request, res: Response) => {
   const { name, contact, email, dateOfBirth, gender, medicalHistory, isHoscoreUser, manualCareNote } = req.body;
+  const hospitalId = hid(req);
+  // Staff can override a duplicate warning by re-submitting with ?force=true
+  const force = req.query.force === 'true' || req.body.force === true;
   try {
-    const shouldCreateHoscoreId = isHoscoreUser !== false;
-    let uniqueId: string | null = null;
-    if (shouldCreateHoscoreId) {
-      uniqueId = await generateSixDigitId();
+    // Guard against creating a second record for someone already in this hospital.
+    // Only dedups on a STRONG identifier (phone/email/6-digit id) — never name alone.
+    if (!force) {
+      const existing = await findExistingPatient(hospitalId, { contact, email });
+      if (existing) {
+        return res.status(409).json({
+          error: 'A patient with this phone or email already exists at your hospital.',
+          code: 'DUPLICATE_PATIENT',
+          existingPatient: existing,
+        });
+      }
     }
 
-    const patient = await prisma.patient.create({
-      data: {
-        name,
-        contact,
-        email,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-        gender,
-        medicalHistory,
-        hospitalId: hid(req),
-        sixDigitId: uniqueId,
-        isHoscoreUser: shouldCreateHoscoreId,
-        registrationMode: shouldCreateHoscoreId ? 'HOSCORE' : 'WALK_IN_MANUAL',
-        manualCareNote: shouldCreateHoscoreId ? null : manualCareNote || 'Patient does not use phone/app. Continue old manual workflow.',
+    // Rural / no-phone patients (or explicit opt-out) stay WALK_IN_MANUAL with no
+    // HOSCORE id; reachable patients get a HOSCORE 6-digit id. Same rule as booking.
+    const { isHoscore, normalizedContact, normalizedEmail } = resolveIdentity({ contact, email, isHoscoreUser });
+
+    let patient: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const sixDigitId = isHoscore ? await generateSixDigitId() : null;
+      try {
+        patient = await prisma.patient.create({
+          data: {
+            name,
+            contact: normalizedContact,
+            email: normalizedEmail,
+            dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+            gender,
+            medicalHistory,
+            hospitalId,
+            sixDigitId,
+            isHoscoreUser: isHoscore,
+            registrationMode: isHoscore ? 'HOSCORE' : 'WALK_IN_MANUAL',
+            manualCareNote: isHoscore ? null : manualCareNote || 'Patient does not use phone/app. Continue manual care workflow.',
+          }
+        });
+        break;
+      } catch (err: any) {
+        if (err?.code === 'P2002' && isHoscore) continue; // sixDigitId collision — retry
+        throw err;
       }
-    });
-    await logAudit(req, 'CREATE', 'Patient', patient.id, shouldCreateHoscoreId ? `Created HOSCORE patient ${patient.name}` : `Created non-HOSCORE manual patient ${patient.name}`);
+    }
+    if (!patient) return res.status(500).json({ error: 'Failed to allocate a patient id' });
+
+    await logAudit(req, 'CREATE', 'Patient', patient.id, isHoscore ? `Created HOSCORE patient ${patient.name}` : `Created non-HOSCORE manual patient ${patient.name}`);
     res.status(201).json(patient);
   } catch (error) {
     console.error(error);

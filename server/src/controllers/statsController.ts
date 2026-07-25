@@ -31,89 +31,124 @@ export const getStats = async (req: Request, res: Response) => {
     const hospitalId = hid(req);
     const roomFilter = { room: { hospitalId } };
 
-    const totalPatients = await prisma.patient.count({ where: { appointments: { some: { hospitalId } } } });
-    const totalRooms = await prisma.room.count({ where: { hospitalId } });
-    const totalBeds = await prisma.bed.count({ where: roomFilter });
-    const occupiedBeds = await prisma.bed.count({ where: { ...roomFilter, status: "OCCUPIED" } });
-    const occupancyRate = totalBeds > 0 ? (occupiedBeds / totalBeds) * 100 : 0;
-
-    const recentAdmissions = await prisma.admission.findMany({
-      where: { bed: { room: { hospitalId } } },
-      take: 5,
-      orderBy: { admissionDate: "desc" },
-      include: { patient: true, bed: { include: { room: true } } },
-    });
-
-    const upcomingAppointments = await prisma.appointment.findMany({
-      where: { hospitalId, date: { gte: new Date() }, status: 'PENDING' },
-      take: 5,
-      orderBy: { date: "asc" },
-      include: { patient: true },
-    });
-
-    const activeQueue = await prisma.oPDQueue.count({ where: { hospitalId, status: { in: ["WAITING", "IN_CONSULTATION"] } } });
-    const pendingLabs = await prisma.labOrder.count({ where: { hospitalId, status: { in: ["ORDERED", "SAMPLE_COLLECTED", "IN_PROGRESS"] } } });
-    const pendingRx = await prisma.prescription.count({ where: { hospitalId, status: "ISSUED" } });
-
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    // 7-day window (weekly chart is bucketed in memory from grouped rows below)
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
 
-    const todaysShifts = await prisma.shiftSchedule.count({ where: { hospitalId, date: { gte: startOfToday, lte: endOfToday } } });
-    const pendingClaims = await prisma.insuranceClaim.count({ where: { hospitalId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } });
+    // ---- Fire every independent query concurrently instead of awaiting serially ----
+    const [
+      totalPatients,
+      totalRooms,
+      totalBeds,
+      occupiedBeds,
+      recentAdmissions,
+      upcomingAppointments,
+      activeQueue,
+      pendingLabs,
+      pendingRx,
+      todaysShifts,
+      pendingClaims,
+      totalICUBeds,
+      occupiedICUBeds,
+      totalERBeds,
+      occupiedERBeds,
+      weekAdmissions,
+      weekDischarges,
+      weekBilling,
+      apptsByDoctor,
+      doctorsList,
+      completedQueues,
+    ] = await Promise.all([
+      prisma.patient.count({ where: { appointments: { some: { hospitalId } } } }),
+      prisma.room.count({ where: { hospitalId } }),
+      prisma.bed.count({ where: roomFilter }),
+      prisma.bed.count({ where: { ...roomFilter, status: "OCCUPIED" } }),
+      prisma.admission.findMany({
+        where: { bed: { room: { hospitalId } } },
+        take: 5,
+        orderBy: { admissionDate: "desc" },
+        include: { patient: true, bed: { include: { room: true } } },
+      }),
+      prisma.appointment.findMany({
+        where: { hospitalId, date: { gte: new Date() }, status: 'PENDING' },
+        take: 5,
+        orderBy: { date: "asc" },
+        include: { patient: true },
+      }),
+      prisma.oPDQueue.count({ where: { hospitalId, status: { in: ["WAITING", "IN_CONSULTATION"] } } }),
+      prisma.labOrder.count({ where: { hospitalId, status: { in: ["ORDERED", "SAMPLE_COLLECTED", "IN_PROGRESS"] } } }),
+      prisma.prescription.count({ where: { hospitalId, status: "ISSUED" } }),
+      prisma.shiftSchedule.count({ where: { hospitalId, date: { gte: startOfToday, lte: endOfToday } } }),
+      prisma.insuranceClaim.count({ where: { hospitalId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
+      prisma.bed.count({ where: { room: { hospitalId, type: "ICU" } } }),
+      prisma.bed.count({ where: { room: { hospitalId, type: "ICU" }, status: "OCCUPIED" } }),
+      prisma.bed.count({ where: { room: { hospitalId, type: { in: ["Emergency", "Triage", "ER"] } } } }),
+      prisma.bed.count({ where: { room: { hospitalId, type: { in: ["Emergency", "Triage", "ER"] } }, status: "OCCUPIED" } }),
+      // Pull the week's rows once and bucket in memory (was 7 × 3 = 21 serial queries)
+      prisma.admission.findMany({
+        where: { bed: { room: { hospitalId } }, admissionDate: { gte: weekStart, lte: endOfToday } },
+        select: { admissionDate: true },
+      }),
+      prisma.admission.findMany({
+        where: { bed: { room: { hospitalId } }, dischargeDate: { gte: weekStart, lte: endOfToday } },
+        select: { dischargeDate: true },
+      }),
+      prisma.billing.findMany({
+        where: { hospitalId, createdAt: { gte: weekStart, lte: endOfToday } },
+        select: { createdAt: true, totalAmount: true },
+      }),
+      // Department distribution in ONE grouped query (was one count per doctor — N+1)
+      prisma.appointment.groupBy({
+        by: ['doctorId'],
+        where: { hospitalId, doctorId: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.doctor.findMany({ where: { hospitalId }, select: { id: true, specialty: true } }),
+      prisma.oPDQueue.findMany({
+        where: { hospitalId, status: "COMPLETED", calledAt: { not: null } },
+        select: { createdAt: true, calledAt: true },
+        take: 50,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
-    // Calculate real ICU bed occupancy rate
-    const totalICUBeds = await prisma.bed.count({ where: { room: { hospitalId, type: "ICU" } } });
-    const occupiedICUBeds = await prisma.bed.count({ where: { room: { hospitalId, type: "ICU" }, status: "OCCUPIED" } });
+    const occupancyRate = totalBeds > 0 ? (occupiedBeds / totalBeds) * 100 : 0;
     const icuOccupancyRate = totalICUBeds > 0 ? Math.round((occupiedICUBeds / totalICUBeds) * 100) : undefined;
-
-    // Calculate real Emergency/Triage bed occupancy rate
-    const totalERBeds = await prisma.bed.count({ where: { room: { hospitalId, type: { in: ["Emergency", "Triage", "ER"] } } } });
-    const occupiedERBeds = await prisma.bed.count({ where: { room: { hospitalId, type: { in: ["Emergency", "Triage", "ER"] } }, status: "OCCUPIED" } });
     const erOccupancyRate = totalERBeds > 0 ? Math.round((occupiedERBeds / totalERBeds) * 100) : undefined;
 
-    // Calculate real weekly admissions, discharges, and revenues for the last 7 calendar days
+    // ---- Bucket the week's rows into 7 days in memory ----
     const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const admByDay: Record<string, number> = {};
+    const disByDay: Record<string, number> = {};
+    const revByDay: Record<string, number> = {};
+    for (const a of weekAdmissions) if (a.admissionDate) admByDay[dayKey(a.admissionDate)] = (admByDay[dayKey(a.admissionDate)] || 0) + 1;
+    for (const dc of weekDischarges) if (dc.dischargeDate) disByDay[dayKey(dc.dischargeDate)] = (disByDay[dayKey(dc.dischargeDate)] || 0) + 1;
+    for (const b of weekBilling) revByDay[dayKey(b.createdAt)] = (revByDay[dayKey(b.createdAt)] || 0) + (b.totalAmount || 0);
+
     const weeklyData = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-      
-      const admissions = await prisma.admission.count({
-        where: {
-          bed: { room: { hospitalId } },
-          admissionDate: { gte: start, lte: end }
-        }
-      });
-      const discharges = await prisma.admission.count({
-        where: {
-          bed: { room: { hospitalId } },
-          dischargeDate: { gte: start, lte: end }
-        }
-      });
-      const dayBilling = await prisma.billing.aggregate({
-        where: { hospitalId, createdAt: { gte: start, lte: end } },
-        _sum: { totalAmount: true }
-      });
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const k = dayKey(d);
       weeklyData.push({
         name: weekdays[d.getDay()],
-        admissions: admissions || 0,
-        discharges: discharges || 0,
-        revenue: dayBilling._sum.totalAmount || 0
+        admissions: admByDay[k] || 0,
+        discharges: disByDay[k] || 0,
+        revenue: revByDay[k] || 0,
       });
     }
 
-    // Calculate real department distribution based on doctor specialty appointment counts
-    const doctorsList = await prisma.doctor.findMany({ where: { hospitalId } });
+    // ---- Map grouped appointment counts onto doctor specialties ----
+    const specialtyById: Record<string, string | null> = {};
+    for (const doc of doctorsList) specialtyById[doc.id] = doc.specialty;
     const deptCounts: Record<string, number> = {};
-    for (const doc of doctorsList) {
-      if (doc.specialty) {
-        const count = await prisma.appointment.count({ where: { hospitalId, doctorId: doc.id } });
-        if (count > 0) {
-          deptCounts[doc.specialty] = (deptCounts[doc.specialty] || 0) + count;
-        }
+    for (const row of apptsByDoctor) {
+      const specialty = row.doctorId ? specialtyById[row.doctorId] : null;
+      const count = row._count._all;
+      if (specialty && count > 0) {
+        deptCounts[specialty] = (deptCounts[specialty] || 0) + count;
       }
     }
     const colors = ["#38bdf8", "#6366f1", "#a78bfa", "#34d399", "#f43f5e", "#fbbf24"];
@@ -123,14 +158,8 @@ export const getStats = async (req: Request, res: Response) => {
       color: colors[idx % colors.length]
     }));
 
-    // Calculate real average wait/triage time from completed OPD queues
-    const completedQueues = await prisma.oPDQueue.findMany({
-      where: { hospitalId, status: "COMPLETED", calledAt: { not: null } },
-      select: { createdAt: true, calledAt: true },
-      take: 50,
-      orderBy: { createdAt: "desc" }
-    });
-    let avgTriageTime = 8.5; // Default fallback if no queues exist
+    // Real average wait/triage time from completed OPD queues (undefined when none — client shows "—")
+    let avgTriageTime: number | undefined = undefined;
     if (completedQueues.length > 0) {
       const sum = completedQueues.reduce((acc, q) => {
         if (q.calledAt && q.createdAt) {

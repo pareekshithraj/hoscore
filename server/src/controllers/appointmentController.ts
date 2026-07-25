@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { findOrCreatePatient } from '../utils/patientResolver.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -38,29 +39,16 @@ export const createAppointment = async (req: Request, res: Response) => {
   const { hospitalId, patientName, doctorId, time, date, contact, email, isHoscoreUser, manualCareNote } = req.body;
   const activeHospitalId = hospitalId || hid(req);
   try {
-    let patient = await prisma.patient.findFirst({
-      where: {
-        hospitalId: activeHospitalId,
-        OR: [
-          { email: email || undefined },
-          { name: patientName }
-        ]
-      }
+    // Reuse an existing hospital-connected patient (matched by phone/email/6-digit
+    // id — never name alone) or create one with the same HOSCORE/manual rules the
+    // Register Patient path uses, so both flows stay consistent.
+    const { patient } = await findOrCreatePatient(activeHospitalId, {
+      name: patientName,
+      contact,
+      email,
+      isHoscoreUser,
+      manualCareNote,
     });
-    if (!patient) {
-      const shouldCreateHoscoreId = isHoscoreUser !== false;
-      patient = await prisma.patient.create({
-        data: {
-          name: patientName,
-          email: email || undefined,
-          contact: contact || undefined,
-          hospitalId: activeHospitalId,
-          isHoscoreUser: shouldCreateHoscoreId,
-          registrationMode: shouldCreateHoscoreId ? 'HOSCORE' : 'WALK_IN_MANUAL',
-          manualCareNote: shouldCreateHoscoreId ? null : manualCareNote || 'Patient does not use phone/app. Continue manual care workflow.',
-        },
-      });
-    }
     const apptDate = new Date(date);
     const tokenNumber = await getNextAppointmentToken(activeHospitalId, apptDate);
     const appointment = await prisma.appointment.create({

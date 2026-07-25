@@ -24,6 +24,9 @@ export const Patients = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  // Possible-duplicate prompt: holds the existing patient the backend matched.
+  const [duplicateMatch, setDuplicateMatch] = useState<any>(null);
 
   const openBookingModal = (patient: any) => {
     setSelectedPatient(patient);
@@ -75,19 +78,32 @@ export const Patients = () => {
     fetchPatients();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitPatient = async (force: boolean) => {
+    setSubmitting(true);
     try {
-      await api.post('/patients', {
+      await api.post(`/patients${force ? '?force=true' : ''}`, {
         ...formData,
         dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined
       });
       setIsModalOpen(false);
+      setDuplicateMatch(null);
       setFormData({ name: '', contact: '', email: '', dateOfBirth: '', gender: 'Male', bloodGroup: 'O+', isHoscoreUser: true, manualCareNote: '' });
       fetchPatients();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      // Backend returns 409 with the existing patient when a phone/email already exists.
+      if (err?.response?.status === 409 && err.response.data?.code === 'DUPLICATE_PATIENT') {
+        setDuplicateMatch(err.response.data.existingPatient);
+      } else {
+        setAlertMessage(err?.response?.data?.error || 'Failed to register patient. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitPatient(false);
   };
 
   const handleDelete = (id: string) => {
@@ -100,8 +116,9 @@ export const Patients = () => {
       await api.delete(`/patients/${confirmDeleteId}`);
       setConfirmDeleteId(null);
       fetchPatients();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setConfirmDeleteId(null);
+      setAlertMessage(err?.response?.data?.error || 'Failed to delete patient record.');
     }
   };
 
@@ -311,7 +328,7 @@ export const Patients = () => {
           </div>
           <div className="pt-4 flex gap-3">
             <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Register</button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{submitting ? 'Registering…' : 'Register'}</button>
           </div>
         </form>
       </Modal>
@@ -432,6 +449,41 @@ export const Patients = () => {
           <div className="flex justify-end gap-2">
             <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
             <button onClick={confirmDelete} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold">Delete</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Possible-duplicate confirmation — backend matched an existing phone/email */}
+      <Modal isOpen={!!duplicateMatch} onClose={() => setDuplicateMatch(null)} title="Possible Duplicate Patient">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            A patient with this phone or email already exists at your hospital:
+          </p>
+          {duplicateMatch && (
+            <div className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-4 text-sm">
+              <div className="font-bold text-slate-900 dark:text-zinc-100">{duplicateMatch.name}</div>
+              <div className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                {duplicateMatch.isHoscoreUser === false ? 'Manual walk-in' : `HSC-${duplicateMatch.sixDigitId || '—'}`}
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-slate-500 dark:text-zinc-500">
+            Use the existing record to avoid duplicate charts, or create a new one only if this is genuinely a different person.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => { setDuplicateMatch(null); setIsModalOpen(false); }}
+              className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Use Existing
+            </button>
+            <button
+              onClick={() => submitPatient(true)}
+              disabled={submitting}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+            >
+              {submitting ? 'Creating…' : 'Create New Anyway'}
+            </button>
           </div>
         </div>
       </Modal>
