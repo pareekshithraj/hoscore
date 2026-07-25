@@ -41,28 +41,36 @@ export async function getPresignedUrl(key: string, expiresInSeconds: number = 90
 export function extractKey(urlOrKey: string): string {
   if (!urlOrKey) return '';
   if (!urlOrKey.startsWith('http://') && !urlOrKey.startsWith('https://')) {
-    return urlOrKey; // It's already a key
+    return urlOrKey.replace(/^\/+/, ''); // It's already a key
   }
-  
-  const endpoint = process.env.R2_ENDPOINT || '';
+
   const publicUrl = process.env.R2_PUBLIC_URL || '';
-  
+  const endpoint = process.env.R2_ENDPOINT || '';
+
   let key = urlOrKey;
   if (publicUrl && key.startsWith(publicUrl)) {
     key = key.replace(publicUrl, '');
   } else if (endpoint && key.startsWith(endpoint)) {
     key = key.replace(endpoint, '');
   } else {
-    // Search for known folder structures if the custom domains differ
-    const folders = ['/images/', '/documents/', '/uploads/'];
-    for (const folder of folders) {
-      const idx = key.indexOf(folder);
-      if (idx !== -1) {
-        return key.substring(idx + 1);
+    try {
+      const parsed = new URL(urlOrKey);
+      key = parsed.pathname;
+      const bucketName = process.env.R2_BUCKET_NAME || 'hoscore';
+      if (key.startsWith(`/${bucketName}/`)) {
+        key = key.substring(bucketName.length + 2);
+      }
+    } catch {
+      const folders = ['/logos/', '/hospital-photos/', '/images/', '/documents/', '/uploads/', '/photos/', '/avatars/'];
+      for (const folder of folders) {
+        const idx = key.indexOf(folder);
+        if (idx !== -1) {
+          return key.substring(idx + 1);
+        }
       }
     }
   }
-  
+
   if (key.startsWith('/')) {
     key = key.substring(1);
   }
