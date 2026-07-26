@@ -67,7 +67,8 @@ class SessionStore(context: Context) {
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     } catch (e: Exception) {
-        Log.w("SessionStore", "Encrypted prefs unavailable, falling back: ${e.message}")
+        Log.w("SessionStore", "Encrypted prefs unavailable, wiping corrupted file & falling back: ${e.message}")
+        runCatching { context.deleteSharedPreferences(PREFS_NAME) }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 

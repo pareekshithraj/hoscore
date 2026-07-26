@@ -23,11 +23,11 @@ fun <T> DataScreen(
 ) {
     LaunchedEffect(Unit) { vm.loadOnce() }
     val state by vm.state.collectAsState()
-    Crossfade(targetState = state::class, modifier = modifier, label = "dataState") {
-        when (val s = state) {
+    Crossfade(targetState = state, modifier = modifier, label = "dataState") { currentState ->
+        when (currentState) {
             is Resource.Loading -> LoadingSkeleton(rows = skeletonRows)
-            is Resource.Error -> ErrorState(message = s.message, onRetry = { vm.refresh() })
-            is Resource.Success -> content(s.data)
+            is Resource.Error -> ErrorState(message = currentState.message, onRetry = { vm.refresh() })
+            is Resource.Success<T> -> content(currentState.data)
         }
     }
 }

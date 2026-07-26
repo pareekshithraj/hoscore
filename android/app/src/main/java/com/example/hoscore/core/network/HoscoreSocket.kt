@@ -39,6 +39,14 @@ object HoscoreSocket {
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.w(TAG, "socket failure: ${t.message}")
+                if (!closedByUser) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        if (!closedByUser) {
+                            Log.i(TAG, "Attempting socket reconnection...")
+                            connect(token)
+                        }
+                    }, 5000)
+                }
             }
         })
     }

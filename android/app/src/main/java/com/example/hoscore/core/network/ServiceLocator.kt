@@ -68,7 +68,9 @@ object ServiceLocator {
             sessionStore.token?.let { builder.addHeader("Authorization", "Bearer $it") }
             val response: Response = chain.proceed(builder.build())
             if (response.code == 401) {
-                onUnauthorized?.invoke()
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    onUnauthorized?.invoke()
+                }
             }
             response
         }

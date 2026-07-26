@@ -141,7 +141,7 @@ fun findPath(cells: List<List<String>>, startIn: MapCell, goalIn: MapCell): List
     val rows = cells.size
     val cols = cells.firstOrNull()?.size ?: 0
     fun walkable(r: Int, c: Int) =
-        r in 0 until rows && c in 0 until cols && (cells[r][c] in WALKABLE)
+        r in 0 until rows && c in 0 until (cells.getOrNull(r)?.size ?: 0) && (cells[r][c] in WALKABLE)
 
     fun nearestWalkable(cell: MapCell): MapCell? {
         val maxR = maxOf(rows, cols)
