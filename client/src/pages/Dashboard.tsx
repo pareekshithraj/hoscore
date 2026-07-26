@@ -597,13 +597,6 @@ export const Dashboard = () => {
                 </p>
               </div>
             </div>
-            <Link
-              to="/dashboard/simulator"
-              className="flex items-center gap-2 rounded-2xl border border-[var(--card-border)] bg-[var(--bg-secondary)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--inner-bg)] active:scale-[0.98]"
-            >
-              <Activity className={`h-4 w-4 ${rt.clock}`} />
-              Simulator
-            </Link>
           </div>
         </div>
       </div>

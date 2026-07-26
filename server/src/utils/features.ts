@@ -1,6 +1,6 @@
 export const FEATURES = {
   DASHBOARD: 'dashboard',
-  SIMULATOR: 'simulator',
+  MAP: 'map',
   QUEUE: 'queue',
   PRESCRIPTIONS: 'prescriptions',
   ROOMS: 'rooms',

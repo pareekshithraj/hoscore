@@ -1,40 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
-import { Bed, Plus, Edit2, Trash2, Filter, AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Bed, Plus, Trash2, X } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { EmptyState, LoadingState, PageHeader, StatCard, StatusPill } from '../components/ui';
+import { formatINR } from '../utils/clinical';
+import { cn } from '../lib/cn';
 
-const statusStyles: Record<string, string> = {
-  AVAILABLE: 'bg-emerald-100 text-emerald-800',
-  OCCUPIED: 'bg-blue-100 text-blue-800',
-  MAINTENANCE: 'bg-amber-100 text-amber-800',
-  CLEANING: 'bg-slate-100 text-slate-800',
+const BED_TONE: Record<string, string> = {
+  AVAILABLE: 'border-emerald-500/40 bg-emerald-500/[0.08] hover:bg-emerald-500/15',
+  OCCUPIED: 'border-sky-500/40 bg-sky-500/[0.08] hover:bg-sky-500/15',
+  MAINTENANCE: 'border-amber-500/40 bg-amber-500/[0.08]',
+  CLEANING: 'border-slate-400/40 bg-slate-500/[0.08]',
 };
 
 export const Rooms = () => {
-  const [activeTab, setActiveTab] = useState<'rooms' | 'beds'>('rooms');
   const [rooms, setRooms] = useState<any[]>([]);
   const [beds, setBeds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [isBedModalOpen, setIsBedModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'room' | 'bed'; name: string } | null>(null);
-
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [roomData, setRoomData] = useState({ hospitalId: 'h1', name: '', type: 'Ward', capacity: 1, basePrice: 50 });
   const [bedData, setBedData] = useState({ roomId: '', bedNumber: '', pricePerDay: 50 });
 
   const fetchData = () => {
     setLoading(true);
-    Promise.all([
-      api.get('/rooms'),
-      api.get('/beds')
-    ]).then(([roomsRes, bedsRes]) => {
-      setRooms(roomsRes);
-      setBeds(bedsRes);
-      if (roomsRes.length > 0 && !bedData.roomId) {
-        setBedData(prev => ({ ...prev, roomId: roomsRes[0].id }));
-      }
-    }).finally(() => setLoading(false));
+    Promise.all([api.get('/rooms'), api.get('/beds')])
+      .then(([roomsRes, bedsRes]) => {
+        setRooms(roomsRes || []);
+        setBeds(bedsRes || []);
+        if (roomsRes?.length && !bedData.roomId) {
+          setBedData((prev) => ({ ...prev, roomId: roomsRes[0].id }));
+        }
+      })
+      .finally(() => setLoading(false));
   };
+
+  useEffect(() => { fetchData(); }, []);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -42,12 +46,10 @@ export const Rooms = () => {
       await api.delete(`/${deleteTarget.type}s/${deleteTarget.id}`);
       setDeleteTarget(null);
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleRoomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +58,9 @@ export const Rooms = () => {
       setIsRoomModalOpen(false);
       setRoomData({ hospitalId: 'h1', name: '', type: 'Ward', capacity: 1, basePrice: 50 });
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleBedSubmit = async (e: React.FormEvent) => {
@@ -64,278 +68,255 @@ export const Rooms = () => {
     try {
       await api.post('/beds', { ...bedData, pricePerDay: Number(bedData.pricePerDay) });
       setIsBedModalOpen(false);
-      setBedData(prev => ({ ...prev, bedNumber: '', pricePerDay: 50 }));
+      setBedData((prev) => ({ ...prev, bedNumber: '', pricePerDay: 50 }));
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400 font-medium">
-        <div className="animate-pulse">Loading hospital facilities...</div>
-      </div>
-    );
-  }
+  const stats = useMemo(() => {
+    const available = beds.filter((b) => b.status === 'AVAILABLE').length;
+    const occupied = beds.filter((b) => b.status === 'OCCUPIED').length;
+    const other = beds.length - available - occupied;
+    const rate = beds.length ? Math.round((occupied / beds.length) * 100) : 0;
+    return { available, occupied, other, rate, total: beds.length };
+  }, [beds]);
+
+  const boardRooms = useMemo(() => {
+    return rooms
+      .filter((r) => typeFilter === 'ALL' || r.type === typeFilter)
+      .map((room) => {
+        const roomBeds = beds
+          .filter((b) => b.roomId === room.id || b.room?.id === room.id)
+          .filter((b) => statusFilter === 'ALL' || b.status === statusFilter);
+        // Also include beds nested on room if API returns them
+        const nested = (room.beds || []).filter((b: any) => statusFilter === 'ALL' || b.status === statusFilter);
+        const merged = roomBeds.length ? roomBeds : nested;
+        return { ...room, boardBeds: merged };
+      })
+      .filter((r) => statusFilter === 'ALL' || r.boardBeds.length > 0 || typeFilter !== 'ALL');
+  }, [rooms, beds, statusFilter, typeFilter]);
+
+  if (loading) return <LoadingState label="Loading bed board…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Room & Bed Management</h2>
-          <p className="text-slate-500">Manage hospital categories, pricing, and occupancy.</p>
-        </div>
-        <button 
-          onClick={() => activeTab === 'rooms' ? setIsRoomModalOpen(true) : setIsBedModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add New {activeTab === 'rooms' ? 'Room' : 'Bed'}
-        </button>
+    <div className="space-y-5 pb-10 animate-fade-in-up">
+      <PageHeader
+        title="Bed Board"
+        subtitle="Live ward occupancy — green free, blue occupied, amber maintenance."
+        icon={<Bed className="h-5 w-5" />}
+        meta={
+          <>
+            <StatusPill tone="success">{stats.available} free</StatusPill>
+            <StatusPill tone="info">{stats.occupied} occupied</StatusPill>
+            <StatusPill tone="warning">{stats.rate}% full</StatusPill>
+          </>
+        }
+        actions={
+          <>
+            <button onClick={() => setIsRoomModalOpen(true)} className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2.5 text-sm font-bold text-[var(--text-primary)]">
+              <span className="inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Room</span>
+            </button>
+            <button onClick={() => setIsBedModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">
+              <Plus className="h-4 w-4" /> Bed
+            </button>
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Total beds" value={stats.total} sub="Across all wards" icon={<Bed className="h-5 w-5" />} accent="#2563eb" />
+        <StatCard label="Available" value={stats.available} sub="Ready for admit" icon={<Bed className="h-5 w-5" />} accent="#10b981" />
+        <StatCard label="Occupied" value={stats.occupied} sub="Active inpatients" icon={<Bed className="h-5 w-5" />} accent="#0ea5e9" urgent={stats.rate > 85} />
+        <StatCard label="Occupancy" value={`${stats.rate}%`} sub="Hospital-wide" icon={<Bed className="h-5 w-5" />} accent="#f59e0b" />
       </div>
 
-      <Modal 
-        isOpen={isRoomModalOpen} 
-        onClose={() => setIsRoomModalOpen(false)} 
-        title="Add New Room"
-      >
+      {/* Legend + filters */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-[var(--text-muted)]">
+          {[
+            { c: 'bg-emerald-500', l: 'Available' },
+            { c: 'bg-sky-500', l: 'Occupied' },
+            { c: 'bg-amber-500', l: 'Maintenance' },
+            { c: 'bg-slate-400', l: 'Cleaning' },
+          ].map((x) => (
+            <span key={x.l} className="inline-flex items-center gap-1.5"><span className={cn('h-2.5 w-2.5 rounded-sm', x.c)} />{x.l}</span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm font-semibold">
+            <option value="ALL">All types</option>
+            {['Ward', 'ICU', 'Private', 'Semi-Private'].map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <div className="flex rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-1">
+            {['ALL', 'AVAILABLE', 'OCCUPIED', 'MAINTENANCE', 'CLEANING'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  'rounded-lg px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors',
+                  statusFilter === s ? 'bg-[var(--card-bg)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)]'
+                )}
+              >
+                {s === 'ALL' ? 'All' : s.slice(0, 4)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Board */}
+      {boardRooms.length === 0 ? (
+        <EmptyState
+          icon={<Bed className="h-6 w-6" />}
+          title="No rooms configured"
+          description="Add a room, then add beds to build your live ward board."
+          action={
+            <button onClick={() => setIsRoomModalOpen(true)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">
+              Add first room
+            </button>
+          }
+        />
+      ) : (
+        <div className="space-y-4">
+          {boardRooms.map((room) => {
+            const occ = room.boardBeds.filter((b: any) => b.status === 'OCCUPIED').length;
+            const cap = room.boardBeds.length || room.capacity || 0;
+            return (
+              <div key={room.id} className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] overflow-hidden shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] bg-[var(--inner-bg)] px-5 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-sky-400">
+                      <Bed className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-[var(--text-primary)]">{room.name}</h3>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {room.type} · {formatINR(room.basePrice)}/day base · {occ}/{cap} occupied
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusPill tone={occ / Math.max(cap, 1) > 0.85 ? 'danger' : 'info'}>
+                      {cap ? Math.round((occ / cap) * 100) : 0}% full
+                    </StatusPill>
+                    <button
+                      onClick={() => setDeleteTarget({ id: room.id, type: 'room', name: room.name })}
+                      className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-rose-500/10 hover:text-rose-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  {room.boardBeds.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-[var(--text-muted)]">No beds in this room yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+                      {room.boardBeds.map((bed: any) => (
+                        <div
+                          key={bed.id}
+                          className={cn(
+                            'group relative rounded-xl border-2 p-3 transition-all',
+                            BED_TONE[bed.status] || BED_TONE.CLEANING
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-sm font-black text-[var(--text-primary)]">{bed.bedNumber}</p>
+                            <button
+                              onClick={() => setDeleteTarget({ id: bed.id, type: 'bed', name: bed.bedNumber })}
+                              className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-[var(--text-muted)] hover:text-rose-600"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <StatusPill status={bed.status} className="mt-2 !text-[9px] !px-1.5 !py-0" />
+                          <p className="mt-2 text-[10px] font-semibold text-[var(--text-muted)]">
+                            {formatINR(bed.pricePerDay)}/day
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal isOpen={isRoomModalOpen} onClose={() => setIsRoomModalOpen(false)} title="Add room">
         <form onSubmit={handleRoomSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Room Name</label>
-            <input required value={roomData.name} onChange={e => setRoomData({...roomData, name: e.target.value})} type="text" placeholder="e.g. Ward - B" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="mb-1 block text-sm font-medium">Room name</label>
+            <input required value={roomData.name} onChange={(e) => setRoomData({ ...roomData, name: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="e.g. Ward B" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Room Type</label>
-            <select value={roomData.type} onChange={e => setRoomData({...roomData, type: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>Ward</option>
-              <option>ICU</option>
-              <option>Private</option>
-              <option>Semi-Private</option>
+            <label className="mb-1 block text-sm font-medium">Type</label>
+            <select value={roomData.type} onChange={(e) => setRoomData({ ...roomData, type: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2">
+              {['Ward', 'ICU', 'Private', 'Semi-Private'].map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Capacity (Beds)</label>
-            <input required value={roomData.capacity} onChange={e => setRoomData({...roomData, capacity: Number(e.target.value)})} type="number" placeholder="1" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Capacity</label>
+              <input required type="number" value={roomData.capacity} onChange={(e) => setRoomData({ ...roomData, capacity: Number(e.target.value) })} className="w-full rounded-lg border border-slate-200 px-3 py-2" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Base price (₹)</label>
+              <input required type="number" value={roomData.basePrice} onChange={(e) => setRoomData({ ...roomData, basePrice: Number(e.target.value) })} className="w-full rounded-lg border border-slate-200 px-3 py-2" />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Base Price ($)</label>
-            <input required value={roomData.basePrice} onChange={e => setRoomData({...roomData, basePrice: Number(e.target.value)})} type="number" placeholder="50" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="pt-4 flex gap-3">
-            <button 
-              type="button" 
-              onClick={() => setIsRoomModalOpen(false)}
-              className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              Save Room
-            </button>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setIsRoomModalOpen(false)} className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium">Cancel</button>
+            <button type="submit" className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">Save room</button>
           </div>
         </form>
       </Modal>
 
-      <Modal 
-        isOpen={isBedModalOpen} 
-        onClose={() => setIsBedModalOpen(false)} 
-        title="Add New Bed"
-      >
+      <Modal isOpen={isBedModalOpen} onClose={() => setIsBedModalOpen(false)} title="Add bed">
         <form onSubmit={handleBedSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Select Room</label>
-            <select required value={bedData.roomId} onChange={e => setBedData({...bedData, roomId: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">Select a Room</option>
-              {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            <label className="mb-1 block text-sm font-medium">Room</label>
+            <select required value={bedData.roomId} onChange={(e) => setBedData({ ...bedData, roomId: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2">
+              <option value="">Select room</option>
+              {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Bed Number</label>
-            <input required value={bedData.bedNumber} onChange={e => setBedData({...bedData, bedNumber: e.target.value})} type="text" placeholder="e.g. B-101" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="mb-1 block text-sm font-medium">Bed number</label>
+            <input required value={bedData.bedNumber} onChange={(e) => setBedData({ ...bedData, bedNumber: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="B-101" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Price per Day ($)</label>
-            <input required value={bedData.pricePerDay} onChange={e => setBedData({...bedData, pricePerDay: Number(e.target.value)})} type="number" placeholder="50" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="mb-1 block text-sm font-medium">Price / day (₹)</label>
+            <input required type="number" value={bedData.pricePerDay} onChange={(e) => setBedData({ ...bedData, pricePerDay: Number(e.target.value) })} className="w-full rounded-lg border border-slate-200 px-3 py-2" />
           </div>
-          <div className="pt-4 flex gap-3">
-            <button 
-              type="button" 
-              onClick={() => setIsBedModalOpen(false)}
-              className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              Save Bed
-            </button>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setIsBedModalOpen(false)} className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium">Cancel</button>
+            <button type="submit" className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">Save bed</button>
           </div>
         </form>
       </Modal>
 
-      <div className="flex border-b border-slate-200">
-        <button 
-          onClick={() => setActiveTab('rooms')}
-          className={`px-6 py-3 text-sm font-semibold transition-colors relative ${
-            activeTab === 'rooms' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Rooms
-          {activeTab === 'rooms' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
-        </button>
-        <button 
-          onClick={() => setActiveTab('beds')}
-          className={`px-6 py-3 text-sm font-semibold transition-colors relative ${
-            activeTab === 'beds' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Beds
-          {activeTab === 'beds' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder={`Filter ${activeTab}...`}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-          />
-        </div>
-        <select className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none">
-          <option>All Types</option>
-          {activeTab === 'rooms' ? (
-            <>
-              <option>Ward</option>
-              <option>ICU</option>
-              <option>Private</option>
-            </>
-          ) : (
-            <>
-              <option>Available</option>
-              <option>Occupied</option>
-              <option>Maintenance</option>
-            </>
-          )}
-        </select>
-      </div>
-
-      <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
-        {activeTab === 'rooms' ? (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/75 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Room Name</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Capacity</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Occupancy</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Base Price</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
-              {rooms.map((room) => (
-                <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-950/40 rounded-lg flex items-center justify-center">
-                        <Bed className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <span className="font-semibold text-slate-900 dark:text-zinc-150">{room.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-zinc-900 text-slate-800 dark:text-zinc-350 border border-slate-200/50 dark:border-zinc-800/40">
-                      {room.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">{room.capacity} Beds</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                       <span className="text-xs text-slate-500 dark:text-zinc-400">{room.beds?.filter((b:any)=>b.status==='OCCUPIED').length || 0}/{room.capacity}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-zinc-150">${room.basePrice || 0}/day</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-zinc-900 rounded-md transition-colors cursor-pointer">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setDeleteTarget({ id: room.id, type: 'room', name: room.name })} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-zinc-900 rounded-md transition-colors cursor-pointer">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/75 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Bed Number</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Room</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Current Patient</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Daily Price</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
-              {beds.map((bed) => (
-                <tr key={bed.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors group">
-                  <td className="px-6 py-4 font-semibold text-slate-900 dark:text-zinc-150">{bed.bedNumber}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">{bed.room?.name || 'N/A'}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyles[bed.status]}`}>
-                      {bed.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">
-                    <span className="text-slate-400 italic">None</span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">${bed.pricePerDay || 0}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setDeleteTarget({ id: bed.id, type: 'bed', name: bed.bedNumber })} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Delete Confirm Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 border border-red-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-rose-100 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900">Delete {deleteTarget.type === 'room' ? 'Room' : 'Bed'}</h3>
-                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+                <h3 className="font-bold">Delete {deleteTarget.type}</h3>
+                <p className="text-sm text-slate-500">This cannot be undone.</p>
               </div>
-              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-slate-400"><X className="h-5 w-5" /></button>
             </div>
-            <p className="text-sm text-slate-700 mb-5">Are you sure you want to delete <span className="font-semibold">{deleteTarget.name}</span>?</p>
+            <p className="mb-5 text-sm">Delete <strong>{deleteTarget.name}</strong>?</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Delete</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium">Cancel</button>
+              <button onClick={handleDelete} className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white">Delete</button>
             </div>
           </div>
         </div>

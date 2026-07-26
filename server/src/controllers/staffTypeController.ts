@@ -55,14 +55,102 @@ export const listHospitalStaffTypes = async (req: AuthRequest, res: Response) =>
 
   try {
     await ensureGlobalPresets();
-    const staffTypes = await prisma.staffType.findMany({
+    const rawStaffTypes = await prisma.staffType.findMany({
       where: {
         isActive: true,
         OR: [{ hospitalId: null }, { hospitalId }],
       },
+      include: {
+        memberships: {
+          where: { hospitalId, status: 'ACTIVE' },
+          select: {
+            id: true,
+            role: true,
+            department: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: [{ isPreset: 'desc' }, { name: 'asc' }],
     });
-    res.json(staffTypes);
+
+    // Also fetch all memberships in this hospital to map staff members by role if staffTypeId wasn't set
+    const allHospitalMemberships = await prisma.membership.findMany({
+      where: { hospitalId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        role: true,
+        department: true,
+        staffTypeId: true,
+        user: {
+          select: { id: true, name: true, email: true, phone: true },
+        },
+      },
+    });
+
+    // Deduplicate: if hospital has a custom override for a preset code, prioritize hospital's version
+    const hospitalCodeMap = new Map<string, typeof rawStaffTypes[0]>();
+    const globals: typeof rawStaffTypes = [];
+
+    for (const item of rawStaffTypes) {
+      if (item.hospitalId === hospitalId) {
+        hospitalCodeMap.set(item.code, item);
+      } else if (item.hospitalId === null) {
+        globals.push(item);
+      }
+    }
+
+    const mergedList: any[] = [];
+    // Process globals first (with override priority)
+    for (const g of globals) {
+      const override = hospitalCodeMap.get(g.code);
+      const activeItem = override || g;
+      hospitalCodeMap.delete(g.code); // mark consumed
+
+      // Gather staff mapped to this staffType (either directly via staffTypeId or indirectly via role match)
+      const mappedMemberships = allHospitalMemberships.filter(
+        (m) => m.staffTypeId === activeItem.id || (!m.staffTypeId && m.role === activeItem.role)
+      );
+
+      mergedList.push({
+        ...activeItem,
+        assignedStaff: mappedMemberships.map((m) => ({
+          membershipId: m.id,
+          id: m.user.id,
+          name: m.user.name,
+          email: m.user.email,
+          phone: m.user.phone,
+          department: m.department,
+          role: m.role,
+        })),
+      });
+    }
+
+    // Add remaining custom hospital staff types
+    for (const customItem of hospitalCodeMap.values()) {
+      const mappedMemberships = allHospitalMemberships.filter((m) => m.staffTypeId === customItem.id);
+      mergedList.push({
+        ...customItem,
+        assignedStaff: mappedMemberships.map((m) => ({
+          membershipId: m.id,
+          id: m.user.id,
+          name: m.user.name,
+          email: m.user.email,
+          phone: m.user.phone,
+          department: m.department,
+          role: m.role,
+        })),
+      });
+    }
+
+    res.json(mergedList);
   } catch (error) {
     console.error('Staff type list error:', error);
     res.status(500).json({ error: 'Failed to get staff types' });
@@ -100,20 +188,77 @@ export const updateHospitalStaffType = async (req: AuthRequest, res: Response) =
 
   const { name, role, description, permissions } = req.body;
   try {
-    const existing = await prisma.staffType.findFirst({ where: { id: req.params.id, hospitalId, isPreset: false } });
-    if (!existing) return res.status(404).json({ error: 'Custom staff type not found' });
-    const staffType = await prisma.staffType.update({
-      where: { id: existing.id },
-      data: {
-        name,
-        role,
-        description,
-        permissions: normalizePermissions(permissions),
-      },
+    // 1. Check if updating existing hospital-owned staff type
+    const existingHospitalType = await prisma.staffType.findFirst({
+      where: { id: req.params.id, hospitalId },
     });
-    await logAudit(req, 'UPDATE', 'StaffType', staffType.id, `Updated hospital staff type ${staffType.name}`);
-    res.json(staffType);
+
+    if (existingHospitalType) {
+      const updated = await prisma.staffType.update({
+        where: { id: existingHospitalType.id },
+        data: {
+          name,
+          role,
+          description,
+          permissions: normalizePermissions(permissions),
+        },
+      });
+      await logAudit(req, 'UPDATE', 'StaffType', updated.id, `Updated hospital staff type ${updated.name}`);
+      return res.json(updated);
+    }
+
+    // 2. Check if user is editing a global preset -> create/upsert hospital override
+    const globalPreset = await prisma.staffType.findFirst({
+      where: { id: req.params.id, hospitalId: null },
+    });
+
+    if (globalPreset) {
+      // Find if an override already exists by code
+      const existingOverride = await prisma.staffType.findFirst({
+        where: { hospitalId, code: globalPreset.code },
+      });
+
+      const overrideData = {
+        name: name || globalPreset.name,
+        role: role || globalPreset.role,
+        description: description ?? globalPreset.description,
+        permissions: normalizePermissions(permissions),
+        isPreset: true,
+        isActive: true,
+      };
+
+      let savedType;
+      if (existingOverride) {
+        savedType = await prisma.staffType.update({
+          where: { id: existingOverride.id },
+          data: overrideData,
+        });
+      } else {
+        savedType = await prisma.staffType.create({
+          data: {
+            hospitalId,
+            code: globalPreset.code,
+            ...overrideData,
+          },
+        });
+      }
+
+      // Re-link any hospital memberships matching this preset role or global preset id to the new hospital staff type
+      await prisma.membership.updateMany({
+        where: {
+          hospitalId,
+          OR: [{ staffTypeId: globalPreset.id }, { role: savedType.role, staffTypeId: null }],
+        },
+        data: { staffTypeId: savedType.id },
+      });
+
+      await logAudit(req, 'UPDATE', 'StaffType', savedType.id, `Customized preset ${savedType.name} for hospital`);
+      return res.json(savedType);
+    }
+
+    return res.status(404).json({ error: 'Staff type not found' });
   } catch (error) {
+    console.error('Update staff type error:', error);
     res.status(500).json({ error: 'Failed to update staff type' });
   }
 };
@@ -123,8 +268,8 @@ export const deactivateHospitalStaffType = async (req: AuthRequest, res: Respons
   if (!hospitalId) return res.status(403).json({ error: 'Hospital context required' });
 
   try {
-    const existing = await prisma.staffType.findFirst({ where: { id: req.params.id, hospitalId, isPreset: false } });
-    if (!existing) return res.status(404).json({ error: 'Custom staff type not found' });
+    const existing = await prisma.staffType.findFirst({ where: { id: req.params.id, hospitalId } });
+    if (!existing) return res.status(404).json({ error: 'Hospital staff type not found' });
     const staffType = await prisma.staffType.update({
       where: { id: existing.id },
       data: { isActive: false },

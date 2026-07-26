@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { api } from "../services/api";
-import { Pill, Plus } from "lucide-react";
+import { Pill, Plus, X } from "lucide-react";
+import { PageHeader } from "../components/ui/PageHeader";
+import { EmptyState } from "../components/ui/EmptyState";
+import { StatusPill } from "../components/ui/StatusPill";
 
 export const Prescriptions = () => {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
@@ -26,14 +29,15 @@ export const Prescriptions = () => {
       api.get("/patients"),
       api.get("/doctors"),
     ]);
-    setPrescriptions(rx);
-    setPatients(pts);
-    setDoctors(docs);
+    setPrescriptions(rx || []);
+    setPatients(pts || []);
+    setDoctors(docs || []);
   };
 
   const handleAdd = async () => {
     await api.post("/prescriptions", form);
     setShowForm(false);
+    setForm({ patientId: "", doctorId: "", diagnosis: "", medicines: "", instructions: "" });
     loadData();
   };
 
@@ -44,61 +48,57 @@ export const Prescriptions = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-extrabold">E-Prescriptions</h2>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white font-bold px-4 py-2 rounded-xl flex gap-2"
-        >
-          <Plus className="w-4 h-4" /> Write E-Rx
-        </button>
-      </div>
+      <PageHeader
+        title="E-Prescriptions"
+        subtitle="Issue digital prescriptions and manage medication dispensing tracking"
+        icon={<Pill className="w-5 h-5" />}
+        actions={
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex gap-2 items-center transition-all cursor-pointer shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> Write E-Rx
+          </button>
+        }
+      />
 
       <div className="grid gap-4">
         {prescriptions.map((rx) => (
           <div
             key={rx.id}
-            className="bg-white p-5 rounded-2xl border flex justify-between items-start"
+            className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 flex flex-col sm:flex-row justify-between items-start gap-4 shadow-sm"
           >
             <div className="flex gap-4">
-              <div className="p-3 bg-violet-50 text-violet-600 rounded-xl max-h-12">
+              <div className="p-3 bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-xl border border-violet-500/15 max-h-12 shrink-0">
                 <Pill className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="font-bold text-lg">
+              <div className="space-y-1">
+                <h3 className="font-bold text-lg text-[var(--text-primary)]">
                   {rx.patient?.name || "Unknown Patient"}
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Diagnosis: {rx.diagnosis} •{" "}
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Diagnosis: <span className="font-semibold text-[var(--text-primary)]">{rx.diagnosis}</span> •{" "}
                   {new Date(rx.createdAt).toLocaleDateString()}
                 </p>
-                <div className="mt-3 bg-slate-50 p-3 rounded-lg text-sm border border-slate-100">
-                  <p className="font-bold text-slate-700 mb-1">Medications:</p>
-                  <pre className="font-mono text-xs whitespace-pre-wrap">
+                <div className="mt-3 bg-[var(--inner-bg)] p-3 rounded-xl text-sm border border-[var(--card-border)]">
+                  <p className="font-bold text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Medications:</p>
+                  <pre className="font-mono text-xs whitespace-pre-wrap text-[var(--text-primary)]">
                     {rx.medicines}
                   </pre>
                 </div>
                 {rx.instructions && (
-                  <p className="text-xs text-slate-500 mt-2 bg-amber-50 p-2 rounded text-amber-800 border border-amber-100">
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-2 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 font-medium">
                     Note: {rx.instructions}
                   </p>
                 )}
               </div>
             </div>
-            <div className="flex flex-col items-end justify-between h-full space-y-4">
-              <div className="text-right">
-                <span
-                  className={`px-2 py-1 text-[10px] font-bold rounded ${rx.status === "ISSUED" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"}`}
-                >
-                  {rx.status}
-                </span>
-              </div>
+            <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-[var(--card-border)] gap-3">
+              <StatusPill status={rx.status} />
               {rx.status === "ISSUED" && (
                 <button
                   onClick={() => handleStatus(rx.id, "DISPENSED")}
-                  className="text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition px-3 py-1.5 rounded-lg"
+                  className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all px-3 py-1.5 rounded-xl shadow-sm cursor-pointer"
                 >
                   Dispense
                 </button>
@@ -106,21 +106,42 @@ export const Prescriptions = () => {
             </div>
           </div>
         ))}
+
+        {prescriptions.length === 0 && (
+          <EmptyState
+            icon={<Pill className="w-8 h-8 text-[var(--text-muted)]" />}
+            title="No prescriptions recorded"
+            description="Write a new e-prescription to assign medications to patients"
+          />
+        )}
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-[500px] p-6 space-y-4 shadow-2xl">
-            <h3 className="font-bold text-lg border-b pb-4">
-              Write Prescription
-            </h3>
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] w-full max-w-md p-6 space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <h3 className="font-black uppercase tracking-tight text-sm text-[var(--text-primary)]">
+                Write Prescription
+              </h3>
+              <button
+                onClick={() => setShowForm(false)}
+                className="p-1 hover:bg-[var(--inner-bg)] rounded-lg text-[var(--text-muted)] cursor-pointer"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <select
-                onChange={(e) =>
-                  setForm({ ...form, patientId: e.target.value })
-                }
-                className="w-full p-2 border rounded-xl bg-slate-50"
+                value={form.patientId}
+                onChange={(e) => setForm({ ...form, patientId: e.target.value })}
+                className="w-full p-2.5 border border-[var(--input-border)] rounded-xl bg-[var(--input-bg)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
               >
                 <option value="">Select Patient</option>
                 {patients.map((p) => (
@@ -130,8 +151,9 @@ export const Prescriptions = () => {
                 ))}
               </select>
               <select
+                value={form.doctorId}
                 onChange={(e) => setForm({ ...form, doctorId: e.target.value })}
-                className="w-full p-2 border rounded-xl bg-slate-50"
+                className="w-full p-2.5 border border-[var(--input-border)] rounded-xl bg-[var(--input-bg)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
               >
                 <option value="">Select Doctor</option>
                 {doctors.map((d) => (
@@ -144,32 +166,33 @@ export const Prescriptions = () => {
 
             <input
               placeholder="Diagnosis"
+              value={form.diagnosis}
               onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
-              className="w-full p-2 border rounded-xl bg-slate-50"
+              className="w-full p-2.5 border border-[var(--input-border)] rounded-xl bg-[var(--input-bg)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
             />
             <textarea
               placeholder="Medications (e.g. Paracetamol 500mg 1-0-1)"
+              value={form.medicines}
               onChange={(e) => setForm({ ...form, medicines: e.target.value })}
-              className="w-full p-2 border rounded-xl h-24 bg-slate-50"
+              className="w-full p-2.5 border border-[var(--input-border)] rounded-xl h-24 bg-[var(--input-bg)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none resize-none"
             />
             <input
               placeholder="Special Instructions"
-              onChange={(e) =>
-                setForm({ ...form, instructions: e.target.value })
-              }
-              className="w-full p-2 border rounded-xl bg-slate-50"
+              value={form.instructions}
+              onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+              className="w-full p-2.5 border border-[var(--input-border)] rounded-xl bg-[var(--input-bg)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
             />
 
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowForm(false)}
-                className="w-full p-2 font-bold text-slate-500 bg-slate-100 rounded-xl"
+                className="w-full p-2.5 font-bold text-xs text-[var(--text-secondary)] border border-[var(--card-border)] rounded-xl hover:bg-[var(--inner-bg)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAdd}
-                className="w-full p-2 bg-blue-600 text-white font-bold rounded-xl"
+                className="w-full p-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
               >
                 Generate E-Rx
               </button>
@@ -180,3 +203,4 @@ export const Prescriptions = () => {
     </div>
   );
 };
+

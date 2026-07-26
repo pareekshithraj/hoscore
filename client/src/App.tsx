@@ -37,7 +37,8 @@ const Billing = lazy(() => import('./pages/Billing').then((module) => ({ default
 const Staff = lazy(() => import('./pages/Staff').then((module) => ({ default: module.Staff })));
 const StaffTypes = lazy(() => import('./pages/StaffTypes').then((module) => ({ default: module.StaffTypes })));
 const Analytics = lazy(() => import('./pages/Analytics').then((module) => ({ default: module.Analytics })));
-const Simulator = lazy(() => import('./pages/Simulator').then((module) => ({ default: module.Simulator })));
+const MapBuilder = lazy(() => import('./pages/MapBuilder').then((module) => ({ default: module.MapBuilder })));
+const SharedLocation = lazy(() => import('./pages/SharedLocation').then((module) => ({ default: module.SharedLocation })));
 const CalendarSchedule = lazy(() => import('./pages/CalendarSchedule').then((module) => ({ default: module.CalendarSchedule })));
 const NoticeBoard = lazy(() => import('./pages/NoticeBoard').then((module) => ({ default: module.NoticeBoard })));
 const LeaveManagement = lazy(() => import('./pages/LeaveManagement').then((module) => ({ default: module.LeaveManagement })));
@@ -107,6 +108,7 @@ function App() {
           <Route path="/hospitals" element={<PublicHospitalSearch />} />
           <Route path="/hospitals/:country/:state/:city" element={<PublicHospitalSearch />} />
           <Route path="/hospitals/:id" element={<HospitalProfile />} />
+          <Route path="/shared-location/:token" element={<SharedLocation />} />
           <Route path="/book/:hospitalId" element={<PublicBookRedirect />} />
           
           {/* Government Mandated Guidelines & Public Trust Routes */}
@@ -153,7 +155,7 @@ function App() {
                     <Route path="/inventory" element={<FeatureGate feature="inventory"><Inventory /></FeatureGate>} />
                     <Route path="/billing" element={<FeatureGate feature="billing"><Billing /></FeatureGate>} />
                     <Route path="/analytics" element={<FeatureGate feature="analytics"><Analytics /></FeatureGate>} />
-                    <Route path="/simulator" element={<FeatureGate feature="simulator"><Simulator /></FeatureGate>} />
+                    <Route path="/map" element={<FeatureGate feature="map"><MapBuilder /></FeatureGate>} />
                     <Route path="/calendar" element={<FeatureGate feature="calendar"><CalendarSchedule /></FeatureGate>} />
                     <Route path="/notices" element={<FeatureGate feature="notices"><NoticeBoard /></FeatureGate>} />
                     <Route path="/leaves" element={<FeatureGate feature="leaves"><LeaveManagement /></FeatureGate>} />

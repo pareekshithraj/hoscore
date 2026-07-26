@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { Plus, Search, AlertTriangle, Package, Edit2, Trash2, RefreshCw, X } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { StatusPill } from '../components/ui/StatusPill';
+import { formatINR } from '../utils/clinical';
 
 interface InventoryItem {
   id: string;
@@ -28,7 +33,7 @@ export const Inventory = () => {
   const fetchInventory = () => {
     setLoading(true);
     api.get('/inventory')
-      .then(res => setInventory(res))
+      .then(res => setInventory(res || []))
       .finally(() => setLoading(false));
   };
 
@@ -56,11 +61,7 @@ export const Inventory = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400 font-medium">
-        <div className="animate-pulse">Loading medical supplies...</div>
-      </div>
-    );
+    return <LoadingState label="Loading medical supplies..." />;
   }
 
   const byType = typeFilter === 'All' ? inventory : inventory.filter(i => i.type === typeFilter);
@@ -72,92 +73,108 @@ export const Inventory = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Inventory</h2>
-          <p className="text-slate-500">Manage medicines, equipment, and consumables stock.</p>
-        </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-          <Plus className="w-4 h-4" />
-          Add Item
-        </button>
-      </div>
+      <PageHeader
+        title="Inventory Management"
+        subtitle="Manage medicines, equipment, and medical consumables stock level"
+        icon={<Package className="w-5 h-5" />}
+        actions={
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Add Item
+          </button>
+        }
+      />
 
       {lowStockCount > 0 && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
-          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-          <p className="text-sm text-amber-800 font-medium">
+        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-5 py-4">
+          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
             <span className="font-bold">{lowStockCount} items</span> are at or below reorder level. Consider restocking soon.
           </p>
         </div>
       )}
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
           <input
             type="text"
             placeholder="Search inventory..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold"
           />
         </div>
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+        <div className="flex gap-1 bg-[var(--inner-bg)] p-1.5 rounded-xl border border-[var(--card-border)] overflow-x-auto">
           {['All', ...itemTypes].map(f => (
-            <button key={f} onClick={() => setTypeFilter(f)} className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${typeFilter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{f}</button>
+            <button
+              key={f}
+              onClick={() => setTypeFilter(f)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                typeFilter === f
+                  ? 'bg-[var(--card-bg)] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {f}
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Item</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Stock Level</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Supplier</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Unit Price</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+            <tr className="bg-[var(--inner-bg)] border-b border-[var(--card-border)]">
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Item</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Type</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Stock Level</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Supplier</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Unit Price</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-[var(--card-border)]">
             {filtered.map((item) => {
               const isLow = item.stock <= item.reorderLevel;
               return (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                <tr key={item.id} className="hover:bg-[var(--inner-bg)] transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLow ? 'bg-amber-100' : 'bg-slate-100'}`}>
-                        <Package className={`w-4 h-4 ${isLow ? 'text-amber-600' : 'text-slate-500'}`} />
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+                        isLow ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-[var(--inner-bg)] border-[var(--card-border)] text-[var(--text-muted)]'
+                      }`}>
+                        <Package className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900">{item.itemName}</p>
-                        <p className="text-xs text-slate-400">Reorder at: {item.reorderLevel} {item.unit}</p>
+                        <p className="font-bold text-[var(--text-primary)]">{item.itemName}</p>
+                        <p className="text-xs text-[var(--text-muted)]">Reorder at: {item.reorderLevel} {item.unit || 'units'}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{item.type}</span>
+                    <StatusPill tone="neutral">{item.type}</StatusPill>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className={`font-bold text-sm ${isLow ? 'text-amber-600' : 'text-slate-900'}`}>{item.stock}</span>
-                      <span className="text-xs text-slate-400">{item.unit}</span>
+                      <span className={`font-black text-sm ${isLow ? 'text-amber-600 dark:text-amber-400' : 'text-[var(--text-primary)]'}`}>{item.stock}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{item.unit || 'units'}</span>
                       {isLow && <AlertTriangle className="w-4 h-4 text-amber-500" />}
                     </div>
-                    <div className="mt-1 h-1.5 w-32 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="mt-1.5 h-1.5 w-32 bg-[var(--inner-bg)] rounded-full overflow-hidden border border-[var(--card-border)]">
                       <div className={`h-full rounded-full ${isLow ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, (item.stock / (item.reorderLevel * 3)) * 100)}%` }}></div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{item.supplier}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">${item.price.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-[var(--text-secondary)]">{item.supplier || '—'}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-[var(--text-primary)]">{formatINR(item.price)}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md" title="Restock"><RefreshCw className="w-4 h-4" /></button>
-                      <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => setDeleteTarget(item)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"><Trash2 className="w-4 h-4" /></button>
+                      <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Restock"><RefreshCw className="w-4 h-4" /></button>
+                      <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => setDeleteTarget(item)} className="p-1.5 text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer transition-colors"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -165,63 +182,71 @@ export const Inventory = () => {
             })}
           </tbody>
         </table>
+
+        {filtered.length === 0 && (
+          <EmptyState
+            icon={<Package className="w-8 h-8 text-[var(--text-muted)]" />}
+            title="No inventory items found"
+            description="Add inventory items to track stocks and reorder thresholds"
+          />
+        )}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Inventory Item">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Item Name</label>
-            <input required value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} type="text" placeholder="e.g. Paracetamol 500mg" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Item Name</label>
+            <input required value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} type="text" placeholder="e.g. Paracetamol 500mg" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Item Type</label>
-              <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Item Type</label>
+              <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none">
                 {itemTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Initial Stock</label>
-              <input required value={formData.stock} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} type="number" placeholder="100" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Initial Stock</label>
+              <input required value={formData.stock} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} type="number" placeholder="100" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Reorder Level</label>
-              <input required value={formData.reorderLevel} onChange={e => setFormData({...formData, reorderLevel: Number(e.target.value)})} type="number" placeholder="50" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Reorder Level</label>
+              <input required value={formData.reorderLevel} onChange={e => setFormData({...formData, reorderLevel: Number(e.target.value)})} type="number" placeholder="50" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Unit Price ($)</label>
-              <input required value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Unit Price (₹)</label>
+              <input required value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
-            <input value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} type="text" placeholder="Supplier name" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Supplier</label>
+            <input value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} type="text" placeholder="Supplier name" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none" />
           </div>
           <div className="pt-4 flex gap-3">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Add Item</button>
+            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-[var(--card-border)] rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--inner-bg)] cursor-pointer">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer">Add Item</button>
           </div>
         </form>
       </Modal>
 
       {/* Delete Confirm Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 border border-red-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-rose-500/20 bg-[var(--card-bg)] p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900">Delete Item</h3>
-                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+                <h3 className="font-bold text-[var(--text-primary)]">Delete Item</h3>
+                <p className="text-xs text-[var(--text-muted)]">This action cannot be undone.</p>
               </div>
-              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => setDeleteTarget(null)} className="ml-auto text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X className="h-5 w-5" /></button>
             </div>
-            <p className="text-sm text-slate-700 mb-5">Are you sure you want to remove <span className="font-semibold">{deleteTarget.itemName}</span> from inventory?</p>
+            <p className="mb-5 text-sm text-[var(--text-primary)]">Are you sure you want to remove <strong>{deleteTarget.itemName}</strong> from inventory?</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Delete Item</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl border border-[var(--card-border)] px-4 py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--inner-bg)] cursor-pointer">Cancel</button>
+              <button onClick={handleDelete} className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 shadow-md cursor-pointer">Delete Item</button>
             </div>
           </div>
         </div>
@@ -229,3 +254,4 @@ export const Inventory = () => {
     </div>
   );
 };
+

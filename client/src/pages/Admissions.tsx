@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Plus, Search, Calendar, User, Bed, Clock, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, User, Bed, Clock, Edit2, Trash2, LogOut, Activity, MapPin } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
+import { StatusPill } from '../components/ui/StatusPill';
+import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { initials } from '../utils/clinical';
 
 export const Admissions = () => {
   const [admissions, setAdmissions] = useState<any[]>([]);
@@ -22,11 +28,11 @@ export const Admissions = () => {
       api.get('/doctors'),
       api.get('/beds')
     ]).then(([admRes, docRes, bedRes]) => {
-      setAdmissions(admRes);
-      setDoctors(docRes);
-      setBeds(bedRes);
-      if (docRes.length > 0 && !formData.doctorId) setFormData(p => ({...p, doctorId: docRes[0].id}));
-      if (bedRes.length > 0 && !formData.bedId) {
+      setAdmissions(admRes || []);
+      setDoctors(docRes || []);
+      setBeds(bedRes || []);
+      if (docRes && docRes.length > 0 && !formData.doctorId) setFormData(p => ({...p, doctorId: docRes[0].id}));
+      if (bedRes && bedRes.length > 0 && !formData.bedId) {
         const available = bedRes.find((b:any) => b.status === 'AVAILABLE');
         if (available) setFormData(p => ({...p, bedId: available.id}));
       }
@@ -52,6 +58,31 @@ export const Admissions = () => {
     }
   };
 
+  // Place an admitted patient on the hospital map at the anchor linked to their
+  // bed/room, so the patient app & family share link show a live "you are here".
+  const locateOnMap = async (a: any) => {
+    if (!a.patient?.id) return setAlertMessage('This admission has no linked patient profile to locate.');
+    try {
+      const map = await api.get('/map');
+      const floors: any[] = map?.floors || [];
+      let match: { floorId: string; r: number; c: number; label: string } | null = null;
+      for (const f of floors) {
+        const anchor = (f.anchors || []).find((an: any) =>
+          (a.bed?.id && an.bedId === a.bed.id) || (a.bed?.room?.id && an.roomId === a.bed.room.id));
+        if (anchor) { match = { floorId: f.id, r: anchor.cell.r, c: anchor.cell.c, label: `${a.patient?.name || 'Patient'} · Bed ${a.bed?.bedNumber || ''}`.trim() }; break; }
+      }
+      if (!match) return setAlertMessage('No map anchor is linked to this bed/room yet. Add one in the Map Builder.');
+      await api.post('/map/positions', {
+        subjectType: 'PATIENT', subjectId: a.patient.id, label: match.label,
+        floorId: match.floorId, cellR: match.r, cellC: match.c,
+        note: `Admitted to ${a.bed?.room?.name || 'ward'}${a.bed?.bedNumber ? `, Bed ${a.bed.bedNumber}` : ''}.`,
+      });
+      setAlertMessage('Patient located on map — visible in Simulator, patient app & family share.');
+    } catch (err: any) {
+      setAlertMessage(err?.message || 'Could not set map location.');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -64,15 +95,22 @@ export const Admissions = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400 font-medium">
-        <div className="animate-pulse">Loading admissions records...</div>
-      </div>
-    );
+    return <LoadingState label="Loading admissions records..." />;
   }
 
   const activeCount = admissions.filter(a => a.status === 'Active').length;
   const dischargedCount = admissions.filter(a => a.status === 'Discharged').length;
+  const avgDaysLabel = (() => {
+    const discharged = admissions.filter(a => a.status === 'Discharged' && a.dischargeDate && a.admissionDate);
+    if (discharged.length === 0) return '0.0';
+    const totalStayMs = discharged.reduce((sum, a) => {
+      const start = new Date(a.admissionDate).getTime();
+      const end = new Date(a.dischargeDate).getTime();
+      return sum + Math.max(0, end - start);
+    }, 0);
+    const avgDays = totalStayMs / (1000 * 60 * 60 * 24);
+    return avgDays.toFixed(1);
+  })();
 
   const filtered = admissions.filter(a => {
     const matchesFilter = filter === 'All' || a.status === filter;
@@ -86,170 +124,186 @@ export const Admissions = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Admissions</h2>
-          <p className="text-slate-500">Track and manage patient admissions and discharges.</p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Admission
-        </button>
+      <PageHeader
+        title="Inpatient Admissions"
+        subtitle="Track and manage bed occupancy, patient admissions, and hospital discharges"
+        icon={<Bed className="w-5 h-5" />}
+        actions={
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            New Admission
+          </button>
+        }
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          label="Active Inpatients"
+          value={activeCount}
+          accent="#2563eb"
+          icon={<Bed className="w-5 h-5" />}
+        />
+        <StatCard
+          label="Discharged (Month)"
+          value={dischargedCount}
+          accent="#10b981"
+          icon={<LogOut className="w-5 h-5" />}
+        />
+        <StatCard
+          label="Avg. Inpatient Stay"
+          value={`${avgDaysLabel} days`}
+          accent="#f59e0b"
+          icon={<Activity className="w-5 h-5" />}
+        />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Active Admissions</p>
-          <p className="text-3xl font-bold text-blue-600">{activeCount}</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Discharged This Month</p>
-          <p className="text-3xl font-bold text-emerald-600">{dischargedCount}</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Avg. Stay Duration</p>
-          <p className="text-3xl font-bold text-amber-600">
-            {(() => {
-              const discharged = admissions.filter(a => a.status === 'Discharged' && a.dischargeDate && a.admissionDate);
-              if (discharged.length === 0) return '0.0';
-              const totalStayMs = discharged.reduce((sum, a) => {
-                const start = new Date(a.admissionDate).getTime();
-                const end = new Date(a.dischargeDate).getTime();
-                return sum + Math.max(0, end - start);
-              }, 0);
-              const avgDays = totalStayMs / (1000 * 60 * 60 * 24);
-              return avgDays.toFixed(1);
-            })()}{' '}
-            <span className="text-sm font-medium text-slate-500">days</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
           <input 
             type="text" 
             placeholder="Search admissions..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+            className="w-full pl-10 pr-4 py-2 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold" 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+        <div className="flex gap-1 bg-[var(--inner-bg)] p-1.5 rounded-xl border border-[var(--card-border)]">
           {(['All', 'Active', 'Discharged'] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{f}</button>
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                filter === f
+                  ? 'bg-[var(--card-bg)] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {f}
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Admission ID</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Doctor / Bed</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reason</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Dates</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+            <tr className="bg-[var(--inner-bg)] border-b border-[var(--card-border)]">
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Admission ID</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Patient</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Bed / Room</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Reason</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Dates</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-[var(--card-border)]">
             {filtered.map((a) => (
-              <tr key={a.id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-6 py-4 font-mono text-sm text-blue-600 font-semibold">{a.id}</td>
+              <tr key={a.id} className="hover:bg-[var(--inner-bg)] transition-colors group">
+                <td className="px-6 py-4 font-mono text-xs text-blue-600 dark:text-sky-400 font-bold">ADM-{String(a.id).slice(0, 6).toUpperCase()}</td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center font-bold text-xs text-slate-500">
-                      {a.patient?.name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[var(--inner-bg)] rounded-full flex items-center justify-center font-bold text-xs text-[var(--text-primary)] border border-[var(--card-border)]">
+                      {initials(a.patient?.name || a.patientName)}
                     </div>
-                    <span className="font-medium text-slate-900">{a.patient?.name || 'Unknown'}</span>
+                    <span className="font-bold text-[var(--text-primary)]">{a.patient?.name || a.patientName || 'Unknown'}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm">
-                  <p className="font-medium text-slate-800 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> N/A (Assigned via Appt)</p>
-                  <p className="text-slate-500 flex items-center gap-1.5 mt-0.5"><Bed className="w-3.5 h-3.5" /> {a.bed?.bedNumber} · {a.bed?.room?.name}</p>
+                <td className="px-6 py-4 text-xs font-semibold text-[var(--text-primary)]">
+                  <p className="flex items-center gap-1.5 text-[var(--text-primary)] font-bold"><Bed className="w-3.5 h-3.5 text-[var(--text-muted)]" /> Bed {a.bed?.bedNumber || '—'}</p>
+                  <p className="text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">{a.bed?.room?.name || 'Inpatient Room'}</p>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600 max-w-[150px] truncate">{a.reason || 'Not specified'}</td>
-                <td className="px-6 py-4 text-sm">
-                  <p className="flex items-center gap-1.5 text-slate-600"><Calendar className="w-3.5 h-3.5" /> {new Date(a.admissionDate).toLocaleDateString()}</p>
+                <td className="px-6 py-4 text-xs text-[var(--text-secondary)] font-medium max-w-[160px] truncate">{a.reason || 'Not specified'}</td>
+                <td className="px-6 py-4 text-xs font-semibold">
+                  <p className="flex items-center gap-1.5 text-[var(--text-primary)]"><Calendar className="w-3.5 h-3.5 text-[var(--text-muted)]" /> {new Date(a.admissionDate).toLocaleDateString()}</p>
                   {a.dischargeDate ? (
-                    <p className="flex items-center gap-1.5 text-emerald-600 mt-0.5"><Clock className="w-3.5 h-3.5" /> {new Date(a.dischargeDate).toLocaleDateString()}</p>
-                  ) : <p className="text-xs text-slate-400 mt-0.5">Ongoing</p>}
+                    <p className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 mt-0.5 font-bold"><Clock className="w-3.5 h-3.5" /> {new Date(a.dischargeDate).toLocaleDateString()}</p>
+                  ) : <p className="text-[11px] text-sky-600 dark:text-sky-400 font-bold mt-0.5">Ongoing Stay</p>}
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${a.status === 'Active' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}`}>{a.status}</span>
+                  <StatusPill status={a.status} />
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     {a.status === 'Active' && (
-                      <button onClick={() => handleDischarge(a.id)} className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md hover:bg-emerald-100">Discharge</button>
+                      <>
+                        <button onClick={() => locateOnMap(a)} title="Locate on hospital map" className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-sky-700 bg-sky-50 dark:bg-sky-500/10 dark:text-sky-300 rounded-lg hover:bg-sky-100 cursor-pointer transition-all"><MapPin className="w-3.5 h-3.5" />Locate</button>
+                        <button onClick={() => handleDischarge(a.id)} className="px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300 rounded-lg hover:bg-emerald-100 cursor-pointer transition-all">Discharge</button>
+                      </>
                     )}
-                    <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"><Edit2 className="w-4 h-4" /></button>
-                    <button className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"><Trash2 className="w-4 h-4" /></button>
+                    <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors"><Edit2 className="w-4 h-4" /></button>
+                    <button className="p-1.5 text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {filtered.length === 0 && (
+          <EmptyState
+            icon={<Bed className="w-8 h-8 text-[var(--text-muted)]" />}
+            title="No admissions found"
+            description="Register a new inpatient admission to assign beds and track stay duration"
+          />
+        )}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Admission">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Patient Name</label>
-              <input required value={formData.patientName} onChange={e => setFormData({...formData, patientName: e.target.value})} type="text" placeholder="Full name" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Patient Name</label>
+              <input required value={formData.patientName} onChange={e => setFormData({...formData, patientName: e.target.value})} type="text" placeholder="Full name" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Assign Doctor</label>
-              <select value={formData.doctorId} onChange={e => setFormData({...formData, doctorId: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Assign Doctor</label>
+              <select value={formData.doctorId} onChange={e => setFormData({...formData, doctorId: e.target.value})} className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none">
                 {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Assign Bed</label>
-              <select required value={formData.bedId} onChange={e => setFormData({...formData, bedId: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Assign Bed</label>
+              <select required value={formData.bedId} onChange={e => setFormData({...formData, bedId: e.target.value})} className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none">
                 <option value="">Select Bed</option>
                 {beds.filter(b => b.status === 'AVAILABLE').map(b => <option key={b.id} value={b.id}>{b.bedNumber} - {b.room?.name || 'Room'}</option>)}
               </select>
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Admission</label>
-              <textarea value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} rows={3} placeholder="Describe the reason or diagnosis..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Reason for Admission</label>
+              <textarea value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} rows={3} placeholder="Describe the reason or diagnosis..." className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none resize-none" />
             </div>
           </div>
           <div className="pt-4 flex gap-3">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Admit Patient</button>
+            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-[var(--card-border)] rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--inner-bg)] cursor-pointer">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer">Admit Patient</button>
           </div>
         </form>
       </Modal>
 
       <Modal isOpen={!!dischargeId} onClose={() => setDischargeId(null)} title="Discharge Patient">
         <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Are you sure you want to discharge this patient? This will update the bed status to cleaning.</p>
+          <p className="text-sm text-[var(--text-primary)]">Are you sure you want to discharge this patient? This will update the bed status to cleaning.</p>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setDischargeId(null)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button onClick={confirmDischarge} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold">Discharge</button>
+            <button onClick={() => setDischargeId(null)} className="px-4 py-2 border border-[var(--card-border)] rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--inner-bg)] cursor-pointer">Cancel</button>
+            <button onClick={confirmDischarge} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer">Discharge</button>
           </div>
         </div>
       </Modal>
 
       <Modal isOpen={!!alertMessage} onClose={() => setAlertMessage(null)} title="Alert">
         <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-400">{alertMessage}</p>
+          <p className="text-sm text-[var(--text-primary)]">{alertMessage}</p>
           <div className="flex justify-end">
-            <button onClick={() => setAlertMessage(null)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold">OK</button>
+            <button onClick={() => setAlertMessage(null)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer">OK</button>
           </div>
         </div>
       </Modal>
     </div>
   );
 };
+

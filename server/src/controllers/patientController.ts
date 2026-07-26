@@ -160,17 +160,54 @@ export const getPatientById = async (req: Request, res: Response) => {
     const patient = await prisma.patient.findUnique({
       where: { id: patientId },
       include: {
-        admissions: { include: { bed: { include: { room: true } }, billing: true } },
-        prescriptions: { where: { hospitalId }, include: { doctor: true } },
-        appointments: { where: { hospitalId }, include: { doctor: true } },
+        admissions: {
+          include: { bed: { include: { room: true } }, billing: true },
+          orderBy: { admissionDate: 'desc' },
+        },
+        prescriptions: {
+          where: { hospitalId },
+          include: { doctor: true },
+          orderBy: { date: 'desc' },
+        },
+        appointments: {
+          where: { hospitalId },
+          include: { doctor: true },
+          orderBy: { date: 'desc' },
+        },
       },
     });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    // Enrich chart with vitals + labs (not Prisma relations — keyed by patientId)
+    const [vitals, labOrders] = await Promise.all([
+      prisma.vitalRecord.findMany({
+        where: {
+          hospitalId,
+          OR: [
+            { patientId: patient.id },
+            ...(patient.name ? [{ patientName: { equals: patient.name, mode: 'insensitive' as const } }] : []),
+          ],
+        },
+        orderBy: { recordedAt: 'desc' },
+        take: 40,
+      }),
+      prisma.labOrder.findMany({
+        where: {
+          hospitalId,
+          OR: [
+            { patientId: patient.id },
+            ...(patient.name ? [{ patientName: { equals: patient.name, mode: 'insensitive' as const } }] : []),
+          ],
+        },
+        orderBy: { orderedAt: 'desc' },
+        take: 40,
+      }),
+    ]);
     
     // Log the read event
     await logAudit(req, 'READ', 'Patient', patient.id, `Accessed patient chart/medical profile for ${patient.name}`);
     
-    res.json(patient);
+    res.json({ ...patient, vitals, labOrders });
   } catch { res.status(500).json({ error: 'Failed to fetch patient' }); }
 };
 

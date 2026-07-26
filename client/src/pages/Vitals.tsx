@@ -1,160 +1,182 @@
-import { useState, useEffect } from "react";
-import { api } from "../services/api";
-import { Activity, Plus, Heart, X } from "lucide-react";
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../services/api';
+import { Heart, HeartPulse, Plus, X } from 'lucide-react';
+import { EmptyState, LoadingState, PageHeader, StatusPill, StatCard } from '../components/ui';
+import { formatShortDate, vitalsFlags } from '../utils/clinical';
+import { cn } from '../lib/cn';
 
 export const Vitals = () => {
   const [vitals, setVitals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
-    patientName: "",
-    bloodPressure: "",
-    heartRate: "",
-    temperature: "",
-    oxygenSaturation: "",
+    patientName: '',
+    bloodPressure: '',
+    heartRate: '',
+    temperature: '',
+    oxygenSaturation: '',
   });
 
-  useEffect(() => {
-    api.get("/vitals").then(setVitals);
-  }, []);
+  const load = () => {
+    setLoading(true);
+    api.get('/vitals')
+      .then((res) => setVitals(Array.isArray(res) ? res : []))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
 
   const handleAdd = async () => {
-    const data = {
+    if (!form.patientName.trim()) return;
+    await api.post('/vitals', {
       ...form,
       heartRate: Number(form.heartRate),
       temperature: Number(form.temperature),
       oxygenSaturation: Number(form.oxygenSaturation),
-    };
-    await api.post("/vitals", data);
-    setShowForm(false);
-    setForm({
-      patientName: "",
-      bloodPressure: "",
-      heartRate: "",
-      temperature: "",
-      oxygenSaturation: "",
     });
-    api.get("/vitals").then(setVitals);
+    setShowForm(false);
+    setForm({ patientName: '', bloodPressure: '', heartRate: '', temperature: '', oxygenSaturation: '' });
+    load();
   };
 
+  const alerts = useMemo(
+    () => vitals.filter((v) => vitalsFlags(v).includes('critical') || vitalsFlags(v).includes('high')).length,
+    [vitals]
+  );
+
+  if (loading) return <LoadingState label="Loading vitals rounds…" />;
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-zinc-100">Vitals Tracking</h2>
-          <p className="text-xs text-slate-500 dark:text-zinc-450 mt-1">Realtime monitoring of patient telemetry and charts</p>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex gap-2 items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-sm cursor-pointer transition-all active:scale-95 shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Record Vitals
-        </button>
+    <div className="space-y-5 pb-10 animate-fade-in-up">
+      <PageHeader
+        title="Vitals Rounds"
+        subtitle="Capture BP, HR, temp, SpO₂ — flags fire when values leave safe range."
+        icon={<HeartPulse className="h-5 w-5" />}
+        meta={
+          <>
+            <StatusPill tone="info">{vitals.length} logged</StatusPill>
+            {alerts > 0 && <StatusPill tone="danger" pulse>{alerts} need review</StatusPill>}
+          </>
+        }
+        actions={
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> Record vitals
+          </button>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Total readings" value={vitals.length} icon={<Heart className="h-5 w-5" />} accent="#e11d48" />
+        <StatCard label="Flagged" value={alerts} sub="Out of range" icon={<HeartPulse className="h-5 w-5" />} accent="#f59e0b" urgent={alerts > 0} />
+        <StatCard
+          label="Avg HR"
+          value={
+            vitals.length
+              ? Math.round(vitals.reduce((s, v) => s + (v.heartRate || 0), 0) / vitals.filter((v) => v.heartRate).length || 1)
+              : '—'
+          }
+          sub="bpm"
+          icon={<Heart className="h-5 w-5" />}
+          accent="#f43f5e"
+        />
+        <StatCard
+          label="Low SpO₂"
+          value={vitals.filter((v) => v.oxygenSaturation != null && v.oxygenSaturation < 95).length}
+          sub="< 95%"
+          icon={<HeartPulse className="h-5 w-5" />}
+          accent="#0ea5e9"
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {vitals.map((v) => (
-          <div
-            key={v.id}
-            className="bg-white dark:bg-zinc-950 p-5 rounded-2xl border border-slate-200/60 dark:border-zinc-800/80 shadow-sm relative overflow-hidden group transition-all duration-300 hover:shadow-md"
-          >
-            <Heart className="absolute -bottom-4 -right-4 w-24 h-24 text-rose-500/[0.03] dark:text-rose-500/[0.02] group-hover:scale-105 transition-transform" />
-            <div className="relative z-10">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-zinc-150 mb-4">{v.patientName}</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-slate-400 dark:text-zinc-500 text-xs font-semibold uppercase tracking-wider">BP</p>
-                  <p className="font-bold text-slate-800 dark:text-zinc-200">{v.bloodPressure || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 dark:text-zinc-500 text-xs font-semibold uppercase tracking-wider">Heart Rate</p>
-                  <p className="font-bold text-rose-500 dark:text-rose-400">
-                    {v.heartRate ? `${v.heartRate} bpm` : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-400 dark:text-zinc-500 text-xs font-semibold uppercase tracking-wider">Temp</p>
-                  <p className="font-bold text-slate-800 dark:text-zinc-200">
-                    {v.temperature ? `${v.temperature}°F` : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-400 dark:text-zinc-500 text-xs font-semibold uppercase tracking-wider">SpO2</p>
-                  <p className="font-bold text-cyan-600 dark:text-sky-400">
-                    {v.oxygenSaturation ? `${v.oxygenSaturation}%` : "-"}
-                  </p>
+      {vitals.length === 0 ? (
+        <EmptyState
+          icon={<HeartPulse className="h-6 w-6" />}
+          title="No vitals recorded yet"
+          description="Start a round — record BP, heart rate, temperature, and SpO₂ for any patient."
+          action={
+            <button onClick={() => setShowForm(true)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">
+              Record first reading
+            </button>
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {vitals.map((v) => {
+            const flags = vitalsFlags(v);
+            const critical = flags.includes('critical');
+            return (
+              <div
+                key={v.id}
+                className={cn(
+                  'relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-all hover:-translate-y-0.5',
+                  critical
+                    ? 'border-rose-500/35 bg-rose-500/[0.06]'
+                    : 'border-[var(--card-border)] bg-[var(--card-bg)]'
+                )}
+              >
+                <Heart className="absolute -bottom-3 -right-3 h-20 w-20 text-rose-500/[0.05]" />
+                <div className="relative z-10">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-black text-[var(--text-primary)]">{v.patientName}</h3>
+                      <p className="text-[11px] font-mono text-[var(--text-muted)]">{formatShortDate(v.recordedAt)} · {v.recordedAt ? new Date(v.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                    </div>
+                    {flags.length > 0 && (
+                      <StatusPill tone={critical ? 'danger' : 'warning'} pulse={critical}>
+                        {flags[0]}
+                      </StatusPill>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { l: 'BP', v: v.bloodPressure || '—', c: '' },
+                      { l: 'Heart rate', v: v.heartRate ? `${v.heartRate} bpm` : '—', c: 'text-rose-600 dark:text-rose-400' },
+                      { l: 'Temp', v: v.temperature ? `${v.temperature}°F` : '—', c: '' },
+                      { l: 'SpO₂', v: v.oxygenSaturation != null ? `${v.oxygenSaturation}%` : '—', c: 'text-sky-600 dark:text-sky-400' },
+                    ].map((cell) => (
+                      <div key={cell.l} className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{cell.l}</p>
+                        <p className={cn('mt-0.5 text-sm font-black tabular-nums text-[var(--text-primary)]', cell.c)}>{cell.v}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 dark:text-zinc-550 mt-4 border-t border-slate-100 dark:border-zinc-800/60 pt-2 font-mono">
-                {new Date(v.recordedAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        ))}
-
-        {vitals.length === 0 && (
-          <div className="md:col-span-2 p-12 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl bg-slate-50/50 dark:bg-zinc-950/20">
-            <Activity className="w-8 h-8 text-slate-350 dark:text-zinc-700 mx-auto mb-2 animate-pulse" />
-            <p className="text-sm font-bold text-slate-500 dark:text-zinc-450">No patient vitals recorded today</p>
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {showForm && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 p-6 rounded-2xl w-full max-w-md space-y-4 text-slate-800 dark:text-zinc-200 shadow-2xl animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center">
-              <h3 className="font-black text-slate-900 dark:text-zinc-100 uppercase tracking-tight text-sm">Record Patient Vitals</h3>
-              <button onClick={() => setShowForm(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg text-slate-400 dark:text-zinc-500 cursor-pointer"><X className="w-4.5 h-4.5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowForm(false)}>
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black uppercase tracking-tight text-[var(--text-primary)]">Record patient vitals</h3>
+              <button onClick={() => setShowForm(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--inner-bg)]"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-3">
-              <input
-                placeholder="Patient Name"
-                onChange={(e) =>
-                  setForm({ ...form, patientName: e.target.value })
-                }
-                className="w-full border border-slate-200 dark:border-zinc-800 p-2.5 rounded-lg text-xs font-bold text-slate-850 dark:text-zinc-100 bg-slate-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              <input
-                placeholder="BP (e.g. 120/80)"
-                onChange={(e) =>
-                  setForm({ ...form, bloodPressure: e.target.value })
-                }
-                className="w-full border border-slate-200 dark:border-zinc-800 p-2.5 rounded-lg text-xs font-bold text-slate-850 dark:text-zinc-100 bg-slate-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              <input
-                placeholder="Heart Rate (bpm)"
-                type="number"
-                onChange={(e) => setForm({ ...form, heartRate: e.target.value })}
-                className="w-full border border-slate-200 dark:border-zinc-800 p-2.5 rounded-lg text-xs font-bold text-slate-850 dark:text-zinc-100 bg-slate-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              <input
-                placeholder="Temp (°F)"
-                type="number"
-                onChange={(e) =>
-                  setForm({ ...form, temperature: e.target.value })
-                }
-                className="w-full border border-slate-200 dark:border-zinc-800 p-2.5 rounded-lg text-xs font-bold text-slate-850 dark:text-zinc-100 bg-slate-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              <input
-                placeholder="SpO2 (%)"
-                type="number"
-                onChange={(e) =>
-                  setForm({ ...form, oxygenSaturation: e.target.value })
-                }
-                className="w-full border border-slate-200 dark:border-zinc-800 p-2.5 rounded-lg text-xs font-bold text-slate-850 dark:text-zinc-100 bg-slate-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
+              {[
+                { ph: 'Patient name', k: 'patientName', type: 'text' },
+                { ph: 'BP (e.g. 120/80)', k: 'bloodPressure', type: 'text' },
+                { ph: 'Heart rate (bpm)', k: 'heartRate', type: 'number' },
+                { ph: 'Temp (°F)', k: 'temperature', type: 'number' },
+                { ph: 'SpO₂ (%)', k: 'oxygenSaturation', type: 'number' },
+              ].map((f) => (
+                <input
+                  key={f.k}
+                  type={f.type}
+                  placeholder={f.ph}
+                  value={(form as any)[f.k]}
+                  onChange={(e) => setForm({ ...form, [f.k]: e.target.value })}
+                  className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2.5 text-sm font-semibold text-[var(--text-primary)]"
+                />
+              ))}
             </div>
-            <button
-              onClick={handleAdd}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer mt-4"
-            >
-              Save Vitals
+            <button onClick={handleAdd} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700">
+              Save vitals
             </button>
           </div>
         </div>

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Search, Filter, MoreVertical, Edit2, Trash2, Calendar, Phone, Activity, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Calendar, Phone, Activity, Eye, Users } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { LoadingState } from '../components/ui/LoadingState';
+import { StatusPill } from '../components/ui/StatusPill';
+import { calcAge, patientIdLabel, initials } from '../utils/clinical';
 
 export const Patients = () => {
   const [patients, setPatients] = useState<any[]>([]);
@@ -11,7 +15,6 @@ export const Patients = () => {
   const [formData, setFormData] = useState({
     name: '', contact: '', email: '', dateOfBirth: '', gender: 'Male', bloodGroup: 'O+', isHoscoreUser: true, manualCareNote: ''
   });
-  const [today] = useState(() => new Date());
 
   // Manual/Walk-in Appointment Booking States
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
@@ -123,20 +126,8 @@ export const Patients = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400 font-medium">
-        <div className="animate-pulse">Loading patient registry...</div>
-      </div>
-    );
+    return <LoadingState label="Loading patient registry..." />;
   }
-
-  const calculateAge = (dobString: string | null) => {
-    if (!dobString) return 'N/A';
-    const dob = new Date(dobString);
-    const ageDifMs = today.getTime() - dob.getTime();
-    const ageDate = new Date(ageDifMs);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
-  };
 
   const getLastVisit = (admissions: any[]) => {
     if (!admissions || admissions.length === 0) return 'No visits';
@@ -146,53 +137,57 @@ export const Patients = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Patient Management</h2>
-          <p className="text-slate-500">View and manage patient clinical records and history.</p>
-        </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-          <Plus className="w-4 h-4" />
-          Register New Patient
-        </button>
-      </div>
+      <PageHeader
+        title="Patient Management"
+        subtitle="View and manage patient clinical records and history"
+        icon={<Users className="w-5 h-5" />}
+        actions={
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Register New Patient
+          </button>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-4 bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-200/60 dark:border-zinc-800/80 shadow-sm">
+      <div className="flex flex-wrap items-center gap-4 bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--card-border)] shadow-sm">
         <div className="relative flex-1 min-w-[240px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
           <input 
             type="text" 
             placeholder="Search by name, ID or phone..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800/80 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-650 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3 py-2 border border-slate-200/60 dark:border-zinc-800/80 rounded-lg text-sm text-slate-600 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors cursor-pointer">
+          <button className="flex items-center gap-2 px-3.5 py-2 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer">
             <Filter className="w-4 h-4" />
             Filter
           </button>
-          <button className="flex items-center gap-2 px-3 py-2 border border-slate-200/60 dark:border-zinc-800/80 rounded-lg text-sm text-slate-600 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors cursor-pointer">
+          <button className="flex items-center gap-2 px-3.5 py-2 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer">
             <Calendar className="w-4 h-4" />
             Date Range
           </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50/75 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Patient Name</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Info</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Blood Group</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Last Visit</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
+            <tr className="bg-[var(--inner-bg)] border-b border-[var(--card-border)]">
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Patient Name</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Info</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Blood Group</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Last Visit</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
+              <th className="px-6 py-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
+          <tbody className="divide-y divide-[var(--card-border)]">
             {(() => {
               const filteredPatients = patients.filter(patient => 
                 patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -201,64 +196,57 @@ export const Patients = () => {
                 (patient.sixDigitId || patient.id).toLowerCase().includes(searchQuery.toLowerCase())
               );
               return filteredPatients.map((patient) => (
-              <tr key={patient.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors group">
+              <tr key={patient.id} className="hover:bg-[var(--inner-bg)] transition-colors group">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-100 dark:bg-zinc-900 rounded-full flex items-center justify-center font-bold text-slate-500 dark:text-zinc-400 border border-slate-200/30 dark:border-zinc-800/40">
-                      {patient.name.split(' ').map((n: string) => n[0]).join('')}
+                    <div className="w-10 h-10 bg-[var(--inner-bg)] rounded-full flex items-center justify-center font-bold text-[var(--text-primary)] border border-[var(--card-border)]">
+                      {initials(patient.name)}
                     </div>
                     <div>
-                      <span className="font-bold text-slate-900 dark:text-zinc-150 block">{patient.name}</span>
-                      <span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">
-                        {patient.isHoscoreUser === false ? 'Manual walk-in' : `HSC-${patient.sixDigitId || patient.id.padStart(5, '0')}`}
+                      <span className="font-bold text-[var(--text-primary)] block">{patient.name}</span>
+                      <span className="text-xs text-[var(--text-muted)] font-medium">
+                        {patientIdLabel(patient)}
                       </span>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-xs font-semibold text-slate-600 dark:text-zinc-350 space-y-1">
+                  <div className="text-xs font-semibold text-[var(--text-primary)] space-y-1">
                     <div className="flex items-center gap-1.5">
-                      <Activity className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-550" />
-                      {calculateAge(patient.dateOfBirth)}y, {patient.gender || 'Unknown'}
+                      <Activity className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                      {calcAge(patient.dateOfBirth)}y, {patient.gender || 'Unknown'}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-550" />
+                      <Phone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                       {patient.contact || 'N/A'}
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="px-2 py-0.5 bg-red-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded text-xs font-bold font-mono">
+                  <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded text-xs font-bold font-mono">
                     {patient.bloodGroup || 'N/A'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-xs font-semibold text-slate-650 dark:text-zinc-400">{getLastVisit(patient.admissions)}</td>
+                <td className="px-6 py-4 text-xs font-semibold text-[var(--text-muted)]">{getLastVisit(patient.admissions)}</td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                    patient.isHoscoreUser === false ? 'bg-slate-900 dark:bg-zinc-900 text-white dark:text-zinc-300 border-slate-800 dark:border-zinc-800' :
-                    patient.status === 'In-Patient' ? 'bg-blue-100 dark:bg-blue-950/20 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/25' : 
-                    patient.status === 'Out-Patient' ? 'bg-amber-100 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 border-amber-200/50 dark:border-amber-500/25' : 
-                    'bg-slate-100 dark:bg-zinc-900 text-slate-800 dark:text-zinc-305 border-slate-200/40 dark:border-zinc-800/50'
-                  }`}>
-                    {patient.isHoscoreUser === false ? 'Manual Care' : patient.status}
-                  </span>
+                  <StatusPill status={patient.isHoscoreUser === false ? 'Manual Care' : patient.status} />
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => openBookingModal(patient)} 
-                      className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-blue-50 dark:hover:bg-zinc-900 rounded-md cursor-pointer transition-colors" 
+                      className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-md cursor-pointer transition-colors" 
                       title="Book Appointment"
                     >
                       <Calendar className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-blue-50 dark:hover:bg-zinc-900 rounded-md cursor-pointer transition-colors">
+                    <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-md cursor-pointer transition-colors">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(patient.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md">
+                    <button onClick={() => handleDelete(patient.id)} className="p-1.5 text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md cursor-pointer transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
-                    <Link to={`/dashboard/patients/${patient.id}`} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md" title="View Timeline">
+                    <Link to={`/dashboard/patients/${patient.id}`} className="p-1.5 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-md transition-colors" title="View Timeline">
                       <Eye className="w-4 h-4" />
                     </Link>
                   </div>

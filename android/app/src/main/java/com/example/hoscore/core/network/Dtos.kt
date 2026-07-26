@@ -339,3 +339,71 @@ data class Subscription(
     val status: String? = null,
     val expiresAt: String? = null,
 )
+
+// ---------- Hospital map / wayfinding ----------
+// Mirrors client/src/utils/mapModel.ts so web and app render the same doc.
+
+@Serializable
+data class MapCell(val r: Int = 0, val c: Int = 0)
+
+@Serializable
+data class MapAnchor(
+    val id: String = "",
+    val kind: String = "poi", // room | bed | entrance | poi
+    val cell: MapCell = MapCell(),
+    val label: String = "",
+    val roomId: String? = null,
+    val bedId: String? = null,
+    val zone: String? = null,
+)
+
+@Serializable
+data class MapFloor(
+    val id: String = "",
+    val label: String = "",
+    val index: Int = 0,
+    val cells: List<List<String>> = emptyList(), // AreaType per cell (rows x cols)
+    val anchors: List<MapAnchor> = emptyList(),
+)
+
+@Serializable
+data class HospitalMap(
+    val id: String? = null,
+    val hospitalId: String? = null,
+    val name: String = "Main Building",
+    val cols: Int = 20,
+    val rows: Int = 14,
+    val floors: List<MapFloor> = emptyList(),
+    val isPublished: Boolean = false,
+    val version: Int? = null,
+)
+
+@Serializable
+data class LivePosition(
+    val id: String = "",
+    val subjectType: String = "PATIENT",
+    val subjectId: String = "",
+    val label: String? = null,
+    val floorId: String = "",
+    val cellR: Int = 0,
+    val cellC: Int = 0,
+    val note: String? = null,
+    val status: String = "ACTIVE",
+)
+
+// Response of GET /patient/location
+@Serializable
+data class MyLocation(
+    val admitted: Boolean = false,
+    val hospital: Hospital? = null,
+    val room: Room? = null,
+    val bed: Bed? = null,
+    val map: HospitalMap? = null,
+    val position: LivePosition? = null,
+)
+
+@Serializable
+data class ShareLocationRequest(val expiresHours: Int = 24, val patientId: String? = null)
+
+@Serializable
+data class ShareLocationResponse(val shareToken: String? = null, val expiresAt: String? = null)

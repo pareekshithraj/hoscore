@@ -145,6 +145,8 @@ model Hospital {
   staffTypes    StaffType[]
   auditLogs     AuditLog[]
   billings      Billing[]
+  map           HospitalMap?
+  livePositions LivePosition[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -655,4 +657,64 @@ model Vaccination {
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ============== SPATIAL / WAYFINDING MODELS ==============
+
+// A single persisted floor-map per hospital. The shared source of truth read by
+// the web map builder, the live simulator, the patient wayfinder, and the app.
+// `floors` is a JSON document describing every floor's grid, zones, and anchors:
+//
+// {
+//   "version": 2,
+//   "cols": 20, "rows": 14,          // grid dimensions (shared across floors)
+//   "floors": [
+//     {
+//       "id": "gf", "label": "Ground Floor", "index": 0,
+//       "cells": [["corridor","ward-a", ...], ...],   // AreaType per cell (rows x cols)
+//       "anchors": [                                    // labelled points of interest
+//         { "id": "...", "kind": "room",     "cell": {"r":3,"c":4}, "roomId": "<Room.id>", "label": "Room 101" },
+//         { "id": "...", "kind": "bed",      "cell": {"r":3,"c":5}, "bedId": "<Bed.id>",   "label": "Bed 12" },
+//         { "id": "...", "kind": "entrance", "cell": {"r":13,"c":9},                         "label": "Main Entrance" },
+//         { "id": "...", "kind": "poi",      "cell": {"r":6,"c":9}, "zone": "pharmacy",      "label": "Pharmacy" }
+//       ]
+//     }
+//   ]
+// }
+model HospitalMap {
+  id          String   @id @default(uuid())
+  hospitalId  String   @unique
+  hospital    Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  name        String   @default("Main Building")
+  cols        Int      @default(20)
+  rows        Int      @default(14)
+  floors      Json     @default("[]")
+  isPublished Boolean  @default(false) // when true, patients can see it for wayfinding
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Ephemeral live location of a patient (or asset/staff) inside a hospital map,
+// used for patient location-share to family and the live simulator overlay.
+model LivePosition {
+  id           String    @id @default(uuid())
+  hospitalId   String
+  hospital     Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  subjectType  String    @default("PATIENT") // PATIENT, ASSET, STAFF
+  subjectId    String    // Patient.id / asset id / staff id
+  label        String?   // display name shown on the map
+  floorId      String    // matches a floor id inside HospitalMap.floors
+  cellR        Int
+  cellC        Int
+  status       String    @default("ACTIVE") // ACTIVE, ENDED
+  shareToken   String?   @unique // opaque token for a family-facing share link
+  shareExpires DateTime?
+  note         String?   // e.g. "In Ward A, Bed 12 — visiting hours 4–6pm"
+  updatedBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([hospitalId, subjectType, status])
+  @@index([hospitalId, subjectId])
 }

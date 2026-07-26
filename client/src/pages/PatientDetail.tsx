@@ -1,252 +1,425 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../services/api';
-import { Calendar, Activity, Clock, Bed, Heart, Droplet, Phone, ArrowLeft, Receipt, Stethoscope, UserCheck } from 'lucide-react';
+import {
+  Activity, ArrowLeft, Bed, Calendar, Clock, Droplet, FileText, Heart,
+  HeartPulse, Phone, Pill, Receipt, Stethoscope, TestTube2, UserCheck,
+} from 'lucide-react';
+import { EmptyState, LoadingState, StatusPill } from '../components/ui';
+import { calcAge, formatINR, formatShortDate, initials, patientIdLabel, vitalsFlags } from '../utils/clinical';
+import { cn } from '../lib/cn';
+
+type Tab = 'overview' | 'appointments' | 'vitals' | 'rx' | 'labs' | 'admissions' | 'bills';
+
+const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: 'overview', label: 'Overview', icon: Activity },
+  { id: 'appointments', label: 'Visits', icon: Stethoscope },
+  { id: 'vitals', label: 'Vitals', icon: HeartPulse },
+  { id: 'rx', label: 'Rx', icon: Pill },
+  { id: 'labs', label: 'Labs', icon: TestTube2 },
+  { id: 'admissions', label: 'IPD', icon: Bed },
+  { id: 'bills', label: 'Bills', icon: Receipt },
+];
 
 export const PatientDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
+  const [tab, setTab] = useState<Tab>('overview');
   const [today] = useState(() => new Date());
 
   useEffect(() => {
-    if (id) {
-      api.get(`/patients/${id}`)
-        .then(res => setPatient(res))
-        .catch(err => console.error(err))
-        .finally(() => setLoading(false));
-    }
+    if (!id) return;
+    setLoading(true);
+    api.get(`/patients/${id}`)
+      .then(setPatient)
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <Activity className="w-8 h-8 text-blue-600 animate-bounce" />
-          <p className="text-slate-500 font-medium">Loading patient record...</p>
-        </div>
-      </div>
-    );
-  }
+  const age = useMemo(() => calcAge(patient?.dateOfBirth, today), [patient, today]);
 
-  if (!patient) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <p className="text-slate-500 font-medium text-lg">Patient not found.</p>
-      </div>
-    );
-  }
-
-  const calculateAge = (dobString: string | null) => {
-    if (!dobString) return 'N/A';
-    const dob = new Date(dobString);
-    return Math.abs(new Date(today.getTime() - dob.getTime()).getUTCFullYear() - 1970);
-  };
-
-  const statusColors = {
-    'Out-Patient': 'bg-blue-100 text-blue-800',
-    'Admitted': 'bg-emerald-100 text-emerald-800',
-    'Discharged': 'bg-slate-100 text-slate-800',
-  };
+  const bills = useMemo(() => {
+    if (!patient?.admissions) return [];
+    return patient.admissions
+      .filter((a: any) => a.billing)
+      .map((a: any) => ({ ...a.billing, admission: a }));
+  }, [patient]);
 
   const convertToHoscore = async () => {
     if (!id) return;
     setConverting(true);
     try {
       const updated = await api.patch(`/patients/${id}/convert-hoscore`, {});
-      setPatient(updated);
+      setPatient((p: any) => ({ ...p, ...updated }));
     } finally {
       setConverting(false);
     }
   };
 
+  if (loading) return <LoadingState label="Opening patient chart…" />;
+  if (!patient) {
+    return (
+      <EmptyState
+        title="Patient not found"
+        description="This chart may have been removed or you don't have access."
+        action={<Link to="/dashboard/patients" className="text-sm font-bold text-blue-600">Back to patients</Link>}
+      />
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto p-8 animate-fade-in space-y-8">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8 text-slate-500">
-        <Link to="/dashboard/patients" className="p-2 hover:bg-white hover:shadow rounded-full transition-all">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <span className="font-semibold text-sm uppercase tracking-wider">Patient 360° View</span>
-      </div>
+    <div className="space-y-5 pb-10 animate-fade-in-up">
+      {/* Back */}
+      <Link
+        to="/dashboard/patients"
+        className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+      >
+        <ArrowLeft className="h-4 w-4" /> Patient registry
+      </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column - Core Info */}
-        <div className="lg:col-span-1 space-y-8">
-          {/* Main Profile Card */}
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-2xl transform group-hover:scale-150 transition-transform duration-700"></div>
-            
-            <div className="flex items-center gap-6 mb-8 relative z-10">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-blue-600/20">
-                {patient.name.split(' ').map((n: string) => n[0]).join('').substring(0,2)}
-              </div>
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">{patient.name}</h1>
-                <p className="text-slate-500 font-mono mt-1 text-sm bg-slate-100 inline-block px-2 py-0.5 rounded">
-                  {patient.isHoscoreUser === false ? 'Manual walk-in patient' : `HSC-${patient.sixDigitId || patient.id.padStart(5, '0')}`}
-                </p>
-                {patient.isHoscoreUser === false && (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      {patient.manualCareNote || 'This patient does not use HOSCORE phone/app access. Continue manual care workflow as needed.'}
-                    </p>
-                    <button
-                      onClick={convertToHoscore}
-                      disabled={converting}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-black disabled:opacity-60"
-                    >
-                      <UserCheck className="w-4 h-4" />
-                      {converting ? 'Converting...' : 'Convert to HOSCORE User'}
-                    </button>
-                  </div>
-                )}
-                <div className="mt-3">
-                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusColors[patient.status as keyof typeof statusColors] || statusColors['Out-Patient']}`}>
-                    {patient.status}
-                  </span>
-                </div>
-              </div>
+      {/* Chart header */}
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 sm:p-6 shadow-sm">
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_left,rgba(37,99,235,0.07),transparent_50%)]" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-xl font-black text-white shadow-lg shadow-blue-600/20">
+              {initials(patient.name)}
             </div>
-
-            <div className="space-y-4 relative z-10">
-              <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-3 rounded-xl">
-                <Calendar className="w-5 h-5 text-slate-400" />
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Age / Gender</p>
-                  <p className="font-medium text-slate-900">{calculateAge(patient.dateOfBirth)} years, {patient.gender}</p>
-                </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)] truncate">{patient.name}</h1>
+                <StatusPill status={patient.isHoscoreUser === false ? undefined : patient.status} tone={patient.isHoscoreUser === false ? 'warning' : undefined}>
+                  {patient.isHoscoreUser === false ? 'Manual care' : patient.status}
+                </StatusPill>
               </div>
-              <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-3 rounded-xl">
-                <Droplet className="w-5 h-5 text-rose-400" />
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Blood Group</p>
-                  <p className="font-bold text-rose-600">{patient.bloodGroup || 'N/A'}</p>
-                </div>
+              <p className="mt-1 font-mono text-sm font-bold text-blue-600 dark:text-sky-400">
+                {patientIdLabel(patient)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--inner-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                  <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  {age}y · {patient.gender || '—'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/15 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-600 dark:text-rose-400">
+                  <Droplet className="h-3.5 w-3.5" />
+                  {patient.bloodGroup || 'N/A'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--inner-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                  <Phone className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  {patient.contact || 'No phone'}
+                </span>
               </div>
-              <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-3 rounded-xl">
-                <Phone className="w-5 h-5 text-slate-400" />
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact</p>
-                  <p className="font-medium text-slate-900">{patient.contact || 'N/A'}</p>
-                  {patient.email && <p className="text-sm text-slate-500">{patient.email}</p>}
+              {patient.isHoscoreUser === false && (
+                <div className="mt-3 max-w-xl space-y-2">
+                  <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                    {patient.manualCareNote || 'Walk-in without HOSCORE app access. Continue manual care as needed.'}
+                  </p>
+                  <button
+                    onClick={convertToHoscore}
+                    disabled={converting}
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {converting ? 'Converting…' : 'Convert to HOSCORE user'}
+                  </button>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Medical History */}
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
-            <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 mb-6">
-              <Heart className="w-5 h-5 text-rose-500" />
-              Medical Context
-            </h3>
-            <div className="prose prose-sm prose-slate">
-              {patient.medicalHistory ? (
-                <p className="text-slate-600 leading-relaxed bg-rose-50/50 p-4 rounded-xl border border-rose-100">{patient.medicalHistory}</p>
-              ) : (
-                <p className="text-slate-400 italic">No historical conditions logged.</p>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Right Column - Timeline & Records */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Appointments Pipeline */}
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                <Stethoscope className="w-5 h-5 text-blue-500" />
-                Appointments & Consultations
-              </h3>
-            </div>
-            
-            {patient.appointments?.length > 0 ? (
-              <div className="space-y-4">
-                {patient.appointments.map((apt: any) => (
-                  <div key={apt.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center font-bold text-blue-600">
-                        {new Date(apt.date).getDate()}
-                        <span className="text-[10px] ml-0.5">{new Date(apt.date).toLocaleString('default', { month: 'short' })}</span>
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900">{apt.doctor?.name || 'Unassigned Doctor'}</p>
-                        <p className="text-sm text-slate-600 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/> {apt.time}</p>
-                      </div>
-                    </div>
-                    <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
-                      apt.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
-                      apt.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' :
-                      'bg-amber-100 text-amber-700'
-                    }`}>
-                      {apt.status}
-                    </span>
-                  </div>
-                ))}
+          {/* Snapshot KPIs */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-auto">
+            {[
+              { label: 'Visits', value: patient.appointments?.length || 0 },
+              { label: 'Rx', value: patient.prescriptions?.length || 0 },
+              { label: 'Labs', value: patient.labOrders?.length || 0 },
+              { label: 'IPD', value: patient.admissions?.length || 0 },
+            ].map((k) => (
+              <div key={k.label} className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] px-3 py-2.5 text-center min-w-[72px]">
+                <p className="text-lg font-black tabular-nums text-[var(--text-primary)]">{k.value}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{k.label}</p>
               </div>
-            ) : (
-              <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                No appointments on record.
-              </div>
-            )}
+            ))}
           </div>
+        </div>
+      </div>
 
-          {/* Admissions Journey */}
-          {patient.admissions?.length > 0 && (
-            <div className="bg-slate-900 rounded-3xl p-8 shadow-lg text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px]"></div>
-              <h3 className="flex items-center gap-2 text-lg font-bold mb-6">
-                <Bed className="w-5 h-5 text-emerald-400" />
-                Admission History
+      {/* Tabs */}
+      <div className="flex gap-1 overflow-x-auto rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-1.5">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all',
+                active
+                  ? 'bg-slate-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--inner-bg)]'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab panels */}
+      <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 sm:p-6 shadow-sm">
+        {tab === 'overview' && (
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-5">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-[var(--text-primary)]">
+                <Heart className="h-4 w-4 text-rose-500" /> Medical context
               </h3>
-              
-              <div className="space-y-6 relative z-10">
-                {patient.admissions.map((adm: any) => (
-                  <div key={adm.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="font-bold text-emerald-400">{adm.bed?.room?.name || 'Ward'} - Bed {adm.bed?.bedNumber}</h4>
-                        <p className="text-sm text-slate-400 mt-1">{adm.reason || 'General Observation'}</p>
-                      </div>
-                      <span className={`px-2.5 py-1 text-xs font-bold rounded-md ${adm.status === 'Active' ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10 text-slate-300'}`}>
-                        {adm.status}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-6 mt-6 pt-6 border-t border-white/10">
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Admitted</p>
-                        <p className="text-sm font-medium">{new Date(adm.admissionDate).toLocaleDateString()}</p>
-                      </div>
-                      <div className="h-6 w-px bg-white/10"></div>
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Discharged</p>
-                        <p className="text-sm font-medium">{adm.dischargeDate ? new Date(adm.dischargeDate).toLocaleDateString() : 'Present'}</p>
-                      </div>
-                      
-                      {adm.billing && (
-                        <>
-                          <div className="h-6 w-px bg-white/10"></div>
-                          <div className="flex-1 flex justify-end">
-                            <div className="text-right">
-                              <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1 flex items-center justify-end gap-1"><Receipt className="w-3 h-3"/> Bill Status</p>
-                              <p className={`text-sm font-bold ${adm.billing.status === 'Paid' ? 'text-emerald-400' : 'text-amber-400'}`}>${adm.billing.totalAmount.toLocaleString()} • {adm.billing.status}</p>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
+              {patient.medicalHistory ? (
+                <p className="text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">{patient.medicalHistory}</p>
+              ) : (
+                <p className="text-sm italic text-[var(--text-muted)]">No historical conditions logged.</p>
+              )}
+            </div>
+            <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-5">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-[var(--text-primary)]">
+                <FileText className="h-4 w-4 text-blue-500" /> Contact & identity
+              </h3>
+              <dl className="space-y-3 text-sm">
+                {[
+                  ['Email', patient.email || '—'],
+                  ['Phone', patient.contact || '—'],
+                  ['DOB', formatShortDate(patient.dateOfBirth)],
+                  ['Registration', patient.registrationMode || (patient.isHoscoreUser === false ? 'WALK_IN_MANUAL' : 'HOSCORE')],
+                  ['Follow-up', patient.nextAppointmentAlertInterval && patient.nextAppointmentAlertInterval !== 'None'
+                    ? `${patient.nextAppointmentAlertInterval} · ${formatShortDate(patient.nextAppointmentAlertDate)}`
+                    : 'None'],
+                ].map(([k, v]) => (
+                  <div key={k as string} className="flex items-center justify-between gap-4 border-b border-[var(--card-border)] pb-2 last:border-0">
+                    <dt className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{k}</dt>
+                    <dd className="font-semibold text-[var(--text-primary)] text-right">{v as string}</dd>
                   </div>
                 ))}
+              </dl>
+            </div>
+
+            {/* Recent activity timeline */}
+            <div className="lg:col-span-2">
+              <h3 className="mb-3 text-sm font-black text-[var(--text-primary)]">Recent clinical activity</h3>
+              <div className="space-y-2">
+                {[
+                  ...(patient.appointments || []).slice(0, 3).map((a: any) => ({
+                    id: `a-${a.id}`,
+                    title: `Visit · ${a.doctor?.name || 'Doctor'}`,
+                    sub: a.time,
+                    date: a.date,
+                    status: a.status,
+                  })),
+                  ...(patient.prescriptions || []).slice(0, 2).map((r: any) => ({
+                    id: `r-${r.id}`,
+                    title: `Rx · ${r.diagnosis}`,
+                    sub: r.medicines?.slice(0, 60),
+                    date: r.date,
+                    status: r.status,
+                  })),
+                  ...(patient.vitals || []).slice(0, 2).map((v: any) => ({
+                    id: `v-${v.id}`,
+                    title: `Vitals · BP ${v.bloodPressure || '—'} · HR ${v.heartRate || '—'}`,
+                    sub: `SpO₂ ${v.oxygenSaturation ?? '—'}%`,
+                    date: v.recordedAt,
+                    status: vitalsFlags(v).includes('critical') ? 'URGENT' : 'COMPLETED',
+                  })),
+                ]
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 8)
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-[var(--text-primary)]">{item.title}</p>
+                        <p className="truncate text-xs text-[var(--text-muted)]">{item.sub}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <StatusPill status={item.status} />
+                        <span className="text-[11px] text-[var(--text-muted)]">{formatShortDate(item.date)}</span>
+                      </div>
+                    </div>
+                  ))}
+                {!patient.appointments?.length && !patient.prescriptions?.length && !patient.vitals?.length && (
+                  <EmptyState compact title="No clinical activity yet" description="Appointments, vitals, and prescriptions will appear here." />
+                )}
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-        </div>
+        {tab === 'appointments' && (
+          patient.appointments?.length ? (
+            <div className="space-y-2">
+              {patient.appointments.map((apt: any) => (
+                <div key={apt.id} className="flex flex-col gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 flex-col items-center justify-center rounded-xl bg-blue-500/10 text-blue-700 dark:text-sky-300">
+                      <span className="text-base font-black leading-none">{new Date(apt.date).getDate()}</span>
+                      <span className="text-[9px] font-bold uppercase">{new Date(apt.date).toLocaleString('default', { month: 'short' })}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-[var(--text-primary)]">{apt.doctor?.name || 'Unassigned doctor'}</p>
+                      <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                        <Clock className="h-3.5 w-3.5" /> {apt.time}
+                        {apt.tokenNumber != null && <> · Token #{apt.tokenNumber}</>}
+                      </p>
+                    </div>
+                  </div>
+                  <StatusPill status={apt.status} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact icon={<Stethoscope className="h-5 w-5" />} title="No appointments on record" />
+          )
+        )}
+
+        {tab === 'vitals' && (
+          patient.vitals?.length ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {patient.vitals.map((v: any) => {
+                const flags = vitalsFlags(v);
+                return (
+                  <div
+                    key={v.id}
+                    className={cn(
+                      'rounded-xl border p-4',
+                      flags.includes('critical')
+                        ? 'border-rose-500/30 bg-rose-500/[0.06]'
+                        : 'border-[var(--card-border)] bg-[var(--inner-bg)]'
+                    )}
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-xs font-bold text-[var(--text-muted)]">{formatShortDate(v.recordedAt)}</span>
+                      {flags.length > 0 && <StatusPill tone={flags.includes('critical') ? 'danger' : 'warning'}>{flags[0]}</StatusPill>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">BP</p><p className="font-bold">{v.bloodPressure || '—'}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">HR</p><p className="font-bold text-rose-600">{v.heartRate ? `${v.heartRate} bpm` : '—'}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Temp</p><p className="font-bold">{v.temperature ? `${v.temperature}°F` : '—'}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">SpO₂</p><p className="font-bold">{v.oxygenSaturation != null ? `${v.oxygenSaturation}%` : '—'}</p></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState compact icon={<HeartPulse className="h-5 w-5" />} title="No vitals recorded" description="Record vitals from the Vitals module during rounds." />
+          )
+        )}
+
+        {tab === 'rx' && (
+          patient.prescriptions?.length ? (
+            <div className="space-y-3">
+              {patient.prescriptions.map((rx: any) => (
+                <div key={rx.id} className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-[var(--text-primary)]">{rx.diagnosis}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Dr. {rx.doctor?.name || '—'} · {formatShortDate(rx.date)}</p>
+                    </div>
+                    <StatusPill status={rx.status} />
+                  </div>
+                  <pre className="whitespace-pre-wrap rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3 font-mono text-xs text-[var(--text-secondary)]">{rx.medicines}</pre>
+                  {rx.instructions && <p className="mt-2 text-xs italic text-[var(--text-muted)]">{rx.instructions}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact icon={<Pill className="h-5 w-5" />} title="No prescriptions" />
+          )
+        )}
+
+        {tab === 'labs' && (
+          patient.labOrders?.length ? (
+            <div className="space-y-2">
+              {patient.labOrders.map((lab: any) => (
+                <div key={lab.id} className="flex flex-col gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-bold text-[var(--text-primary)]">{lab.testName}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {lab.testType} · Dr. {lab.doctorName || '—'} · {formatShortDate(lab.orderedAt)}
+                    </p>
+                    {lab.result && <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">Result: {lab.result} {lab.unit || ''}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {lab.priority === 'URGENT' && <StatusPill tone="danger">Urgent</StatusPill>}
+                    <StatusPill status={lab.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact icon={<TestTube2 className="h-5 w-5" />} title="No lab orders" />
+          )
+        )}
+
+        {tab === 'admissions' && (
+          patient.admissions?.length ? (
+            <div className="space-y-3">
+              {patient.admissions.map((adm: any) => (
+                <div key={adm.id} className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-black text-[var(--text-primary)]">
+                        {adm.bed?.room?.name || 'Ward'} · Bed {adm.bed?.bedNumber || '—'}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">{adm.reason || 'General observation'}</p>
+                    </div>
+                    <StatusPill status={adm.status} />
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-6 border-t border-[var(--card-border)] pt-4 text-sm">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Admitted</p>
+                      <p className="font-semibold">{formatShortDate(adm.admissionDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Discharged</p>
+                      <p className="font-semibold">{adm.dischargeDate ? formatShortDate(adm.dischargeDate) : 'Present'}</p>
+                    </div>
+                    {adm.billing && (
+                      <div className="ml-auto text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Bill</p>
+                        <p className={cn('font-bold', adm.billing.status === 'Paid' || adm.billing.status === 'PAID' ? 'text-emerald-600' : 'text-amber-600')}>
+                          {formatINR(adm.billing.totalAmount)} · {adm.billing.status}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact icon={<Bed className="h-5 w-5" />} title="No admissions" />
+          )
+        )}
+
+        {tab === 'bills' && (
+          bills.length ? (
+            <div className="space-y-2">
+              {bills.map((b: any) => (
+                <div key={b.id} className="flex items-center justify-between rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-4">
+                  <div>
+                    <p className="font-bold text-[var(--text-primary)]">{formatINR(b.totalAmount)}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Room {formatINR(b.roomCharges)} · Doctor {formatINR(b.doctorFees)} · Lab {formatINR(b.labFees)}
+                    </p>
+                  </div>
+                  <StatusPill status={b.status} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact icon={<Receipt className="h-5 w-5" />} title="No bills linked" />
+          )
+        )}
       </div>
     </div>
   );

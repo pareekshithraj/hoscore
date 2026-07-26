@@ -123,7 +123,26 @@ interface HoscoreApi {
     @GET("hospital/current")
     suspend fun getCurrentHospital(): Hospital
 
+    // ---------- Hospital map / wayfinding ----------
+    @GET("map")
+    suspend fun getMap(): HospitalMap
+
+    @PUT("map")
+    suspend fun saveMap(@Body body: HospitalMap): HospitalMap
+
+    @GET("map/positions")
+    suspend fun getLivePositions(): List<LivePosition>
+
+    @POST("map/positions")
+    suspend fun upsertLivePosition(@Body body: LivePosition): LivePosition
+
     // ---------- Patient portal ----------
+    @GET("patient/location")
+    suspend fun getMyLocation(): MyLocation
+
+    @POST("patient/location/share")
+    suspend fun shareMyLocation(@Body body: ShareLocationRequest): ShareLocationResponse
+
     @GET("patient/appointments")
     suspend fun getMyAppointments(): List<Appointment>
 

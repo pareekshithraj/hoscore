@@ -1,6 +1,6 @@
 export const FEATURE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
-  simulator: 'Simulator',
+  map: 'Map Builder',
   queue: 'OPD Queue',
   prescriptions: 'Prescriptions',
   rooms: 'Rooms & Beds',
@@ -11,7 +11,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   labs: 'Lab Orders',
   doctors: 'Doctors',
   staff: 'Staff',
-  staff_types: 'Staff Types',
+  staff_types: 'Staff Privileges',
   shifts: 'Shift Roster',
   inventory: 'Inventory',
   billing: 'Billing',

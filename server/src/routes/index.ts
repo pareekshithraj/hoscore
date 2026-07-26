@@ -29,6 +29,7 @@ import * as prescriptionController from '../controllers/prescriptionController.j
 import * as uploadController from '../controllers/uploadController.js';
 import * as staffTypeController from '../controllers/staffTypeController.js';
 import * as paymentController from '../controllers/paymentController.js';
+import * as mapController from '../controllers/mapController.js';
 import { upload } from '../controllers/uploadController.js';
 import {
   validate,
@@ -64,6 +65,9 @@ router.post('/payments/demo-order', paymentController.createDemoPaymentOrder);
 router.post('/payments/demo-verify', paymentController.verifyDemoPaymentOrder);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
+// Public wayfinding: patient-facing published map + family location-share link.
+router.get('/hospitals/:hospitalId/public-map', mapController.getPublicMap);
+router.get('/shared-location/:token', mapController.getSharedLocation);
 router.post('/hospitals/register/initiate', validate(initiateHospitalRegisterSchema), hospitalController.initiateHospitalRegistration);
 router.post('/hospitals/register/complete', validate(completeHospitalRegisterSchema), hospitalController.completeHospitalRegistration);
 router.post('/hospitals/register', optionalAuthenticate, validate(hospitalRegisterSchema), hospitalController.registerHospital);
@@ -123,6 +127,9 @@ router.get('/patient/access-grants', patientPortalController.getAccessGrants);
 router.get('/patient/access-logs', patientPortalController.getAccessLogs);
 router.post('/patient/access-grants/revoke', patientPortalController.revokeDoctorAccess);
 router.post('/patient/access-grants/restore', patientPortalController.restoreDoctorAccess);
+// Patient indoor location + family share
+router.get('/patient/location', requirePatientContext, mapController.getMyLocation);
+router.post('/patient/location/share', requirePatientContext, mapController.shareMyLocation);
 
 // ================= SUPER ADMIN =================
 router.get('/super-admin/stats', requireSuperAdmin, superAdminController.getDashboardStats);
@@ -155,7 +162,13 @@ router.get('/hospital/usage', requireFeature(FEATURES.SETTINGS), hospitalControl
 
 // Stats
 router.get('/stats', requireFeature(FEATURES.DASHBOARD), statsController.getStats);
-router.get('/stats/simulator', requireFeature(FEATURES.SIMULATOR), statsController.getSimulatorData);
+
+// ================= HOSPITAL MAP / WAYFINDING =================
+router.get('/map', requireFeature(FEATURES.MAP), mapController.getMap);
+router.put('/map', requireFeature(FEATURES.MAP), mapController.saveMap);
+router.get('/map/positions', requireFeature(FEATURES.MAP), mapController.getLivePositions);
+router.post('/map/positions', requireFeature(FEATURES.MAP), mapController.upsertLivePosition);
+router.delete('/map/positions/:id', requireFeature(FEATURES.MAP), mapController.endLivePosition);
 router.get('/analytics', requireFeature(FEATURES.ANALYTICS), statsController.getAnalytics);
 
 // Appointments

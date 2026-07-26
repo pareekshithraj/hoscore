@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Bed, Users, Stethoscope, ClipboardList, Package, Receipt,
   Settings, LogOut, BarChart2, UserCircle, Calendar, Megaphone, CalendarOff,
-  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck, X, CreditCard, Search
+  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck, X, CreditCard, Search, Map as MapIcon
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import clsx from "clsx";
@@ -13,7 +13,7 @@ type Role = "ADMIN" | "DOCTOR" | "NURSE" | "RECEPTIONIST" | "STAFF" | "PHARMACIS
 
 const mainMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", feature: "dashboard" },
-  { icon: Activity, label: "Simulator", path: "/dashboard/simulator", feature: "simulator" },
+  { icon: MapIcon, label: "Map Builder", path: "/dashboard/map", feature: "map" },
   { icon: Users, label: "OPD Queue", path: "/dashboard/queue", feature: "queue" },
   { icon: ClipboardList, label: "Prescriptions", path: "/dashboard/prescriptions", feature: "prescriptions" },
   { icon: Bed, label: "Rooms & Beds", path: "/dashboard/rooms", feature: "rooms" },
@@ -24,7 +24,7 @@ const mainMenuItems = [
   { icon: ClipboardList, label: "Lab Orders", path: "/dashboard/labs", feature: "labs" },
   { icon: Stethoscope, label: "Doctors", path: "/dashboard/doctors", feature: "doctors" },
   { icon: UserCircle, label: "Staff", path: "/dashboard/staff", feature: "staff" },
-  { icon: ShieldCheck, label: "Staff Types", path: "/dashboard/staff-types", feature: "staff_types" },
+  { icon: ShieldCheck, label: "Staff Privileges", path: "/dashboard/staff-types", feature: "staff_types" },
   { icon: Calendar, label: "Shift Roster", path: "/dashboard/shifts", feature: "shifts" },
   { icon: Package, label: "Inventory", path: "/dashboard/inventory", feature: "inventory" },
   { icon: Receipt, label: "Billing", path: "/dashboard/billing", feature: "billing" },

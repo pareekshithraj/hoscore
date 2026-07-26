@@ -52,6 +52,10 @@ object ServiceLocator {
             return build(target).also { _api = it; _baseUrl = target }
         }
 
+    fun webOrigin(): String {
+        return Environment.apiBaseUrl.removeSuffix("/api").removeSuffix("/")
+    }
+
     /** Force a rebuild (call after toggling the dev environment). */
     fun rebuild() {
         _api = null

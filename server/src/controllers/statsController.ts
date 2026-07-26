@@ -3,36 +3,7 @@ import { prisma } from "../index.js";
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
-export const getSimulatorData = async (req: Request, res: Response) => {
-  try {
-    const hospitalId = hid(req);
-    const [emergency, icu, wardA, wardB, pharmacy, lab, monitoringLogs] = await Promise.all([
-      prisma.oPDQueue.count({ where: { hospitalId, status: 'IN_CONSULTATION' } }),
-      prisma.admission.count({ where: { status: 'Admitted', bed: { room: { hospitalId, name: { contains: 'ICU' } } } } }),
-      prisma.admission.count({ where: { status: "Admitted", bed: { room: { hospitalId, name: { contains: "Ward A" } } } } }),
-      prisma.admission.count({ where: { status: "Admitted", bed: { room: { hospitalId, name: { contains: "Ward B" } } } } }),
-      prisma.prescription.count({ where: { hospitalId, status: 'ISSUED' } }),
-      prisma.labOrder.count({ where: { hospitalId, status: 'IN_PROGRESS' } }),
-      prisma.auditLog.findMany({
-        where: { hospitalId },
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        select: { action: true, entity: true, details: true, createdAt: true },
-      }),
-    ]);
 
-    const census = {
-      emergency,
-      icu,
-      'ward-a': wardA,
-      'ward-b': wardB,
-      pharmacy,
-      lab,
-    };
-
-    res.json({ census, monitoringLogs });
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch simulator data' }); }
-};
 
 export const getStats = async (req: Request, res: Response) => {
   try {
