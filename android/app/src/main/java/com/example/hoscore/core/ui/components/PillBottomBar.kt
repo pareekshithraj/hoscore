@@ -46,44 +46,53 @@ fun PillBottomBar(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .shadow(16.dp, RoundedCornerShape(26.dp))
-            .clip(RoundedCornerShape(26.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .shadow(20.dp, RoundedCornerShape(28.dp), spotColor = t.primary.copy(alpha = 0.15f))
+            .clip(RoundedCornerShape(28.dp))
             .background(t.card)
-            .border(BorderStroke(1.dp, t.cardBorder), RoundedCornerShape(26.dp))
-            .height(66.dp),
+            .border(BorderStroke(1.dp, t.cardBorder), RoundedCornerShape(28.dp))
+            .height(68.dp),
     ) {
         Row(
-            Modifier.fillMaxSize().padding(horizontal = 6.dp),
+            Modifier.fillMaxSize().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             tabs.forEachIndexed { i, tab ->
                 val active = i == selected
-                val color by animateColorAsState(if (active) t.primary else t.textMuted, label = "tabColor")
-                Column(
-                    Modifier
+                val iconColor by animateColorAsState(if (active) t.primary else t.textMuted, label = "tabColor")
+                val textColor by animateColorAsState(if (active) t.primary else t.textMuted, label = "textColor")
+                
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (active) t.primary.copy(alpha = 0.12f) else androidx.compose.ui.graphics.Color.Transparent)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                         ) { onSelect(i) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    if (active) {
-                        Box(
-                            Modifier
-                                .size(width = 34.dp, height = 4.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(t.primary),
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = tab.icon,
+                            contentDescription = tab.label,
+                            tint = iconColor,
+                            modifier = Modifier.size(22.dp)
                         )
-                        Spacer(Modifier.height(6.dp))
-                    } else {
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = tab.label,
+                            fontSize = 10.sp,
+                            fontWeight = if (active) FontWeight.Black else FontWeight.Bold,
+                            color = textColor,
+                            maxLines = 1
+                        )
                     }
-                    Icon(tab.icon, tab.label, tint = color, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.height(3.dp))
-                    Text(tab.label, fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = color, maxLines = 1)
                 }
             }
         }

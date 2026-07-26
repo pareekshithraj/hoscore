@@ -34,24 +34,24 @@ import com.example.hoscore.core.ui.theme.HoscoreTokens
 @Composable
 fun ContextSwitcherSheet(
     contexts: List<ContextItem>,
-    activeType: String?,
+    activeContext: ContextItem?,
     onPick: (ContextItem) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val t = HoscoreTokens.current
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = t.card) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
-            Text("Switch workspace", fontSize = 18.sp, fontWeight = FontWeight.Black, color = t.textPrimary)
+            Text("Switch Workspace", fontSize = 18.sp, fontWeight = FontWeight.Black, color = t.textPrimary)
             Spacer(Modifier.size(4.dp))
-            Text("Your account has access to multiple portals.", fontSize = 12.sp, color = t.textMuted)
+            Text("Select an environment to switch active permissions and data.", fontSize = 12.sp, color = t.textMuted)
             Spacer(Modifier.size(16.dp))
             contexts.forEach { ctx ->
                 val (icon, label, sub) = when (ctx.type) {
                     "hospital" -> Triple(Icons.Rounded.Apartment, ctx.hospitalName ?: "Hospital", "Staff · ${ctx.role ?: ""}")
-                    "superadmin" -> Triple(Icons.Rounded.Shield, "Super Admin", "Platform control")
-                    else -> Triple(Icons.Rounded.Person, "Patient Portal", "Your personal health")
+                    "superadmin" -> Triple(Icons.Rounded.Shield, "Super Admin", "Platform Control")
+                    else -> Triple(Icons.Rounded.Person, "Patient Portal", "Personal Health Profile")
                 }
-                val active = ctx.type == activeType
+                val active = ctx.type == activeContext?.type && ctx.hospitalId == activeContext?.hospitalId
                 HoscoreCard(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     onClick = { onPick(ctx) },
@@ -59,15 +59,22 @@ fun ContextSwitcherSheet(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier.size(44.dp).clip(CircleShape)
-                                .background((if (active) t.primary else t.textMuted).copy(alpha = 0.12f)),
+                                .background((if (active) t.primary else t.textMuted).copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center,
                         ) { Icon(icon, label, tint = if (active) t.primary else t.textSecondary, modifier = Modifier.size(22.dp)) }
                         Spacer(Modifier.size(14.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(label, fontWeight = FontWeight.Bold, color = t.textPrimary, fontSize = 15.sp)
-                            Text(sub, color = t.textMuted, fontSize = 12.sp)
+                            Text(label, fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp)
+                            Text(sub, color = t.textMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         }
-                        if (active) Text("Active", color = t.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        if (active) {
+                            Box(
+                                Modifier.clip(CircleShape).background(t.primary.copy(alpha = 0.15f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("Active", color = t.primary, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
             }

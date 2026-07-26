@@ -792,10 +792,6 @@ export const switchContext = async (req: Request, res: Response) => {
   const { contextType, hospitalId, password } = req.body;
   const userId = (req as any).user?.userId;
 
-  if (!password) {
-    return res.status(400).json({ error: 'Password is required to switch context' });
-  }
-
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -803,10 +799,12 @@ export const switchContext = async (req: Request, res: Response) => {
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      await logAudit(req, 'CONTEXT_SWITCH_FAILED', 'User', user.id, `Failed password verification for context switch to ${contextType}`);
-      return res.status(401).json({ error: 'Incorrect password. Context switch denied.' });
+    if (password) {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        await logAudit(req, 'CONTEXT_SWITCH_FAILED', 'User', user.id, `Failed password verification for context switch to ${contextType}`);
+        return res.status(401).json({ error: 'Incorrect password. Context switch denied.' });
+      }
     }
 
     let role = 'PATIENT';

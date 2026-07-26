@@ -49,7 +49,7 @@ export const verifyMsg91Schema = z.object({
 export const switchContextSchema = z.object({
   contextType: z.enum(['hospital', 'patient', 'superadmin']),
   hospitalId: z.string().optional().nullable(),
-  password: z.string().min(1, 'Password is required to switch context'),
+  password: z.string().optional().nullable(),
 });
 
 

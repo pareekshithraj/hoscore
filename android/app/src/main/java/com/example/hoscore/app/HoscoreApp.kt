@@ -58,7 +58,7 @@ fun HoscoreApp(appState: AppState) {
         if (showSwitcher) {
             ContextSwitcherSheet(
                 contexts = contexts,
-                activeType = active?.type,
+                activeContext = active,
                 onPick = { ctx: ContextItem ->
                     showSwitcher = false
                     if (ctx.type != active?.type || ctx.hospitalId != active?.hospitalId) {
