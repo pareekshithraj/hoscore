@@ -15,7 +15,7 @@ import { createChallenge, buildSession } from './authController.js';
 import { pick } from '../utils/pick.js';
 
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
+const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 
 
 const normalizePermissions = (permissions: unknown) => {
@@ -125,7 +125,7 @@ export const initiateHospitalRegistration = async (req: Request, res: Response) 
         description,
         userId: user.id,
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '30m' }
     );
 
@@ -156,7 +156,7 @@ export const completeHospitalRegistration = async (req: Request, res: Response) 
   try {
     let decoded: any;
     try {
-      decoded = jwt.verify(pendingHospitalToken, JWT_SECRET);
+      decoded = jwt.verify(pendingHospitalToken, getJwtSecret());
     } catch {
       return res.status(400).json({ error: 'Invalid or expired hospital registration session. Please start again.' });
     }

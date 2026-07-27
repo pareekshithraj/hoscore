@@ -20,7 +20,7 @@ import {
 } from '../utils/otp.js';
 import { normalizePhone } from '../utils/phone.js';
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
+const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 const OTP_REVERIFY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
 
 type ChallengePurpose = 'register' | 'login' | 'reset_password';
@@ -181,7 +181,7 @@ export async function buildSession(userId: string) {
       role: defaultContext.role || 'PATIENT',
       permissions: defaultContext.permissions || permissionsForRole(defaultContext.role),
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '24h' }
   );
 
@@ -336,7 +336,7 @@ async function finalizeChallenge(user: User, challenge: AuthChallenge) {
   if (challenge.purpose === 'reset_password') {
     const resetToken = jwt.sign(
       { userId: user.id, purpose: 'password_reset' },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '15m' }
     );
 
@@ -570,7 +570,7 @@ export const resetPassword = async (req: Request, res: Response) => {
   const password = String(req.body.password || '');
 
   try {
-    const payload = jwt.verify(resetToken, JWT_SECRET) as { userId?: string; purpose?: string };
+    const payload = jwt.verify(resetToken, getJwtSecret()) as { userId?: string; purpose?: string };
     if (!payload?.userId || payload.purpose !== 'password_reset') {
       return res.status(401).json({ error: 'Invalid reset token' });
     }
@@ -844,7 +844,7 @@ export const switchContext = async (req: Request, res: Response) => {
         role,
         permissions,
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '24h' }
     );
 

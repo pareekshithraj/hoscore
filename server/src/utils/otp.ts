@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 
-// OTP secret used to salt the stored hash. Falls back to JWT_SECRET so the app
-// works without an extra env var; set OTP_SECRET to rotate independently.
-const OTP_SECRET = process.env.OTP_SECRET || process.env.JWT_SECRET || '';
+function getOtpSecret(): string {
+  return process.env.OTP_SECRET || process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
+}
 
 export const OTP_TTL_MS = 5 * 60 * 1000;        // OTP valid for 5 minutes
 export const OTP_RESEND_COOLDOWN_MS = 30 * 1000; // min gap between OTP sends
@@ -10,7 +10,7 @@ export const OTP_MAX_ATTEMPTS = 5;               // failed verifies before locko
 
 // We never store the plaintext OTP. The DB holds SHA256(otp + secret).
 export function hashOtp(otp: string): string {
-  return crypto.createHash('sha256').update(`${otp}${OTP_SECRET}`).digest('hex');
+  return crypto.createHash('sha256').update(`${otp}${getOtpSecret()}`).digest('hex');
 }
 
 export function generateOtp(): string {

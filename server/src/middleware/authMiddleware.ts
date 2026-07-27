@@ -3,8 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
 import { ADMIN_PERMISSIONS } from '../utils/features.js';
 
-// No fallback — validateEnv() guarantees a strong JWT_SECRET is present at boot.
-const JWT_SECRET = process.env.JWT_SECRET as string;
+const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 
 export interface AuthUser {
   userId: string;
@@ -29,7 +28,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
     
     // Check user suspension status
     const dbUser = await prisma.user.findUnique({
@@ -69,7 +68,7 @@ export const optionalAuthenticate = async (req: AuthRequest, _res: Response, nex
 
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
     const dbUser = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: { isActive: true },
