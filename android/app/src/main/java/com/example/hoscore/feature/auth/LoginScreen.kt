@@ -1,40 +1,21 @@
 package com.example.hoscore.feature.auth
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.LocalHospital
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hoscore.core.ui.theme.HoscoreTokens
+
+
 
 @Composable
 fun LoginScreen(
@@ -69,6 +52,7 @@ fun LoginScreen(
 
     val t = HoscoreTokens.current
     val context = LocalContext.current
+    var isOtpTab by remember { mutableStateOf(false) }
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -77,27 +61,147 @@ fun LoginScreen(
             .fillMaxSize()
             .background(t.screenBg)
             .imePadding(),
-        contentAlignment = Alignment.Center,
     ) {
         Column(
             Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(28.dp),
+                .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Top Bar
+            Row(
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(t.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.LocalHospital, "HOSCORE", tint = t.primary, modifier = Modifier.size(22.dp))
+                }
+                Box(
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable { /* Skip to guest mode if applicable */ }
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Text("HOSCORE v2.0", fontSize = 12.sp, fontWeight = FontWeight.Black, color = t.primary)
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Modern Hero Graphic Box (Matching Image 3)
             Box(
                 Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Brush.linearGradient(listOf(t.heroStart, t.heroEnd))),
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                t.primary,
+                                Color(0xFF2563EB),
+                                Color(0xFF1D4ED8),
+                            )
+                        )
+                    )
+                    .padding(20.dp),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.LocalHospital, "HOSCORE", tint = Color.White, modifier = Modifier.size(38.dp)) }
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.HealthAndSafety, "Health", tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.25f))
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                    ) {
+                        Text("PATIENTS & HOSPITALS", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Headline matching Image 3
+            Text(
+                "Level Up Your\nHealth Game",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = t.textPrimary,
+                textAlign = TextAlign.Center,
+                lineHeight = 34.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Balanced clinical care. Real-time patient queues.\nInstant records & seamless hospital context.",
+                fontSize = 13.sp,
+                color = t.textMuted,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium,
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // Auth Mode Switcher Chips
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(t.card)
+                    .border(1.dp, t.cardBorder, RoundedCornerShape(16.dp))
+                    .padding(4.dp),
+            ) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (!isOtpTab) t.primary else Color.Transparent)
+                        .clickable { isOtpTab = false }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Password Login",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 13.sp,
+                        color = if (!isOtpTab) Color.White else t.textMuted,
+                    )
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isOtpTab) t.primary else Color.Transparent)
+                        .clickable { isOtpTab = true }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "OTP Access",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 13.sp,
+                        color = if (isOtpTab) Color.White else t.textMuted,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(20.dp))
-            Text("HOSCORE", fontSize = 30.sp, fontWeight = FontWeight.Black, color = t.textPrimary, letterSpacing = (-1).sp)
-            Text("Hospital Operations System", fontSize = 13.sp, color = t.textSecondary, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(28.dp))
 
             val fieldColors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = t.primary,
@@ -112,32 +216,38 @@ fun LoginScreen(
             OutlinedTextField(
                 value = identifier,
                 onValueChange = { identifier = it; vm.clearError() },
-                label = { Text("Email or phone", color = t.textSecondary) },
+                label = { Text(if (isOtpTab) "Phone number" else "Email or phone", color = t.textMuted) },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = fieldColors,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it; vm.clearError() },
-                label = { Text("Password", color = t.textSecondary) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(14.dp),
+                leadingIcon = { Icon(if (isOtpTab) Icons.Rounded.Phone else Icons.Rounded.LocalHospital, null, tint = t.primary) },
+                shape = RoundedCornerShape(18.dp),
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            if (!isOtpTab) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it; vm.clearError() },
+                    label = { Text("Password", color = t.textMuted) },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Rounded.Lock, null, tint = t.primary) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             Spacer(Modifier.height(14.dp))
+
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Local dev environment", fontSize = 12.sp, color = t.textSecondary, fontWeight = FontWeight.SemiBold)
+                Text("Development Server", fontSize = 12.sp, color = t.textMuted, fontWeight = FontWeight.Bold)
                 Switch(
                     checked = state.useDev,
                     onCheckedChange = { vm.setDev(context, it) },
@@ -149,26 +259,41 @@ fun LoginScreen(
             }
 
             if (state.error != null) {
-                Spacer(Modifier.height(12.dp))
-                Text(state.error!!, color = t.clinical, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(10.dp))
+                Text(state.error!!, color = t.clinical, fontSize = 13.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
+
+            // Prominent Full-Width Pill Buttons (Matching Image 3)
             Button(
-                onClick = { vm.login(identifier, password) },
+                onClick = {
+                    if (isOtpTab) vm.startOtp(identifier) else vm.login(identifier, password)
+                },
                 enabled = !state.loading,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = t.primary),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
-                if (state.loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                else Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                if (state.loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(if (isOtpTab) "Send Verification Code" else "Sign In to Account", fontWeight = FontWeight.Black, fontSize = 16.sp)
+                }
             }
 
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { /* passwordless start could be added here */ }) {
-                Text("Having trouble signing in?", fontSize = 12.sp, color = t.textMuted)
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { isOtpTab = !isOtpTab },
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.linearGradient(listOf(t.cardBorder, t.cardBorder))),
+            ) {
+                Text(if (isOtpTab) "Use Password Instead" else "Log In with Phone OTP", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = t.textPrimary)
             }
+
+            Spacer(Modifier.height(28.dp))
         }
     }
 }

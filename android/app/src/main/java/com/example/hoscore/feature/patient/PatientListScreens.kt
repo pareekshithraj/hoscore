@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Description
@@ -19,6 +20,10 @@ import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Vaccines
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -112,12 +117,30 @@ fun PatientRecordsScreen() {
     }
 }
 
+enum class PatientDest { VACCINATIONS, PRIVACY, LOCATION }
+
 @Composable
 fun PatientMoreScreen(onLogout: () -> Unit) {
     val t = HoscoreTokens.current
     val billsVm: BillsVM = viewModel()
+    var subScreen by remember { mutableStateOf<PatientDest?>(null) }
+
+    if (subScreen != null) {
+        val closeSub = { subScreen = null }
+        androidx.activity.compose.BackHandler { closeSub() }
+        Box(Modifier.fillMaxSize()) {
+            when (subScreen) {
+                PatientDest.VACCINATIONS -> MyVaccinationsScreen(onBack = closeSub)
+                PatientDest.PRIVACY -> MyPrivacyScreen(onBack = closeSub)
+                PatientDest.LOCATION -> MyLocationScreen()
+                null -> Unit
+            }
+        }
+        return
+    }
+
     Column(Modifier.fillMaxSize().background(t.screenBg)) {
-        HoscoreTopBar("More", "Bills, vaccinations & hospitals")
+        HoscoreTopBar("More & Settings", "Bills, vaccinations, privacy & location")
         DataScreen(billsVm) { bills ->
             LazyColumn(
                 Modifier.fillMaxSize(),
@@ -125,6 +148,33 @@ fun PatientMoreScreen(onLogout: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
+                    Text("Health Services", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HoscoreCard(Modifier.weight(1f), onClick = { subScreen = PatientDest.VACCINATIONS }) {
+                            Column {
+                                Text("Vaccinations", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 14.sp)
+                                Text("Dose history & pass", color = t.textMuted, fontSize = 11.sp)
+                            }
+                        }
+                        HoscoreCard(Modifier.weight(1f), onClick = { subScreen = PatientDest.PRIVACY }) {
+                            Column {
+                                Text("Privacy", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 14.sp)
+                                Text("ABDM access grants", color = t.textMuted, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    HoscoreCard(Modifier.fillMaxWidth(), onClick = { subScreen = PatientDest.LOCATION }) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text("Indoor Live Location & Share", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 14.sp)
+                                Text("Share 24h wayfinding link with family", color = t.textMuted, fontSize = 12.sp)
+                            }
+                            StatusBadge("LIVE", t.emerald)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
                     Text("Outstanding bills", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp)
                     Spacer(Modifier.height(4.dp))
                 }

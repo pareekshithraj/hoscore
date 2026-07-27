@@ -9,6 +9,7 @@ import com.example.hoscore.core.model.Challenge
 import com.example.hoscore.core.model.Session
 import com.example.hoscore.core.network.Environment
 import com.example.hoscore.core.network.LoginRequest
+import com.example.hoscore.core.network.OtpStartRequest
 import com.example.hoscore.core.network.OtpResendRequest
 import com.example.hoscore.core.network.OtpVerifyRequest
 import com.example.hoscore.core.network.ServiceLocator
@@ -46,6 +47,21 @@ class AuthViewModel : ViewModel() {
         _state.value = _state.value.copy(loading = true, error = null)
         viewModelScope.launch {
             when (val res = apiCall { login(LoginRequest(identifier.trim(), password)) }) {
+                is Resource.Success -> handleAuthResponse(res.data)
+                is Resource.Error -> _state.value = _state.value.copy(loading = false, error = res.message)
+                Resource.Loading -> Unit
+            }
+        }
+    }
+
+    fun startOtp(identifier: String) {
+        if (identifier.isBlank()) {
+            _state.value = _state.value.copy(error = "Enter your phone number.")
+            return
+        }
+        _state.value = _state.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            when (val res = apiCall { startOtpLogin(OtpStartRequest(identifier.trim())) }) {
                 is Resource.Success -> handleAuthResponse(res.data)
                 is Resource.Error -> _state.value = _state.value.copy(loading = false, error = res.message)
                 Resource.Loading -> Unit

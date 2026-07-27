@@ -20,10 +20,19 @@ data class OtpVerifyRequest(val challengeId: String, val channel: String, val co
 data class OtpResendRequest(val challengeId: String, val channel: String)
 
 @Serializable
-data class SwitchContextRequest(val contextType: String, val hospitalId: String? = null)
+data class SwitchContextRequest(
+    val contextType: String,
+    val hospitalId: String? = null,
+    val password: String? = null,
+)
 
 @Serializable
-data class SwitchContextResponse(val token: String? = null)
+data class SwitchContextResponse(
+    val token: String? = null,
+    val activeContext: com.example.hoscore.core.model.ContextItem? = null,
+    val user: com.example.hoscore.core.model.User? = null,
+    val contexts: List<com.example.hoscore.core.model.ContextItem> = emptyList(),
+)
 
 // ---------- Hospital: stats / dashboard ----------
 @Serializable

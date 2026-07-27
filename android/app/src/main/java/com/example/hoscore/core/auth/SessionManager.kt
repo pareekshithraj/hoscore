@@ -26,17 +26,23 @@ object SessionManager {
         store.token?.let { HoscoreSocket.connect(it) }
     }
 
-    suspend fun switchContext(ctx: ContextItem): Resource<Unit> {
+    suspend fun switchContext(ctx: ContextItem, password: String? = null): Resource<Unit> {
         val result = apiCall {
-            switchContext(SwitchContextRequest(contextType = ctx.type, hospitalId = ctx.hospitalId))
+            switchContext(SwitchContextRequest(contextType = ctx.type, hospitalId = ctx.hospitalId, password = password))
         }
         return when (result) {
             is Resource.Success -> {
                 val newToken = result.data.token
+                val activeCtx = result.data.activeContext ?: ctx
                 if (newToken.isNullOrEmpty()) {
                     Resource.Error("Could not switch context.")
                 } else {
-                    store.updateActiveContext(newToken, ctx)
+                    store.updateActiveContext(
+                        newToken = newToken,
+                        activeContext = activeCtx,
+                        updatedUser = result.data.user,
+                        updatedContexts = result.data.contexts,
+                    )
                     HoscoreSocket.disconnect()
                     HoscoreSocket.connect(newToken)
                     Resource.Success(Unit)

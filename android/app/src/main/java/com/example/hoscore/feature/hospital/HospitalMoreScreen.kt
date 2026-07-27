@@ -29,20 +29,24 @@ import com.example.hoscore.core.ui.theme.HoscoreTokens
 enum class HospitalDest {
     ROOMS,
     ADMISSIONS,
+    DISCHARGES,
     PRESCRIPTIONS,
     LABS,
     VITALS,
     BILLING,
     DOCTORS,
     STAFF,
+    STAFF_TYPES,
     INVENTORY,
     EXPENSES,
     CLAIMS,
     SHIFTS,
     NOTICES,
     LEAVES,
+    GROUPS,
     FEEDBACK,
-    AUDIT_LOGS
+    AUDIT_LOGS,
+    MAP,
 }
 
 private data class MoreItem(val label: String, val icon: ImageVector, val dest: HospitalDest)
@@ -55,10 +59,12 @@ fun HospitalMoreScreen(onOpen: (HospitalDest) -> Unit, onLogout: () -> Unit) {
     val clinicalItems = listOf(
         MoreItem("Rooms & Beds", Icons.Rounded.Bed, HospitalDest.ROOMS),
         MoreItem("Admissions", Icons.Rounded.MedicalServices, HospitalDest.ADMISSIONS),
+        MoreItem("Discharge Summaries", Icons.Rounded.AssignmentTurnedIn, HospitalDest.DISCHARGES),
         MoreItem("Prescriptions", Icons.Rounded.Medication, HospitalDest.PRESCRIPTIONS),
         MoreItem("Lab Orders", Icons.Rounded.Science, HospitalDest.LABS),
         MoreItem("Patient Vitals", Icons.Rounded.MonitorHeart, HospitalDest.VITALS),
         MoreItem("Doctors Roster", Icons.Rounded.Badge, HospitalDest.DOCTORS),
+        MoreItem("Indoor Hospital Map", Icons.Rounded.Map, HospitalDest.MAP),
     )
 
     val adminItems = listOf(
@@ -67,7 +73,9 @@ fun HospitalMoreScreen(onOpen: (HospitalDest) -> Unit, onLogout: () -> Unit) {
         MoreItem("Operating Expenses", Icons.Rounded.Payments, HospitalDest.EXPENSES),
         MoreItem("Insurance Claims", Icons.Rounded.Shield, HospitalDest.CLAIMS),
         MoreItem("Staff Directory", Icons.Rounded.People, HospitalDest.STAFF),
+        MoreItem("Staff Types & Roles", Icons.Rounded.AdminPanelSettings, HospitalDest.STAFF_TYPES),
         MoreItem("Duty Shifts", Icons.Rounded.CalendarMonth, HospitalDest.SHIFTS),
+        MoreItem("Department Groups", Icons.Rounded.Groups, HospitalDest.GROUPS),
         MoreItem("Notice Board", Icons.Rounded.PushPin, HospitalDest.NOTICES),
         MoreItem("Leave Approvals", Icons.Rounded.EventBusy, HospitalDest.LEAVES),
         MoreItem("Patient Reviews", Icons.Rounded.Star, HospitalDest.FEEDBACK),

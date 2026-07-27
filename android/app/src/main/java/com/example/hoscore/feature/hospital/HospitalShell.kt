@@ -51,20 +51,24 @@ fun HospitalShell(
             when (subScreen) {
                 HospitalDest.ROOMS -> RoomsScreen()
                 HospitalDest.ADMISSIONS -> AdmissionsScreen()
+                HospitalDest.DISCHARGES -> DischargesScreen(onBack = closeSub)
                 HospitalDest.PRESCRIPTIONS -> PrescriptionsScreen(onBack = closeSub)
                 HospitalDest.LABS -> LabOrdersScreen(onBack = closeSub)
                 HospitalDest.VITALS -> VitalsScreen(onBack = closeSub)
                 HospitalDest.BILLING -> BillingScreen(onBack = closeSub)
                 HospitalDest.DOCTORS -> DoctorsScreen(onBack = closeSub)
                 HospitalDest.STAFF -> StaffScreen(onBack = closeSub)
+                HospitalDest.STAFF_TYPES -> StaffTypesScreen(onBack = closeSub)
                 HospitalDest.INVENTORY -> InventoryScreen(onBack = closeSub)
                 HospitalDest.EXPENSES -> ExpensesScreen(onBack = closeSub)
                 HospitalDest.CLAIMS -> ClaimsScreen(onBack = closeSub)
                 HospitalDest.SHIFTS -> ShiftsScreen(onBack = closeSub)
                 HospitalDest.NOTICES -> NoticesScreen(onBack = closeSub)
                 HospitalDest.LEAVES -> LeavesScreen(onBack = closeSub)
+                HospitalDest.GROUPS -> GroupsScreen(onBack = closeSub)
                 HospitalDest.FEEDBACK -> FeedbackScreen(onBack = closeSub)
                 HospitalDest.AUDIT_LOGS -> AuditLogsScreen(onBack = closeSub)
+                HospitalDest.MAP -> com.example.hoscore.feature.patient.MyLocationScreen()
                 null -> Unit
             }
         }

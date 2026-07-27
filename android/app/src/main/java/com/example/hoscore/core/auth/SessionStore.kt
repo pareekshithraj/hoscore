@@ -39,10 +39,17 @@ class SessionStore(context: Context) {
         prefs.edit().putString(KEY_SESSION, json.encodeToString(Session.serializer(), session)).apply()
     }
 
-    /** Replace just the token + active context (used by /auth/switch-context). */
-    fun updateActiveContext(newToken: String, ctx: ContextItem) {
+    /** Replace token, active context, user, and contexts returned by /auth/switch-context. */
+    fun updateActiveContext(
+        newToken: String,
+        activeContext: ContextItem,
+        updatedUser: User? = null,
+        updatedContexts: List<ContextItem> = emptyList(),
+    ) {
         val current = _session.value ?: return
-        save(current.copy(token = newToken, activeContext = ctx))
+        val nextUser = updatedUser ?: current.user
+        val nextContexts = if (updatedContexts.isNotEmpty()) updatedContexts else current.contexts
+        save(current.copy(token = newToken, activeContext = activeContext, user = nextUser, contexts = nextContexts))
     }
 
     fun clear() {

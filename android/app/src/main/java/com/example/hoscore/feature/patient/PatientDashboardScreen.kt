@@ -82,21 +82,128 @@ fun PatientDashboardScreen(
         }
 
         Column(Modifier.padding(horizontal = 20.dp)) {
-            GradientHeroCard(
-                eyebrow = "YOUR HEALTH PORTAL",
-                title = "Everything in one place",
-                metricLabel = "Secure & encrypted",
-                metricValue = "Active",
-                bullets = listOf(
-                    "Book and manage appointments",
-                    "View prescriptions & records",
-                    "Track bills and vaccinations",
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // "Let's Find Your Doctor" Search Header (Matching Image 4)
+            Text("Let's Find Your\nDoctor", fontSize = 24.sp, fontWeight = FontWeight.Black, color = t.textPrimary, lineHeight = 28.sp)
+            Spacer(Modifier.height(12.dp))
+
+            // Search Bar
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                    .background(t.card)
+                    .clickable { onOpenTab(3) }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Search, "Search", tint = t.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(10.dp))
+                    Text("Search doctors, specialties & hospitals...", fontSize = 13.sp, color = t.textMuted)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Specialist Filter Chips (Matching Image 4)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SpecialistChip("Pediatric", t.primary, true)
+                SpecialistChip("Neurologist", t.amber, false)
+                SpecialistChip("Physician", t.emerald, false)
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // "Health Status Review" Blue Hero (Matching Image 2)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(t.primary, Color(0xFF2563EB), Color(0xFF1D4ED8))
+                        )
+                    )
+                    .padding(20.dp)
+            ) {
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text("HEALTH STATUS REVIEW", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.White.copy(0.8f), letterSpacing = 1.sp)
+                            Text("Vitals & Biomarkers", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
+                        Box(
+                            Modifier.clip(CircleShape).background(Color.White.copy(0.2f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text("Normal", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        PatientMetricTile("SpO2", "98.5%", "Oxygen Saturation", Modifier.weight(1f))
+                        PatientMetricTile("Heart Rate", "78 bpm", "Pulse Rate", Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        PatientMetricTile("Blood Count", "Now 116/70", "Blood Pressure", Modifier.weight(1f))
+                        PatientMetricTile("Glucose Level", "90 mg/dL", "Fasting Glucose", Modifier.weight(1f))
+                    }
+                }
+            }
 
             Spacer(Modifier.height(22.dp))
-            SectionTitle("Quick actions")
+            SectionTitle("Upcoming appointment")
+            Spacer(Modifier.height(12.dp))
+
+            // Doctor Appointment Hero Card (Matching Image 4)
+            HoscoreCard(Modifier.fillMaxWidth(), onClick = { onOpenTab(1) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(52.dp).clip(CircleShape).background(t.primary.copy(0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("DR", color = t.primary, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                    }
+                    Spacer(Modifier.size(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Dr. Tanjana Jhon", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp)
+                            Spacer(Modifier.size(6.dp))
+                            Box(
+                                Modifier.clip(CircleShape).background(t.amber.copy(0.15f)).padding(horizontal = 6.dp, vertical = 2.dp),
+                            ) {
+                                Text("★ 4.9", fontSize = 10.sp, fontWeight = FontWeight.Black, color = t.amber)
+                            }
+                        }
+                        Text("Neurologist · 45 Reviews", color = t.textMuted, fontSize = 12.sp)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                Modifier.clip(CircleShape).background(t.primary.copy(0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                            ) {
+                                Text("14 Jun", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = t.primary)
+                            }
+                            Box(
+                                Modifier.clip(CircleShape).background(t.emerald.copy(0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                            ) {
+                                Text("14:30 PM", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = t.emerald)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(22.dp))
+            SectionTitle("Quick portal access")
             Spacer(Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -106,26 +213,41 @@ fun PatientDashboardScreen(
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 QuickAction("Bills", Icons.Rounded.Payments, t.amber, Modifier.weight(1f)) { onOpenTab(3) }
-                QuickAction("Find hospital", Icons.Rounded.Search, t.cyan, Modifier.weight(1f)) { onOpenTab(3) }
+                QuickAction("Find Hospital", Icons.Rounded.Search, t.cyan, Modifier.weight(1f)) { onOpenTab(3) }
             }
 
-            Spacer(Modifier.height(22.dp))
-            SectionTitle("Your care")
-            Spacer(Modifier.height(12.dp))
-            HoscoreCard(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(t.emerald.copy(0.12f)),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Rounded.Vaccines, null, tint = t.emerald, modifier = Modifier.size(22.dp)) }
-                    Spacer(Modifier.size(14.dp))
-                    Column {
-                        Text("Health summary", fontWeight = FontWeight.Bold, color = t.textPrimary, fontSize = 14.sp)
-                        Text("Open a tab below to view live details", color = t.textMuted, fontSize = 12.sp)
-                    }
-                }
-            }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun SpecialistChip(label: String, color: Color, selected: Boolean) {
+    val t = HoscoreTokens.current
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .background(if (selected) color else t.card)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Black, color = if (selected) Color.White else t.textMuted)
+    }
+}
+
+@Composable
+private fun PatientMetricTile(title: String, value: String, sub: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.15f))
+            .padding(12.dp)
+    ) {
+        Column {
+            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Spacer(Modifier.height(2.dp))
+            Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(sub, fontSize = 9.5.sp, color = Color.White.copy(0.75f))
         }
     }
 }
