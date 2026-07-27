@@ -752,6 +752,19 @@ export const Login = () => {
 
       <div className="flex-1 min-h-screen flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-20 bg-[#1C1924]">
         <div className="max-w-md w-full mx-auto space-y-6">
+          {/* Image 3 Hero Card */}
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 rounded-3xl p-6 text-white shadow-xl shadow-blue-500/10 border border-blue-400/20">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-black uppercase tracking-wider mb-3">
+              🏥 PATIENTS & HOSPITALS v2.0
+            </div>
+            <h1 className="text-2xl font-black tracking-tight leading-tight">
+              Level Up Your Health Game
+            </h1>
+            <p className="text-xs text-blue-100/90 font-medium mt-1">
+              Balanced clinical care. Real-time patient queues. Instant records & sovereign privacy.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <h2 className="text-3xl font-bold tracking-tight text-white">
               {mode === 'register'

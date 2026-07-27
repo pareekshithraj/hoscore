@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.hoscore"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
 
         buildConfigField("String", "PROD_API_BASE", "\"https://api.hoscore.in/api/\"")
         buildConfigField("String", "PROD_WS_URL", "\"wss://api.hoscore.in/ws\"")
