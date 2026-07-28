@@ -81,59 +81,103 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // WebSocket — connect once; listen for NEW_APPOINTMENT from server
+  const knownApptIdsRef = useRef<Set<string> | null>(null);
+
+  // Live Toast Notifications — via WebSocket (dev/local) OR HTTP Polling Fallback (Production)
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // WebSocket not available on Vercel serverless — skip
     const hostname = window.location.hostname;
     const isServerless =
       hostname.endsWith('.vercel.app') ||
       hostname === 'hoscore.in' ||
       hostname === 'www.hoscore.in';
-    if (isServerless) return;
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let host = window.location.host;
-    try {
-      if (BASE_URL.startsWith('http')) {
-        const url = new URL(BASE_URL);
-        host = url.host;
-      }
-    } catch {}
-    const wsUrl = `${wsProtocol}//${host}/ws?token=${token}`;
+    // 1. Try WebSocket if not serverless
+    if (!isServerless) {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      let host = window.location.host;
+      try {
+        if (BASE_URL.startsWith('http')) {
+          const url = new URL(BASE_URL);
+          host = url.host;
+        }
+      } catch {}
+      const wsUrl = `${wsProtocol}//${host}/ws?token=${token}`;
 
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'NEW_APPOINTMENT') {
-            const d = payload.data;
-            setToasts(prev => [
-              ...prev,
-              {
-                id: ++toastIdRef.current,
-                patientName: d.patientName || 'Patient',
-                tokenNumber: d.tokenNumber,
-                date: d.date,
-                time: d.time,
-                doctorName: d.doctorName,
-              },
-            ]);
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'NEW_APPOINTMENT') {
+              const d = payload.data;
+              setToasts(prev => [
+                ...prev,
+                {
+                  id: ++toastIdRef.current,
+                  patientName: d.patientName || 'Patient',
+                  tokenNumber: d.tokenNumber,
+                  date: d.date,
+                  time: d.time,
+                  doctorName: d.doctorName,
+                },
+              ]);
+            }
+          } catch {}
+        };
+        ws.onerror = () => {};
+        ws.onclose = () => {};
+      } catch {}
+    }
+
+    // 2. HTTP Polling Fallback (Essential for Vercel/production live toasts)
+    const checkNewAppointments = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/appointments`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const list: any[] = await res.json();
+        if (!Array.isArray(list)) return;
+
+        if (!knownApptIdsRef.current) {
+          // Initial seed — remember existing appointment IDs
+          knownApptIdsRef.current = new Set(list.map((a: any) => a.id));
+        } else {
+          // Check for newly added appointments
+          for (const appt of list) {
+            if (!knownApptIdsRef.current.has(appt.id)) {
+              knownApptIdsRef.current.add(appt.id);
+              if (appt.status === 'PENDING' || appt.status === 'CONFIRMED') {
+                const dateStr = appt.date ? new Date(appt.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Today';
+                setToasts(prev => [
+                  ...prev,
+                  {
+                    id: ++toastIdRef.current,
+                    patientName: appt.patient?.name || appt.patientName || 'Patient',
+                    tokenNumber: appt.tokenNumber || 1,
+                    date: dateStr,
+                    time: appt.time || '10:00 AM',
+                    doctorName: appt.doctor?.name,
+                  },
+                ]);
+              }
+            }
           }
-        } catch {}
-      };
+        }
+      } catch {}
+    };
 
-      ws.onerror = () => {};
-      ws.onclose = () => {};
-    } catch {}
+    checkNewAppointments();
+    const interval = setInterval(checkNewAppointments, 10000);
 
     return () => {
+      clearInterval(interval);
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }

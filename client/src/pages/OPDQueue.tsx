@@ -80,6 +80,8 @@ export const OPDQueue = () => {
   const [filterDoctor, setFilterDoctor] = useState('ALL');
   const [now, setNow] = useState(Date.now());
 
+  const [pendingAppointments, setPendingAppointments] = useState<any[]>([]);
+
   const loadQueue = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -92,11 +94,21 @@ export const OPDQueue = () => {
     }
   }, []);
 
-  useEffect(() => { loadQueue(); }, [loadQueue]);
+  const loadPendingAppointments = useCallback(async () => {
+    try {
+      const res = await api.get('/appointments');
+      if (Array.isArray(res)) {
+        const pending = res.filter((a: any) => a.status === 'PENDING');
+        setPendingAppointments(pending);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadQueue(); loadPendingAppointments(); }, [loadQueue, loadPendingAppointments]);
   useEffect(() => {
-    const t = setInterval(() => { setNow(Date.now()); loadQueue(true); }, 20000);
+    const t = setInterval(() => { setNow(Date.now()); loadQueue(true); loadPendingAppointments(); }, 12000);
     return () => clearInterval(t);
-  }, [loadQueue]);
+  }, [loadQueue, loadPendingAppointments]);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -298,6 +310,26 @@ export const OPDQueue = () => {
   const computedTargetDate = alertInterval !== 'None' ? calculateTargetDate(alertInterval) : null;
   void now; // drives re-render for wait timers
 
+  const handleCheckInAppt = async (id: string) => {
+    try {
+      await api.patch(`/appointments/${id}/checkin`);
+      loadPendingAppointments();
+      loadQueue(true);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to check in appointment');
+    }
+  };
+
+  const handleCheckInAllAppts = async () => {
+    try {
+      for (const appt of pendingAppointments) {
+        await api.patch(`/appointments/${appt.id}/checkin`);
+      }
+      loadPendingAppointments();
+      loadQueue(true);
+    } catch {}
+  };
+
   if (loading) return <LoadingState label="Loading live OPD board…" />;
 
   return (
@@ -369,7 +401,7 @@ export const OPDQueue = () => {
             ))}
           </select>
           <button
-            onClick={() => loadQueue()}
+            onClick={() => { loadQueue(); loadPendingAppointments(); }}
             className="rounded-xl border border-[var(--card-border)] p-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             title="Refresh"
           >
@@ -377,6 +409,61 @@ export const OPDQueue = () => {
           </button>
         </div>
       </div>
+
+      {/* 🔔 Pending Online Bookings Banner */}
+      {pendingAppointments.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 shadow-sm animate-fade-in">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+              </span>
+              <span className="font-bold text-amber-700 dark:text-amber-300 text-sm">
+                🔔 {pendingAppointments.length} Online Booking{pendingAppointments.length > 1 ? 's' : ''} Pending Check-In
+              </span>
+              <span className="hidden md:inline text-xs text-[var(--text-muted)] font-medium">
+                (Click "Check In" to immediately add patient to the OPD Live Board)
+              </span>
+            </div>
+            {pendingAppointments.length > 1 && (
+              <button
+                onClick={handleCheckInAllAppts}
+                className="rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 active:scale-95 transition-all"
+              >
+                Check In All ({pendingAppointments.length})
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pendingAppointments.map((appt) => (
+              <div
+                key={appt.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-[var(--card-bg)] p-3 shadow-xs hover:border-amber-500/40 transition-all"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[var(--text-primary)] text-sm truncate">
+                    {appt.patient?.name || appt.patientName || 'Patient'}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)] font-semibold flex items-center gap-1.5 mt-0.5">
+                    <span className="rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 font-bold">
+                      #{appt.tokenNumber}
+                    </span>
+                    <span>{appt.time || '10:00 AM'}</span>
+                    {appt.doctor?.name && <span className="truncate">· Dr. {appt.doctor.name}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleCheckInAppt(appt.id)}
+                  className="shrink-0 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+                >
+                  Check In →
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Kanban board */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">

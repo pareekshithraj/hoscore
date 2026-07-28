@@ -181,6 +181,7 @@ router.get('/analytics', requireFeature(FEATURES.ANALYTICS), statsController.get
 router.get('/appointments', requireFeature(FEATURES.CALENDAR), appointmentController.getAllAppointments);
 router.post('/appointments', requireFeature(FEATURES.CALENDAR), appointmentController.createAppointment);
 router.patch('/appointments/:id/checkin', requireFeature(FEATURES.QUEUE), appointmentController.checkInAppointment);
+router.patch('/appointments/:id/check-in', requireFeature(FEATURES.QUEUE), appointmentController.checkInAppointment);
 router.delete('/appointments/:id', requireFeature(FEATURES.CALENDAR), appointmentController.deleteAppointment);
 
 // Rooms
