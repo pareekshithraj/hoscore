@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.hoscore"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "3.0"
 
         buildConfigField("String", "PROD_API_BASE", "\"https://api.hoscore.in/api/\"")
         buildConfigField("String", "PROD_WS_URL", "\"wss://api.hoscore.in/ws\"")
@@ -105,4 +105,10 @@ dependencies {
 
   // Encrypted Storage (JWT token)
   implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+  // Google Fonts (Inter)
+  implementation("androidx.compose.ui:ui-text-google-fonts")
+
+  // Biometric authentication
+  implementation("androidx.biometric:biometric:1.2.0-alpha05")
 }

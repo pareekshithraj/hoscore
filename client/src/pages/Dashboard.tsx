@@ -12,8 +12,11 @@ import {
   ArrowRight,
   FileText,
   Pill,
+  Building2,
+  QrCode,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { HospitalQRPassModal } from "../components/HospitalQRPassModal";
 import {
   AreaChart,
   Area,
@@ -132,6 +135,7 @@ export const Dashboard = () => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showHospitalQR, setShowHospitalQR] = useState(false);
 
   // Real data lists for quick actions
   const [patients, setPatients] = useState<any[]>([]);
@@ -588,6 +592,13 @@ export const Dashboard = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowHospitalQR(true)}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-sm"
+            >
+              <Building2 className="w-4 h-4" />
+              Hospital QR Pass
+            </button>
             <div className="flex items-center gap-2.5 rounded-2xl border border-[var(--card-border)] bg-[var(--bg-secondary)] px-4 py-2.5">
               <Clock className={`h-4 w-4 ${rt.clock}`} />
               <div className="leading-tight">
@@ -599,6 +610,13 @@ export const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        <HospitalQRPassModal
+          isOpen={showHospitalQR}
+          onClose={() => setShowHospitalQR(false)}
+          hospitalName={hospitalName || "Hoscore Facility"}
+          hospitalId={activeContext?.hospitalId || "HSP-MAIN"}
+        />
       </div>
 
       {role === "PHARMACIST" ? (

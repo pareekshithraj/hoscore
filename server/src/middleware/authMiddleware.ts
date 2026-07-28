@@ -96,7 +96,8 @@ export const authorize = (roles: string[]) => {
 export const requireFeature = (feature: string) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-    // Fix 1: Enforce valid hospital context when accessing hospital features
+    if (req.user.contextType === 'patient') return next();
+    // Enforce valid hospital context when accessing hospital features
     if (req.user.contextType !== 'hospital' || !req.user.hospitalId) {
       if (!req.user.isSuperAdmin) {
         return res.status(403).json({ error: 'Hospital context required to access this feature' });

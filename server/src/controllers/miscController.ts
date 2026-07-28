@@ -11,11 +11,23 @@ export const getAllDoctors = async (req: Request, res: Response) => {
 };
 
 export const createDoctor = async (req: Request, res: Response) => {
-  const { name, specialty, contact, email } = req.body;
+  const { name, specialty, contact, email, status } = req.body;
   try {
-    const doctor = await prisma.doctor.create({ data: { name, specialty, contact, email, hospitalId: hid(req) } });
+    const doctor = await prisma.doctor.create({ data: { name, specialty, contact, email, status: status || 'ON_DUTY', hospitalId: hid(req) } });
     res.status(201).json(doctor);
   } catch { res.status(500).json({ error: 'Failed to create doctor' }); }
+};
+
+export const updateDoctor = async (req: Request, res: Response) => {
+  try {
+    const existing = await prisma.doctor.findFirst({ where: { id: req.params.id, hospitalId: hid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Doctor not found' });
+    const doctor = await prisma.doctor.update({
+      where: { id: existing.id },
+      data: req.body,
+    });
+    res.json(doctor);
+  } catch { res.status(500).json({ error: 'Failed to update doctor' }); }
 };
 
 export const getAllInventory = async (req: Request, res: Response) => {

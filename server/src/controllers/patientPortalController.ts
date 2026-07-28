@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
+import { parseDateSafe } from '../utils/dateUtils.js';
 
 async function validatePatientAccess(userId: string, targetPatientId?: string): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { patientProfile: true } });
@@ -232,9 +233,32 @@ export const rescheduleAppointment = async (req: AuthRequest, res: Response) => 
     if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
 
     if (appointment.status === 'COMPLETED' || appointment.status === 'CANCELLED') return res.status(400).json({ error: 'This appointment cannot be rescheduled' });
+    const apptDate = parseDateSafe(date);
+    if (!apptDate) return res.status(400).json({ error: 'Invalid date format' });
+    const apptDateTime = new Date(`${date.slice(0, 10)}T${time}`);
+    if (!isNaN(apptDateTime.getTime()) && apptDateTime < new Date(Date.now() - 5 * 60 * 1000)) {
+      return res.status(400).json({ error: 'Cannot reschedule appointments into the past.' });
+    }
+
+    // Check slot collision
+    if (appointment.doctorId) {
+      const existingSlot = await prisma.appointment.findFirst({
+        where: {
+          doctorId: appointment.doctorId,
+          date: apptDate,
+          time,
+          status: { notIn: ['CANCELLED'] },
+          id: { not: appointment.id }
+        }
+      });
+      if (existingSlot) {
+        return res.status(409).json({ error: 'Selected time slot is already booked for this doctor. Please select another time slot.' });
+      }
+    }
+
     const updated = await prisma.appointment.update({
       where: { id: req.params.id },
-      data: { date: new Date(date), time, status: 'PENDING' },
+      data: { date: apptDate, time, status: 'PENDING' },
       include: { hospital: { select: { name: true } }, doctor: { select: { name: true, specialty: true } } },
     });
     res.json(updated);
@@ -255,7 +279,15 @@ export const getVaccinations = async (req: AuthRequest, res: Response) => {
     });
 
     if (vaccinations.length === 0) {
-      const presets = [
+      // Check patient age to determine if pediatric presets apply
+      const patient = await prisma.patient.findUnique({ where: { id: pid }, select: { dateOfBirth: true } });
+      let isPediatric = true;
+      if (patient?.dateOfBirth) {
+        const ageYears = (new Date().getTime() - new Date(patient.dateOfBirth).getTime()) / (365.25 * 24 * 3600 * 1000);
+        if (ageYears > 18) isPediatric = false;
+      }
+
+      const presets = isPediatric ? [
         { name: 'BCG (Tuberculosis)', scheduledAge: 'At Birth' },
         { name: 'Hepatitis B (Birth Dose)', scheduledAge: 'At Birth' },
         { name: 'OPV 0 (Polio)', scheduledAge: 'At Birth' },
@@ -276,6 +308,11 @@ export const getVaccinations = async (req: AuthRequest, res: Response) => {
         { name: 'DPT Booster 2', scheduledAge: '5-6 Years' },
         { name: 'Td (Tetanus, Diphtheria)', scheduledAge: '10 Years' },
         { name: 'Td Booster', scheduledAge: '15 Years' }
+      ] : [
+        { name: 'Td/Tdap (Tetanus, Diphtheria, Pertussis)', scheduledAge: 'Every 10 Years' },
+        { name: 'Influenza (Annual Flu Shot)', scheduledAge: 'Annually' },
+        { name: 'Hepatitis B (Adult Series)', scheduledAge: 'On Demand / High Risk' },
+        { name: 'Pneumococcal (PCV20 / PPSV23)', scheduledAge: 'Age 50+ / High Risk' }
       ];
 
       // Insert presets

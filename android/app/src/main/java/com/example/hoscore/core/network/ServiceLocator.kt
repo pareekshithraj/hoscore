@@ -67,7 +67,11 @@ object ServiceLocator {
             val builder = chain.request().newBuilder()
             sessionStore.token?.let { builder.addHeader("Authorization", "Bearer $it") }
             val response: Response = chain.proceed(builder.build())
-            if (response.code == 401) {
+            // Only treat a 401 as an expired session for authenticated endpoints. The
+            // backend also returns 401 for invalid login credentials / failed OTP on the
+            // /auth/* routes — those must surface inline, not trigger a forced logout.
+            val isAuthRoute = chain.request().url.encodedPath.contains("/auth/")
+            if (response.code == 401 && !isAuthRoute && sessionStore.token != null) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     onUnauthorized?.invoke()
                 }

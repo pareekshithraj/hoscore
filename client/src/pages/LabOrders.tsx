@@ -37,11 +37,34 @@ export const LabOrders = () => {
     loadOrders();
   };
 
+  const [selectedResultOrder, setSelectedResultOrder] = useState<any>(null);
+  const [resultForm, setResultForm] = useState({ result: "", unit: "", normalRange: "", remarks: "" });
+
+  const openResultModal = (order: any) => {
+    setSelectedResultOrder(order);
+    setResultForm({
+      result: order.result || "",
+      unit: order.unit || "",
+      normalRange: order.normalRange || "",
+      remarks: order.remarks || "",
+    });
+  };
+
+  const handleSaveResult = async () => {
+    if (!selectedResultOrder) return;
+    await api.put(`/lab-orders/${selectedResultOrder.id}`, {
+      ...resultForm,
+      status: "COMPLETED",
+    });
+    setSelectedResultOrder(null);
+    loadOrders();
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Lab Orders"
-        subtitle="Manage diagnostic tests and sample processing tracking"
+        subtitle="Manage diagnostic tests, result values, and sample processing"
         icon={<TestTube className="w-5 h-5" />}
         actions={
           <button
@@ -57,37 +80,72 @@ export const LabOrders = () => {
         {orders.map((o) => (
           <div
             key={o.id}
-            className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
+            className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 flex flex-col justify-between gap-4 shadow-sm"
           >
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/15">
-                <TestTube className="w-6 h-6" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/15">
+                  <TestTube className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                    {o.testName}{" "}
+                    <span className="text-[10px] bg-[var(--inner-bg)] px-2 py-0.5 rounded border border-[var(--card-border)] text-[var(--text-muted)] font-bold uppercase tracking-wider">
+                      {o.testType || o.category || "Blood Test"}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {o.patientName} • Dr. {o.doctorName}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold flex items-center gap-2 text-[var(--text-primary)]">
-                  {o.testName}{" "}
-                  <span className="text-[10px] bg-[var(--inner-bg)] px-2 py-0.5 rounded border border-[var(--card-border)] text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                    {o.testType}
+              <div className="flex items-center justify-between sm:justify-end gap-3">
+                <StatusPill status={o.priority} />
+                {o.status !== "COMPLETED" && (
+                  <button
+                    onClick={() => openResultModal(o)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all"
+                  >
+                    Enter Results
+                  </button>
+                )}
+                <select
+                  value={o.status}
+                  onChange={(e) => {
+                    if (e.target.value === "COMPLETED") {
+                      openResultModal(o);
+                    } else {
+                      handleUpdate(o.id, { status: e.target.value });
+                    }
+                  }}
+                  className="text-xs font-bold border border-[var(--input-border)] rounded-lg px-2.5 py-1.5 bg-[var(--input-bg)] text-[var(--text-primary)] cursor-pointer focus:outline-none"
+                >
+                  <option value="ORDERED">Ordered</option>
+                  <option value="SAMPLE_COLLECTED">Sample Collected</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+            </div>
+
+            {(o.result || o.remarks) && (
+              <div className="mt-2 p-3 rounded-xl bg-[var(--inner-bg)] border border-[var(--card-border)] text-xs space-y-1">
+                <div className="font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <span>Result:</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black text-sm">
+                    {o.result} {o.unit}
                   </span>
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  {o.patientName} • Dr. {o.doctorName}
-                </p>
+                  {o.normalRange && (
+                    <span className="text-[var(--text-muted)] font-normal">
+                      (Ref: {o.normalRange})
+                    </span>
+                  )}
+                </div>
+                {o.remarks && (
+                  <p className="text-[var(--text-secondary)] italic">"{o.remarks}"</p>
+                )}
               </div>
-            </div>
-            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-[var(--card-border)]">
-              <StatusPill status={o.priority} />
-              <select
-                value={o.status}
-                onChange={(e) => handleUpdate(o.id, { status: e.target.value })}
-                className="text-xs font-bold border border-[var(--input-border)] rounded-lg px-2.5 py-1.5 bg-[var(--input-bg)] text-[var(--text-primary)] cursor-pointer focus:outline-none"
-              >
-                <option value="ORDERED">Ordered</option>
-                <option value="SAMPLE_COLLECTED">Sample Collected</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-            </div>
+            )}
           </div>
         ))}
 

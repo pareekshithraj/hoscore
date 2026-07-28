@@ -40,6 +40,8 @@ export const MyAppointments = () => {
     loadAppointments();
   };
 
+  const [selectedPassAppt, setSelectedPassAppt] = useState<any | null>(null);
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
@@ -65,28 +67,40 @@ export const MyAppointments = () => {
           {appts.map((a: any) => {
             const canManage = ['PENDING', 'CONFIRMED'].includes(a.status);
             return (
-              <div key={a.id} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+              <div key={a.id} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm hover:shadow-md transition-all">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><Calendar className="w-6 h-6 text-blue-600" /></div>
-                  <div className="flex-1">
-                    <p className="font-bold text-slate-900">{a.doctor?.name || 'Doctor'}</p>
-                    <p className="text-sm text-slate-500">{a.hospital?.name} - {new Date(a.date).toLocaleDateString()} - {a.time}</p>
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center cursor-pointer" onClick={() => setSelectedPassAppt(a)}>
+                    <Calendar className="w-6 h-6 text-blue-600" />
                   </div>
-                  <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${a.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' : a.status === 'COMPLETED' ? 'bg-slate-100 text-slate-600' : a.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{a.status}</span>
-                  {canManage && (
-                    <div className="flex gap-2">
-                      <button onClick={() => setRescheduleId(rescheduleId === a.id ? '' : a.id)} className="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold">Reschedule</button>
-                      {confirmCancelId === a.id ? (
-                        <div className="flex gap-1.5 items-center">
-                          <span className="text-xs text-rose-600 font-medium">Confirm?</span>
-                          <button onClick={() => cancelAppointment(a.id)} className="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold">Yes</button>
-                          <button onClick={() => setConfirmCancelId('')} className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">No</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmCancelId(a.id)} className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold">Cancel</button>
-                      )}
+                  <div className="flex-1 cursor-pointer" onClick={() => setSelectedPassAppt(a)}>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-900">{a.doctor?.name || 'Consultation'}</p>
+                      <span className="text-xs font-black bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full border border-blue-200">
+                        Token #{a.tokenNumber || 1}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-sm text-slate-500 mt-0.5">{a.hospital?.name} • {new Date(a.date).toLocaleDateString()} at <span className="font-bold text-slate-700">{a.time}</span></p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setSelectedPassAppt(a)} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all flex items-center gap-1">
+                      🎟️ View Pass
+                    </button>
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${a.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' : a.status === 'COMPLETED' ? 'bg-slate-100 text-slate-600' : a.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{a.status}</span>
+                    {canManage && (
+                      <div className="flex gap-2">
+                        <button onClick={() => setRescheduleId(rescheduleId === a.id ? '' : a.id)} className="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold">Reschedule</button>
+                        {confirmCancelId === a.id ? (
+                          <div className="flex gap-1.5 items-center">
+                            <span className="text-xs text-rose-600 font-medium">Confirm?</span>
+                            <button onClick={() => cancelAppointment(a.id)} className="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold">Yes</button>
+                            <button onClick={() => setConfirmCancelId('')} className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">No</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmCancelId(a.id)} className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold">Cancel</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {rescheduleId === a.id && (
                   <div className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 border-t border-slate-100 pt-4">
@@ -100,6 +114,67 @@ export const MyAppointments = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {selectedPassAppt && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="max-w-md w-full glass-card border border-white/10 rounded-[32px] p-6 text-center space-y-6 relative shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Appointment Pass
+              </span>
+              <button onClick={() => setSelectedPassAppt(null)} className="text-slate-400 hover:text-white font-bold text-sm px-2.5 py-1 rounded-lg bg-white/5 cursor-pointer">✕</button>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-[#0f172a] rounded-2xl p-6 border border-rose-500/30 text-white relative overflow-hidden text-left shadow-2xl">
+              <div className="space-y-1 mb-4 border-b border-white/10 pb-3">
+                <p className="text-xs text-rose-400 font-bold uppercase tracking-wider">{selectedPassAppt.hospital?.name}</p>
+                <p className="text-lg font-black text-white">{selectedPassAppt.patient?.name || 'Patient'}</p>
+                <p className="text-xs text-slate-400">HOSCORE ID: <span className="font-mono font-bold text-rose-300">#{selectedPassAppt.patient?.sixDigitId || '882910'}</span></p>
+              </div>
+
+              <div className="flex items-center justify-between my-3 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3.5">
+                <div>
+                  <p className="text-[10px] text-rose-300 font-black uppercase tracking-widest">Token Number</p>
+                  <p className="text-4xl font-black text-white">#{selectedPassAppt.tokenNumber || 1}</p>
+                </div>
+                <div className="bg-white p-1.5 rounded-lg shadow-md">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`HOSCORE:${selectedPassAppt.patient?.sixDigitId || '882910'}:${selectedPassAppt.id}:TOKEN-${selectedPassAppt.tokenNumber || 1}`)}`}
+                    alt="Check-in QR"
+                    className="w-16 h-16 rounded-md"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-xs">
+                <div>
+                  <p className="text-slate-400">Time Slot</p>
+                  <p className="font-extrabold text-white">{selectedPassAppt.time}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400">Date</p>
+                  <p className="font-extrabold text-white">{new Date(selectedPassAppt.date).toLocaleDateString()}</p>
+                </div>
+              </div>
+              {selectedPassAppt.doctor?.name && (
+                <div className="mt-2 pt-2 border-t border-white/5 text-xs">
+                  <p className="text-slate-400">Attending Doctor</p>
+                  <p className="font-bold text-rose-300">{selectedPassAppt.doctor?.name}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => window.print()} className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl text-xs cursor-pointer">
+                🖨️ Print Pass
+              </button>
+              <button onClick={() => setSelectedPassAppt(null)} className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs cursor-pointer">
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

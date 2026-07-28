@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../services/api';
-import { Plus, Search, User, Moon, Sun, Coffee, Edit2, Trash2, Check, Save } from 'lucide-react';
+import { Plus, Search, User, Moon, Sun, Coffee, Edit2, Trash2, Check, Save, QrCode } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { StaffQRBadgeModal } from '../components/StaffQRBadgeModal';
 import { ALL_FEATURES, FEATURE_LABELS } from '../utils/features';
 
 const roleColors: Record<string, string> = {
@@ -41,6 +42,7 @@ export const Staff = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('All Roles');
   const [selectedShift, setSelectedShift] = useState('All Shifts');
+  const [selectedBadgeStaff, setSelectedBadgeStaff] = useState<any | null>(null);
   const [membershipForm, setMembershipForm] = useState({
     role: 'STAFF',
     department: 'General',
@@ -209,10 +211,19 @@ export const Staff = () => {
                     <p className="font-bold text-slate-900 dark:text-zinc-150">{membership.user?.name || membership.user?.email}</p>
                     <p className="text-xs text-slate-500 dark:text-zinc-450 mt-0.5">{membership.user?.email} - {membership.staffType?.name || 'Custom permissions'} - {permissionCount} features</p>
                   </div>
-                  <button onClick={() => startEditMembership(membership)} className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850 text-xs font-bold transition-all cursor-pointer">
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit Access
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedBadgeStaff(membership)}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      Staff Badge
+                    </button>
+                    <button onClick={() => startEditMembership(membership)} className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850 text-xs font-bold transition-all cursor-pointer">
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Edit Access
+                    </button>
+                  </div>
                 </div>
                 {isEditing && (
                   <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
@@ -432,6 +443,14 @@ export const Staff = () => {
           </div>
         </div>
       </Modal>
+
+      <StaffQRBadgeModal
+        isOpen={!!selectedBadgeStaff}
+        onClose={() => setSelectedBadgeStaff(null)}
+        staffName={selectedBadgeStaff?.user?.name || selectedBadgeStaff?.user?.email || 'Staff Member'}
+        roleOrSpecialty={selectedBadgeStaff?.staffType?.name || selectedBadgeStaff?.role || 'Clinical Staff'}
+        staffId={selectedBadgeStaff?.id || 'STF-MAIN'}
+      />
     </div>
   );
 };

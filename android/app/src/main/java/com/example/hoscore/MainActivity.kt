@@ -28,9 +28,8 @@ class MainActivity : ComponentActivity() {
 
         val appState = AppState(this)
 
-        enableEdgeToEdge()
         setContent {
-            HoscoreTheme(darkTheme = appState.darkMode) {
+            HoscoreTheme(darkTheme = false) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var showSplash by remember { mutableStateOf(true) }
                     if (showSplash) {

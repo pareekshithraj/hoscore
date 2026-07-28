@@ -2,7 +2,6 @@ import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { pick } from '../utils/pick.js';
 
-
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
 export const getAllLabOrders = async (req: Request, res: Response) => {
@@ -26,26 +25,32 @@ export const createLabOrder = async (req: Request, res: Response) => {
       }
     }
     const safeData = pick(req.body, ['patientId', 'patientName', 'testName', 'category', 'priority', 'status', 'doctorName', 'notes', 'resultSummary', 'resultFileUrl']);
+    const initialStatus = safeData.status || 'PENDING';
 
-    const order = await prisma.labOrder.create({ data: { ...safeData, hospitalId: hid(req) } });
+    const order = await prisma.labOrder.create({ data: { ...safeData, status: initialStatus, hospitalId: hid(req) } });
     res.status(201).json(order);
   } catch (err) { res.status(500).json({ error: 'Failed to create lab order' }); }
 };
-
-
 
 export const updateLabOrder = async (req: Request, res: Response) => {
   try {
     const existing = await prisma.labOrder.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
     if (!existing) return res.status(404).json({ error: 'Lab order not found' });
 
-    const safeData: any = pick(req.body, ['testName', 'category', 'priority', 'status', 'doctorName', 'notes', 'resultSummary', 'resultFileUrl']);
-    if (safeData.status === 'COMPLETED') safeData.completedAt = new Date();
+    const safeData: any = pick(req.body, ['testName', 'category', 'priority', 'status', 'doctorName', 'notes', 'resultSummary', 'resultFileUrl', 'result', 'normalRange', 'unit', 'remarks']);
+    const newStatus = (safeData.status || '').toUpperCase();
+    const currentStatus = (existing.status || 'ORDERED').toUpperCase();
+
+    // Collision Guard: COMPLETED lab orders cannot be reopened
+    if (currentStatus === 'COMPLETED' && newStatus !== 'COMPLETED') {
+      return res.status(400).json({ error: "Collision Guard: Completed lab orders cannot be reopened or reset." });
+    }
+
+    if (newStatus === 'COMPLETED' && !safeData.completedAt) safeData.completedAt = new Date();
     const order = await prisma.labOrder.update({ where: { id: existing.id }, data: safeData });
     res.json(order);
   } catch (err) { res.status(500).json({ error: 'Failed to update lab order' }); }
 };
-
 
 export const deleteLabOrder = async (req: Request, res: Response) => {
   try {
@@ -56,4 +61,3 @@ export const deleteLabOrder = async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Failed to delete lab order' }); }
 };
-

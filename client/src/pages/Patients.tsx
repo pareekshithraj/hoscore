@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Search, Filter, Edit2, Trash2, Calendar, Phone, Activity, Eye, Users } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Calendar, Phone, Activity, Eye, Users, QrCode } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { HoscoreIDScannerModal } from '../components/HoscoreIDScannerModal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { LoadingState } from '../components/ui/LoadingState';
 import { StatusPill } from '../components/ui/StatusPill';
@@ -30,6 +31,7 @@ export const Patients = () => {
   const [submitting, setSubmitting] = useState(false);
   // Possible-duplicate prompt: holds the existing patient the backend matched.
   const [duplicateMatch, setDuplicateMatch] = useState<any>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const openBookingModal = (patient: any) => {
     setSelectedPatient(patient);
@@ -142,14 +144,29 @@ export const Patients = () => {
         subtitle="View and manage patient clinical records and history"
         icon={<Users className="w-5 h-5" />}
         actions={
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Register New Patient
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 rounded-xl text-sm font-bold text-white hover:bg-sky-500 transition-colors shadow-sm cursor-pointer"
+            >
+              <QrCode className="w-4 h-4" />
+              Scan / Search Hoscore ID
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Register New Patient
+            </button>
+          </div>
         }
+      />
+
+      <HoscoreIDScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onAppointmentBooked={fetchPatients}
       />
 
       <div className="flex flex-wrap items-center gap-4 bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--card-border)] shadow-sm">

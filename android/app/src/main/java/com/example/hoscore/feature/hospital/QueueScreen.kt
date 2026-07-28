@@ -18,7 +18,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,19 +60,36 @@ fun QueueScreen() {
                 if (s.data.isEmpty()) {
                     EmptyState("Queue is empty", "Patients checked in will show here.", Icons.Rounded.Groups)
                 } else {
+                    val waitingCount = s.data.count { it.status.uppercase() == "WAITING" }
+                    val consultCount = s.data.count { it.status.uppercase() == "IN_CONSULTATION" }
+                    
                     LazyColumn(
                         Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        item {
+                            Box(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(t.primary.copy(alpha=0.1f)).padding(12.dp)
+                            ) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.Groups, null, tint = t.primary, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.size(8.dp))
+                                    Text("$waitingCount waiting  ·  $consultCount in consultation", fontWeight = FontWeight.Bold, color = t.primary, fontSize = 13.sp)
+                                }
+                            }
+                        }
                         items(s.data, key = { it.id }) { q ->
                             HoscoreCard(Modifier.fillMaxWidth()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
-                                        Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(t.primary.copy(0.12f)),
+                                        Modifier.size(46.dp)
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(Color.White)
+                                            .border(2.dp, t.primary.copy(0.3f), androidx.compose.foundation.shape.CircleShape),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Text("#${q.tokenNumber ?: "-"}", fontWeight = FontWeight.Black, color = t.primary, fontSize = 14.sp)
+                                        Text("${q.tokenNumber ?: "-"}", fontWeight = FontWeight.Black, color = t.primary, fontSize = 16.sp)
                                     }
                                     Spacer(Modifier.size(14.dp))
                                     Column(Modifier.weight(1f)) {

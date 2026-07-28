@@ -25,7 +25,7 @@ fun SplashScreen(
 ) {
     // Fades and transitions configuration
     LaunchedEffect(key1 = true) {
-        delay(2000)
+        delay(400)
         onSplashComplete()
     }
 

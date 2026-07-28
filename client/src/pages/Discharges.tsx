@@ -10,13 +10,22 @@ export const Discharges = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
 
+  const [bypassBillingCheck, setBypassBillingCheck] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
   useEffect(() => { api.get('/discharges').then(setDocs); }, []);
 
   const handleCreate = async () => {
-    await api.post('/discharges', form);
-    setShowForm(false);
-    setForm({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
-    api.get('/discharges').then(setDocs);
+    setErrorMsg("");
+    try {
+      await api.post('/discharges', { ...form, bypassBillingCheck });
+      setShowForm(false);
+      setForm({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
+      setBypassBillingCheck(false);
+      api.get('/discharges').then(setDocs);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || "Failed to create discharge summary.");
+    }
   };
 
   return (
@@ -114,6 +123,24 @@ export const Discharges = () => {
                   <option value="DRAFT">Draft</option>
                 </select>
               </div>
+
+              <label className="flex items-center gap-2.5 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bypassBillingCheck}
+                  onChange={(e) => setBypassBillingCheck(e.target.checked)}
+                  className="rounded border-[var(--input-border)] text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-[var(--text-primary)]">
+                  Bypass Billing Check (Emergency Discharge)
+                </span>
+              </label>
+
+              {errorMsg && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-medium">
+                  {errorMsg}
+                </div>
+              )}
             </div>
             
             <button onClick={handleCreate} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer mt-4">Save Summary</button>

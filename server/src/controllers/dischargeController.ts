@@ -13,18 +13,25 @@ export const getAll = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
-    const { patientName, status } = req.body;
+    const { patientName, admissionId, patientId, status } = req.body;
     
-    // Find active admission for this patient in the active hospital
-    const admission = await prisma.admission.findFirst({
-      where: {
-        patient: {
-          name: patientName,
-          hospitalId: hid(req)
-        },
-        dischargeDate: null // Active admission
-      }
-    });
+    // Find active admission for this patient/admission ID in the active hospital
+    let admission = null;
+    if (admissionId) {
+      admission = await prisma.admission.findFirst({ where: { id: admissionId, patient: { hospitalId: hid(req) } } });
+    } else if (patientId) {
+      admission = await prisma.admission.findFirst({ where: { patientId, dischargeDate: null, patient: { hospitalId: hid(req) } } });
+    } else if (patientName) {
+      admission = await prisma.admission.findFirst({
+        where: {
+          patient: {
+            name: patientName,
+            hospitalId: hid(req)
+          },
+          dischargeDate: null
+        }
+      });
+    }
 
     const userId = (req as any).user?.userId;
     if (admission && userId) {

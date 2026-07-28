@@ -25,16 +25,20 @@ export const create = async (req: Request, res: Response) => {
     const safeData = pick(req.body, ['patientId', 'patientName', 'doctorId', 'doctorName', 'diagnosis', 'instructions', 'status', 'validUntil']);
     const medicinesData = req.body.medicines || req.body.medications || [];
     
+    // Default prescription status is ISSUED
+    const initialStatus = safeData.status || 'ISSUED';
+
     // @ts-ignore
     const rx = await prisma.prescription.create({
       data: {
         ...safeData,
+        status: initialStatus,
         medicines: medicinesData,
         hospitalId: hid(req),
       },
       include: { patient: true },
     });
-    await logAudit(req, 'CREATE', 'Prescription', rx.id, `Prescribed to patient`);
+    await logAudit(req, 'CREATE', 'Prescription', rx.id, `Prescribed to patient (status: ${initialStatus})`);
     res.status(201).json(rx);
   } catch (err) { res.status(500).json({ error: 'Failed to create prescription' }); }
 };
@@ -45,11 +49,18 @@ export const updateStatus = async (req: Request, res: Response) => {
     const existing = await prisma.prescription.findFirst({ where: { id: req.params.id!, hospitalId } });
     if (!existing) return res.status(404).json({ error: 'Prescription not found' });
     
-    const newStatus = req.body.status;
+    const newStatus = (req.body.status || '').toUpperCase();
+    const currentStatus = (existing.status || 'ISSUED').toUpperCase();
+
+    // Guard: Prevent double-dispensing
+    if (currentStatus === 'DISPENSED' && newStatus !== 'DISPENSED') {
+      return res.status(400).json({ error: "Prescription is ALREADY DISPENSED and cannot be changed." });
+    }
+
     const rx = await prisma.prescription.update({ where: { id: existing.id }, data: { status: newStatus } });
 
-    // Auto-deduct matching medicine items from Inventory when status transitions to DISPENSED
-    if (newStatus === 'DISPENSED' && existing.status !== 'DISPENSED' && existing.medicines) {
+    // Auto-deduct matching medicine items from Inventory when status transitions to DISPENSED or CURRENT
+    if ((newStatus === 'DISPENSED' || newStatus === 'CURRENT') && currentStatus !== 'DISPENSED' && currentStatus !== 'CURRENT' && existing.medicines) {
       try {
         let medicineList: Array<{ name?: string; itemName?: string; quantity?: number; count?: number }> = [];
         if (typeof existing.medicines === 'string') {
@@ -78,7 +89,7 @@ export const updateStatus = async (req: Request, res: Response) => {
       }
     }
 
-    await logAudit(req, 'UPDATE', 'Prescription', rx.id, `Status set to ${rx.status}`);
+    await logAudit(req, 'UPDATE', 'Prescription', rx.id, `Status set from ${existing.status} to ${rx.status}`);
     res.json(rx);
   } catch (err) { res.status(500).json({ error: 'Failed to update prescription' }); }
 };

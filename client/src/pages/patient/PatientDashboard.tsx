@@ -6,6 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useAnimatedCounter } from '../../hooks/useAnimatedCounter';
 import { WayfindingModal } from '../../components/WayfindingModal';
 import { Modal } from '../../components/Modal';
+import { QrCode } from 'lucide-react';
+import { DigitalQRPassModal } from '../../components/DigitalQRPassModal';
 
 import { BASE_URL } from '../../utils/apiConfig';
 const getWsUrl = (token: string) => {
@@ -32,6 +34,7 @@ export const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dependents, setDependents] = useState<any[]>([]);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
+  const [showQRPass, setShowQRPass] = useState(false);
 
   // Live Queue state
   const [liveQueueAlert, setLiveQueueAlert] = useState<any>(null);
@@ -299,10 +302,23 @@ export const PatientDashboard = () => {
                   <span className="text-xs font-mono font-black text-cyan-600 dark:text-cyan-400 tracking-widest bg-cyan-500/10 px-3 py-1 rounded-xl border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm">
                     HSC-{data.profile.sixDigitId}
                   </span>
+                  <button
+                    onClick={() => setShowQRPass(true)}
+                    className="flex items-center gap-1 text-xs font-extrabold text-cyan-500 bg-cyan-500/20 hover:bg-cyan-500/30 px-3 py-1 rounded-xl border border-cyan-500/30 transition-all cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5" /> View Pass
+                  </button>
                 </div>
               )}
             </div>
           </div>
+
+          <DigitalQRPassModal
+            isOpen={showQRPass}
+            onClose={() => setShowQRPass(false)}
+            patientName={data.profile?.name || user?.name || 'Patient'}
+            sixDigitId={data.profile?.sixDigitId || ''}
+          />
 
 
           <div className="grid grid-cols-2 gap-y-4 gap-x-2 border-t border-[var(--card-border)] pt-5">

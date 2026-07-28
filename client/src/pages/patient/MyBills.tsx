@@ -7,6 +7,8 @@ export const MyBills = () => {
   const { selectedPatientId } = useAuth();
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const fetchBills = () => {
     setLoading(true);
@@ -26,8 +28,12 @@ export const MyBills = () => {
   }, [selectedPatientId]);
 
   const handlePayment = async (billId: string) => {
+    setNotice(null);
+    setPayingId(billId);
     try {
-      const orderData = await api.post(`/billing/${billId}/razorpay-order`, {});
+      // Patient-context endpoints — the staff /billing/* routes are feature-gated
+      // to hospital context and always reject a patient session.
+      const orderData = await api.post(`/patient/bills/${billId}/pay-order`, {});
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_xxxx',
         amount: orderData.amount,
@@ -37,20 +43,32 @@ export const MyBills = () => {
         order_id: orderData.orderId,
         handler: async (response: any) => {
           try {
-            await api.post(`/billing/razorpay-verify`, response);
-            alert('Payment successful!');
+            await api.post('/patient/bills/pay-verify', response);
+            setNotice({ tone: 'success', text: 'Payment successful — your receipt is ready to download.' });
             fetchBills();
-          } catch (e) {
-            alert('Payment verification failed.');
+          } catch (e: any) {
+            setNotice({
+              tone: 'error',
+              text: e?.message || 'Payment went through but confirmation failed. Contact the hospital before paying again.',
+            });
+          } finally {
+            setPayingId(null);
           }
+        },
+        modal: {
+          ondismiss: () => {
+            setPayingId(null);
+            setNotice({ tone: 'error', text: 'Payment cancelled. Your bill is unchanged.' });
+          },
         },
         theme: { color: '#e11d48' }
       };
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('Failed to initialize payment.');
+      setNotice({ tone: 'error', text: e?.message || 'Could not start payment. Please try again.' });
+      setPayingId(null);
     }
   };
 
@@ -59,6 +77,20 @@ export const MyBills = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-black text-slate-900">My Bills</h1>
+
+      {notice && (
+        <div
+          role="status"
+          className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${
+            notice.tone === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-rose-200 bg-rose-50 text-rose-700'
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
+
       {bills.length === 0 ? <p className="text-slate-500">No bills found.</p> : (
         <div className="space-y-3">
           {bills.map((b: any, i: number) => (
@@ -72,8 +104,12 @@ export const MyBills = () => {
                 <p className="text-lg font-black text-slate-900 flex items-center gap-0.5"><IndianRupee className="w-4 h-4" />{b.totalAmount}</p>
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${b.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{b.status}</span>
                 {b.status === 'PENDING' && (
-                  <button onClick={() => handlePayment(b.id)} className="mt-2 text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold py-1.5 px-3 rounded-lg shadow flex items-center gap-1.5 transition-colors">
-                    <CreditCard className="w-3.5 h-3.5" /> Pay Now
+                  <button
+                    onClick={() => handlePayment(b.id)}
+                    disabled={payingId === b.id}
+                    className="mt-2 text-xs bg-rose-600 hover:bg-rose-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-1.5 px-3 rounded-lg shadow flex items-center gap-1.5 transition-colors"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" /> {payingId === b.id ? 'Opening…' : 'Pay Now'}
                   </button>
                 )}
                 {b.status === 'PAID' && b.receiptUrl && (

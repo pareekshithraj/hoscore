@@ -13,6 +13,7 @@ import {
 import { signUrl, signHospitalPhotos } from '../services/r2.js';
 import { createChallenge, buildSession } from './authController.js';
 import { pick } from '../utils/pick.js';
+import { parseDateSafe } from '../utils/dateUtils.js';
 
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
@@ -578,5 +579,124 @@ export const getHospitalStaff = async (req: AuthRequest, res: Response) => {
     res.json(signedMemberships);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get staff' });
+  }
+};
+
+function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 8 * 60;
+  const cleanStr = timeStr.trim();
+  const isPM = /pm/i.test(cleanStr);
+  const isAM = /am/i.test(cleanStr);
+  const timeWithoutAmPm = cleanStr.replace(/(am|pm)/i, '').trim();
+  const parts = timeWithoutAmPm.split(/[:\.]/);
+  let hours = parseInt(parts[0] || '8', 10);
+  const minutes = parseInt(parts[1] || '0', 10);
+
+  if (isPM && hours < 12) hours += 12;
+  if (isAM && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+function formatMinutesTo12Hour(totalMinutes: number): string {
+  const hours24 = Math.floor(totalMinutes / 60) % 24;
+  const mins = totalMinutes % 60;
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  let hours12 = hours24 % 12;
+  if (hours12 === 0) hours12 = 12;
+  const formattedHours = hours12 < 10 ? `0${hours12}` : `${hours12}`;
+  const formattedMins = mins < 10 ? `0${mins}` : `${mins}`;
+  return `${formattedHours}:${formattedMins} ${period}`;
+}
+
+export function normalizeTimeString(timeStr: string): string {
+  const m = parseTimeToMinutes(timeStr);
+  return formatMinutesTo12Hour(m);
+}
+
+export function generate30MinSlots(openTimeStr: string, closeTimeStr: string): string[] {
+  const startMins = parseTimeToMinutes(openTimeStr);
+  let endMins = parseTimeToMinutes(closeTimeStr);
+  if (endMins <= startMins) {
+    endMins = startMins + 8 * 60;
+  }
+
+  const slots: string[] = [];
+  for (let m = startMins; m < endMins; m += 30) {
+    slots.push(formatMinutesTo12Hour(m));
+  }
+  return slots;
+}
+
+export const getAvailableSlots = async (req: Request, res: Response) => {
+  try {
+    const { hospitalId } = req.params;
+    const { date, doctorId } = req.query;
+
+    const targetDate = parseDateSafe(date) || new Date();
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    const dayOfWeek = targetDate.getDay();
+
+    const override = await prisma.schedule.findFirst({
+      where: { hospitalId, date: { gte: startOfDay, lte: endOfDay } }
+    });
+
+    let isOpen = true;
+    let openTime = '08:00';
+    let closeTime = '20:00';
+
+    if (override) {
+      isOpen = override.isOpen;
+      openTime = override.openTime || '08:00';
+      closeTime = override.closeTime || '20:00';
+    } else {
+      const defaultSched = await prisma.defaultSchedule.findFirst({
+        where: { hospitalId, dayOfWeek }
+      });
+      if (defaultSched) {
+        isOpen = defaultSched.isOpen;
+        openTime = defaultSched.openTime || '08:00';
+        closeTime = defaultSched.closeTime || '20:00';
+      }
+    }
+
+    if (!isOpen) {
+      return res.json({ isOpen: false, openTime: 'Closed', closeTime: 'Closed', slots: [] });
+    }
+
+    const rawSlots = generate30MinSlots(openTime, closeTime);
+
+    const apptWhere: any = {
+      hospitalId,
+      date: { gte: startOfDay, lte: endOfDay },
+      status: { notIn: ['CANCELLED'] }
+    };
+    if (doctorId && typeof doctorId === 'string' && doctorId.trim()) {
+      apptWhere.doctorId = doctorId;
+    }
+
+    const existingAppointments = await prisma.appointment.findMany({
+      where: apptWhere,
+      select: { time: true }
+    });
+
+    const bookedSet = new Set(existingAppointments.map(a => normalizeTimeString(a.time)));
+
+    const slots = rawSlots.map(slotTime => ({
+      time: slotTime,
+      isBooked: bookedSet.has(normalizeTimeString(slotTime))
+    }));
+
+    res.json({
+      isOpen: true,
+      openTime: normalizeTimeString(openTime),
+      closeTime: normalizeTimeString(closeTime),
+      slots
+    });
+  } catch (error) {
+    console.error('Error fetching available slots:', error);
+    res.status(500).json({ error: 'Failed to fetch available slots' });
   }
 };

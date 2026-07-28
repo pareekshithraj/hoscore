@@ -571,10 +571,10 @@ export const GovMandateGuidelines: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2.5 text-base font-extrabold text-slate-900">
                   <Award className="w-6 h-6 text-amber-500" />
-                  <span>STQC & CERT-In Empanelled</span>
+                  <span>STQC & CERT-In Standards Aligned</span>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                  Audited by CERT-In Assessors and STQC Certified for Web Accessibility GIGW 3.0 & ABDM M1/M2/M3 Health Data Security.
+                  Architected to align with CERT-In Guidelines, GIGW 3.0 Web Accessibility, and ABDM M1/M2/M3 Health Data Security Standards.
                 </p>
               </div>
               <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-slate-600">
@@ -768,16 +768,15 @@ export const GovMandateGuidelines: React.FC = () => {
               </ul>
             </div>
 
-            {/* Column 4: Institutional Trust */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-extrabold uppercase tracking-widest text-white">Certifications</h4>
-              <ul className="space-y-2.5 text-sm font-medium">
-                <li className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-400" />STQC Web Certified</li>
-                <li className="flex items-center gap-1.5"><Shield className="w-4 h-4 text-blue-400" />CERT-In Audited</li>
-                <li className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-amber-400" />ABDM Sandbox Certified</li>
-                <li className="flex items-center gap-1.5"><Lock className="w-4 h-4 text-rose-400" />AES-256 / TLS 1.3</li>
-              </ul>
-            </div>
+              <div className="space-y-4">
+                <h4 className="text-xs font-extrabold uppercase tracking-widest text-white">Compliance Posture</h4>
+                <ul className="space-y-2.5 text-sm font-medium">
+                  <li className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-400" />STQC GIGW 3.0 Ready</li>
+                  <li className="flex items-center gap-1.5"><Shield className="w-4 h-4 text-blue-400" />CERT-In Aligned</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-amber-400" />ABDM M1 Integration in Progress</li>
+                  <li className="flex items-center gap-1.5"><Lock className="w-4 h-4 text-rose-400" />AES-256 / TLS 1.3</li>
+                </ul>
+              </div>
           </div>
 
           <div className="pt-10 flex flex-col md:flex-row items-center justify-between gap-8 text-xs font-bold text-slate-500">

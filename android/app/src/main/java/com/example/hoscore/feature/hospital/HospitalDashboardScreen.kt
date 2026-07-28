@@ -1,46 +1,22 @@
 package com.example.hoscore.feature.hospital
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bed
-import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.MonitorHeart
-import androidx.compose.material.icons.rounded.Science
-import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -51,245 +27,463 @@ import com.example.hoscore.core.common.Resource
 import com.example.hoscore.core.network.ServiceLocator
 import com.example.hoscore.core.network.Stats
 import com.example.hoscore.core.ui.components.DonutChart
-import com.example.hoscore.core.ui.components.HoscoreCard
-import com.example.hoscore.core.ui.components.LoadingSkeleton
-import com.example.hoscore.core.ui.components.MetricCard
-import com.example.hoscore.core.ui.components.SectionTitle
-import com.example.hoscore.core.ui.theme.HoscoreTokens
-import com.example.hoscore.core.ui.components.WorkspaceHeaderBar
+
+// ─── Hospital portal colour tokens ───────────────────────────────────────────
+private val HTeal      = Color(0xFF0D9488)
+private val HTealMid   = Color(0xFF14B8A6)
+private val HTealSoft  = Color(0xFFCCFBF1)
+private val HBlue      = Color(0xFF2563EB)
+private val HBlueSoft  = Color(0xFFDBEAFE)
+private val HGreen     = Color(0xFF10B981)
+private val HGreenSoft = Color(0xFFD1FAE5)
+private val HAmber     = Color(0xFFF59E0B)
+private val HAmberSoft = Color(0xFFFEF3C7)
+private val HPurple    = Color(0xFF7C3AED)
+private val HPurpleSoft = Color(0xFFEDE9FE)
+private val HRed       = Color(0xFFEF4444)
+private val HRedSoft   = Color(0xFFFEE2E2)
+private val BGLight    = Color(0xFFF0FDF9)   // slightly teal-tinted background
+private val TextDark   = Color(0xFF0F172A)
+private val TextMid    = Color(0xFF475569)
+private val TextLight  = Color(0xFF94A3B8)
 
 @Composable
 fun HospitalDashboardScreen(
-    darkMode: Boolean,
-    onToggleDark: () -> Unit,
     onSwitchContext: () -> Unit,
     canSwitch: Boolean,
+    onOpenTab: (Int) -> Unit = {},
 ) {
-    val t = HoscoreTokens.current
     val vm: HospitalDashboardVM = viewModel()
     LaunchedEffect(Unit) { vm.start() }
     val state by vm.state.collectAsState()
 
-    val ctx = ServiceLocator.sessionStore.activeContext
+    val ctx          = ServiceLocator.sessionStore.activeContext
     val hospitalName = ctx?.hospitalName ?: "Hospital"
-    val role = ctx?.role ?: "STAFF"
+    val role         = ctx?.role ?: "Staff"
+    val user         = ServiceLocator.sessionStore.user
+    val initials     = (user?.name ?: hospitalName).split(" ").filter { it.isNotEmpty() }.take(2)
+        .joinToString("") { it.first().uppercase() }.ifEmpty { "H" }
 
-    Column(Modifier.fillMaxSize().background(t.screenBg).verticalScroll(rememberScrollState())) {
-        WorkspaceHeaderBar(
-            onSwitchContext = onSwitchContext,
-            darkMode = darkMode,
-            onToggleDark = onToggleDark,
-            canSwitch = canSwitch
-        )
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(BGLight)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // ─── Top bar ──────────────────────────────────────────────────────
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(HTeal, HTealMid))),
+                contentAlignment = Alignment.Center,
+            ) { Text(initials, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Dashboard 🏥", fontSize = 12.sp, color = TextLight, fontWeight = FontWeight.Medium)
+                Text(hospitalName, fontSize = 15.sp, fontWeight = FontWeight.Black, color = TextDark, maxLines = 1)
+            }
+            var showHospitalQR by remember { mutableStateOf(false) }
+            if (showHospitalQR) {
+                HospitalQRModal(hospitalName, ctx?.hospitalId ?: "HSP-MAIN") { showHospitalQR = false }
+            }
+
+            HIconBtn(Icons.Rounded.QrCode2, { showHospitalQR = true }, HTeal)
+            Spacer(Modifier.width(8.dp))
+            if (canSwitch) {
+                HIconBtn(Icons.Rounded.SwapHoriz, onSwitchContext, HTeal)
+                Spacer(Modifier.width(8.dp))
+            }
+            HIconBtn(Icons.Rounded.Notifications, { onOpenTab(1) }, HTeal)
+        }
 
         when (val s = state) {
-            is Resource.Loading -> LoadingSkeleton()
-            is Resource.Error -> com.example.hoscore.core.ui.components.ErrorState(s.message, onRetry = { vm.refresh() })
-            is Resource.Success -> DashboardContent(s.data)
+            is Resource.Loading -> HospitalLoadingContent()
+            is Resource.Error   -> HospitalErrorContent(s.message) { vm.refresh() }
+            is Resource.Success -> HospitalContent(s.data, onOpenTab)
         }
     }
 }
 
 @Composable
-private fun DashboardContent(stats: Stats) {
-    val t = HoscoreTokens.current
-    var selectedDateIdx by remember { mutableStateOf(3) }
-    val dateChips = listOf("09", "10", "11", "Today, 12 June", "13", "14")
+private fun HospitalContent(stats: Stats, onOpenTab: (Int) -> Unit = {}) {
+    var selectedDateIdx by remember { mutableStateOf(2) }
+    val today = java.util.Calendar.getInstance()
+    val dayOfMonth = today.get(java.util.Calendar.DAY_OF_MONTH)
+    val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    val dayOfWeek = today.get(java.util.Calendar.DAY_OF_WEEK) // 1=Sun
+    val dateChips = (0..5).map { offset ->
+        val d = dayOfMonth - 2 + offset
+        val dow = ((dayOfWeek - 2 + offset).mod(7))
+        Pair(d.toString(), dayNames[dow])
+    }
 
     Column(Modifier.padding(horizontal = 20.dp)) {
-        // Date chip selector (Matching Image 3)
+        // ─── Date strip ───────────────────────────────────────────────────
         Row(
-            Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            dateChips.forEachIndexed { idx, label ->
-                val isSelected = idx == selectedDateIdx
-                Box(
+            dateChips.forEachIndexed { i, (day, dow) ->
+                val selected = i == selectedDateIdx
+                Column(
                     Modifier
-                        .clip(CircleShape)
-                        .background(if (isSelected) t.primary else t.card)
-                        .clickable { selectedDateIdx = idx }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center,
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) HTeal else Color.White)
+                        .clickable { selectedDateIdx = i }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(
-                        label,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                        color = if (isSelected) Color.White else t.textMuted,
-                    )
+                    Text(dow, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White.copy(0.8f) else TextLight)
+                    Spacer(Modifier.height(2.dp))
+                    Text(day, fontSize = 15.sp, fontWeight = FontWeight.Black, color = if (selected) Color.White else TextDark)
                 }
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // Vibrant Royal Blue Metrics Hero Grid (Matching Image 2)
+        // ─── Hero gradient activity card ─────────────────────────────────
         Box(
             Modifier
                 .fillMaxWidth()
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp))
-                .background(
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(t.primary, Color(0xFF2563EB), Color(0xFF1D4ED8))
-                    )
-                )
-                .padding(20.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(listOf(HTeal, Color(0xFF2DD4BF), HBlue)))
+                .padding(20.dp),
         ) {
-            Column {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text("CLINICAL REVIEW", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.8f), letterSpacing = 1.sp)
-                        Text("Active Hospital Load", fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.White)
-                    }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Box(
                         Modifier
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .background(Color.White.copy(0.2f))
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
                     ) {
-                        Text("LIVE", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("LIVE CLINICAL", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 1.sp)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Hospital\nActivity", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Color.White, lineHeight = 26.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        HeroPill("${stats.telemetry.activeQueue} Queue", Color(0xFFBFDBFE))
+                        HeroPill("${stats.occupancyRate}% Beds", Color(0xFFBBF7D0))
                     }
                 }
-
-                Spacer(Modifier.height(16.dp))
-
-                // 2x2 Metric Tile Grid (Matching Image 2)
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MetricTile(
-                            title = "Active Queue",
-                            value = "${stats.telemetry.activeQueue} Patients",
-                            subPill = "Now Waiting",
-                            icon = Icons.Rounded.Groups,
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricTile(
-                            title = "Pending Labs",
-                            value = "${stats.telemetry.pendingLabs} Orders",
-                            subPill = "Awaiting",
-                            icon = Icons.Rounded.Science,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MetricTile(
-                            title = "Heart Rate & Vitals",
-                            value = "${stats.icuOccupancyRate ?: 98.5}%",
-                            subPill = "ICU Load",
-                            icon = Icons.Rounded.MonitorHeart,
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricTile(
-                            title = "Ward Beds",
-                            value = "${stats.occupancyRate}%",
-                            subPill = "${stats.occupiedBeds}/${stats.totalBeds} Beds",
-                            icon = Icons.Rounded.Bed,
-                            modifier = Modifier.weight(1f)
-                        )
+                Box(
+                    Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Rounded.LocalHospital, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                        Text("${stats.occupancyRate}%", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White)
                     }
                 }
             }
         }
 
         Spacer(Modifier.height(20.dp))
-        SectionTitle("Bed occupancy & ward distribution")
+
+        // ─── Metric 2×2 grid ─────────────────────────────────────────────
+        SectionHeader2("Clinic Metrics")
         Spacer(Modifier.height(12.dp))
 
-        // Donut Chart Card
-        HoscoreCard(Modifier.fillMaxWidth(), padding = 20) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HMetricCard(
+                icon = Icons.Rounded.Groups,
+                iconBg = HTealSoft,
+                iconTint = HTeal,
+                label = "Active Queue",
+                value = "${stats.telemetry.activeQueue}",
+                sub = "Patients waiting",
+                modifier = Modifier.weight(1f),
+            )
+            HMetricCard(
+                icon = Icons.Rounded.Bed,
+                iconBg = HBlueSoft,
+                iconTint = HBlue,
+                label = "Ward Beds",
+                value = "${stats.occupiedBeds}/${stats.totalBeds}",
+                sub = "${stats.occupancyRate}% occupied",
+                trend = "${stats.occupancyRate}%",
+                trendUp = stats.occupancyRate < 85,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HMetricCard(
+                icon = Icons.Rounded.Science,
+                iconBg = HAmberSoft,
+                iconTint = HAmber,
+                label = "Pending Labs",
+                value = "${stats.telemetry.pendingLabs}",
+                sub = "Awaiting results",
+                modifier = Modifier.weight(1f),
+            )
+            HMetricCard(
+                icon = Icons.Rounded.MonitorHeart,
+                iconBg = HPurpleSoft,
+                iconTint = HPurple,
+                label = "Pending Rx",
+                value = "${stats.telemetry.pendingRx}",
+                sub = "Prescriptions",
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // ─── Donut chart ─────────────────────────────────────────────────
+        SectionHeader2("Bed Occupancy")
+        Spacer(Modifier.height(12.dp))
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White)
+                .shadow(4.dp, RoundedCornerShape(20.dp))
+                .padding(20.dp),
+        ) {
             Column {
                 val occupied = stats.occupiedBeds.toFloat()
                 val free = (stats.totalBeds - stats.occupiedBeds).coerceAtLeast(0).toFloat()
                 DonutChart(
-                    segments = listOf(occupied to t.primary, free to t.gridLine),
+                    segments = listOf(occupied to HTeal, free to HTealSoft),
                     centerLabel = "occupied",
                     centerValue = "${stats.occupancyRate}%",
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    LegendItem("Occupied", stats.occupiedBeds.toString(), t.primary)
-                    LegendItem("Available", (stats.totalBeds - stats.occupiedBeds).coerceAtLeast(0).toString(), t.emerald)
-                    LegendItem("Total Beds", stats.totalBeds.toString(), t.textMuted)
+                    DonutLegend("Occupied",  "${stats.occupiedBeds}",                                  HTeal)
+                    DonutLegend("Available", "${(stats.totalBeds - stats.occupiedBeds).coerceAtLeast(0)}", HGreen)
+                    DonutLegend("Total",     "${stats.totalBeds}",                                     TextLight)
                 }
             }
         }
 
         Spacer(Modifier.height(20.dp))
-        SectionTitle("Clinical operations summary")
+
+        // ─── Quick actions row ────────────────────────────────────────────
+        SectionHeader2("Quick Actions")
         Spacer(Modifier.height(12.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetricCard("Prescriptions", stats.telemetry.pendingRx.toString(), "Pending dispense", Icons.Rounded.Science, t.primary, Modifier.weight(1f))
-            MetricCard("Discharges", stats.dischargesThisMonth.toString(), "This month", Icons.Rounded.Bed, t.emerald, Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            HQuickBtn("OPD Queue", Icons.Rounded.Groups, HTeal, HTealSoft, Modifier.weight(1f)) { onOpenTab(1) }
+            HQuickBtn("Patients", Icons.Rounded.Person, HBlue, HBlueSoft, Modifier.weight(1f)) { onOpenTab(2) }
+            HQuickBtn("More", Icons.Rounded.GridView, HGreen, HGreenSoft, Modifier.weight(1f)) { onOpenTab(3) }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
     }
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 @Composable
-private fun MetricTile(
-    title: String,
-    value: String,
-    subPill: String,
+private fun HMetricCard(
     icon: ImageVector,
+    iconBg: Color,
+    iconTint: Color,
+    label: String,
+    value: String,
+    sub: String,
     modifier: Modifier = Modifier,
+    trend: String? = null,
+    trendUp: Boolean = true,
 ) {
     Box(
         modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.15f))
-            .padding(14.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+            .padding(14.dp),
     ) {
         Column {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(
-                    Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.25f)),
+                    Modifier.size(38.dp).clip(CircleShape).background(iconBg),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
                 }
-                Box(
-                    Modifier
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.25f))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                ) {
-                    Text(subPill, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                // Only render a trend badge when we have a real derived value.
+                if (trend != null) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (trendUp) HGreenSoft else HRedSoft)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            trend,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            color = if (trendUp) HGreen else HRed,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text(value, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Text(title, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.85f))
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Black, color = TextDark)
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMid)
+            Text(sub, fontSize = 10.sp, color = TextLight)
         }
     }
 }
 
 @Composable
-private fun LegendItem(label: String, value: String, color: Color) {
-    val t = HoscoreTokens.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Black, color = color)
-        Text(label, fontSize = 10.sp, color = t.textMuted, fontWeight = FontWeight.Bold)
+private fun HQuickBtn(label: String, icon: ImageVector, color: Color, bgColor: Color, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .clickable { onClick() }
+            .padding(10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(bgColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextDark, maxLines = 1)
+        }
     }
 }
 
 @Composable
-private fun LiveDot() {
-    val t = HoscoreTokens.current
-    val transition = rememberInfiniteTransition(label = "live")
-    val alpha by transition.animateFloat(
-        0.3f, 1f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "liveAlpha",
+private fun HeroPill(text: String, bg: Color) {
+    Box(Modifier.clip(CircleShape).background(bg.copy(0.3f)).padding(horizontal = 10.dp, vertical = 3.dp)) {
+        Text(text, fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.White)
+    }
+}
+
+@Composable
+private fun DonutLegend(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Black, color = color)
+        Text(label, fontSize = 10.sp, color = TextLight, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun SectionHeader2(title: String) {
+    Text(title, fontSize = 16.sp, fontWeight = FontWeight.Black, color = TextDark)
+}
+
+@Composable
+private fun HIconBtn(icon: ImageVector, onClick: () -> Unit, tint: Color = TextLight) {
+    Box(
+        Modifier.size(40.dp).clip(CircleShape).background(Color.White).clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun HospitalLoadingContent() {
+    Box(Modifier.fillMaxWidth().padding(60.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = HTeal)
+    }
+}
+
+@Composable
+private fun HospitalErrorContent(msg: String, onRetry: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(Icons.Rounded.Warning, null, tint = HAmber, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.height(12.dp))
+        Text(msg, color = TextMid, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Spacer(Modifier.height(16.dp))
+        Box(
+            Modifier.clip(RoundedCornerShape(12.dp)).background(HTeal).clickable { onRetry() }.padding(horizontal = 24.dp, vertical = 10.dp),
+        ) {
+            Text("Retry", color = Color.White, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun HospitalQRModal(hospitalName: String, hospitalId: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text("Hospital Official QR Pass", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextDark)
+                Text(hospitalName, fontSize = 13.sp, color = TextMid, fontWeight = FontWeight.Medium)
+            }
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .border(2.dp, HTeal.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        val size = this.size
+                        val step = size.width / 7f
+                        drawRect(color = Color(0xFF0284C7), topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
+                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(step * 0.4f, step * 0.4f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
+                        drawRect(color = Color(0xFF0284C7), topLeft = androidx.compose.ui.geometry.Offset(step * 0.7f, step * 0.7f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
+                        
+                        drawRect(color = Color(0xFF0284C7), topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 2, 0f), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
+                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 1.6f, step * 0.4f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
+                        drawRect(color = Color(0xFF0284C7), topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 1.3f, step * 0.7f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
+
+                        drawRect(color = Color(0xFF0284C7), topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - step * 2), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
+                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(step * 0.4f, size.height - step * 1.6f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
+                        drawRect(color = Color(0xFF0284C7), topLeft = androidx.compose.ui.geometry.Offset(step * 0.7f, size.height - step * 1.3f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "ID: HSP-${hospitalId.take(8).uppercase()}",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 15.sp,
+                    color = HTeal
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("Display at OPD desk or kiosk for patient auto-checkin & hospital selection", fontSize = 11.sp, color = TextLight)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = HTeal)
+            ) {
+                Text("Done", fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color.White
     )
-    Box(Modifier.size(7.dp).clip(CircleShape).background(t.emerald.copy(alpha = alpha)))
 }

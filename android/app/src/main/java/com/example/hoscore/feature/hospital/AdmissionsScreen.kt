@@ -60,7 +60,7 @@ fun AdmissionsScreen() {
                                     Spacer(Modifier.height(4.dp))
                                     Text(a.reason, color = t.textSecondary, fontSize = 12.sp)
                                 }
-                                if (a.status.equals("Admitted", true)) {
+                                if (a.status.equals("Admitted", true) || a.status.equals("Active", true) || a.status.equals("PENDING", true)) {
                                     Spacer(Modifier.height(10.dp))
                                     OutlinedButton(
                                         onClick = { vm.discharge(a.id) },

@@ -1,7 +1,14 @@
 package com.example.hoscore.feature.superadmin
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,7 +39,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hoscore.core.ui.DataScreen
 import com.example.hoscore.core.ui.components.EmptyState
-import com.example.hoscore.core.ui.components.GradientHeroCard
 import com.example.hoscore.core.ui.components.HoscoreCard
 import com.example.hoscore.core.ui.components.HoscoreTopBar
 import com.example.hoscore.core.ui.components.MetricCard
@@ -41,45 +47,106 @@ import com.example.hoscore.core.ui.components.StatusBadge
 import com.example.hoscore.core.ui.components.statusColor
 import com.example.hoscore.core.ui.theme.HoscoreTokens
 
-import com.example.hoscore.core.ui.components.WorkspaceHeaderBar
-
 @Composable
 fun SuperAdminOverviewScreen(
-    darkMode: Boolean,
-    onToggleDark: () -> Unit,
     onSwitchContext: () -> Unit,
     canSwitch: Boolean,
 ) {
-    val t = HoscoreTokens.current
+    // Purple SuperAdmin palette
+    val SABg      = androidx.compose.ui.graphics.Color(0xFFF5F3FF)
+    val SAPurple  = androidx.compose.ui.graphics.Color(0xFF7C3AED)
+    val SAPurpleMid = androidx.compose.ui.graphics.Color(0xFFA855F7)
+    val SAText    = androidx.compose.ui.graphics.Color(0xFF0F172A)
+    val SAMuted   = androidx.compose.ui.graphics.Color(0xFF64748B)
+    val SALight   = androidx.compose.ui.graphics.Color(0xFF94A3B8)
+
+    val user = com.example.hoscore.core.network.ServiceLocator.sessionStore.user
+    val initials = (user?.name ?: "SA").split(" ").filter { it.isNotEmpty() }.take(2)
+        .joinToString("") { it.first().uppercase() }.ifEmpty { "SA" }
     val vm: SuperAdminStatsVM = viewModel()
-    Column(Modifier.fillMaxSize().background(t.screenBg)) {
-        WorkspaceHeaderBar(
-            onSwitchContext = onSwitchContext,
-            darkMode = darkMode,
-            onToggleDark = onToggleDark,
-            canSwitch = canSwitch
-        )
+
+    androidx.compose.foundation.layout.Column(
+        Modifier.fillMaxSize()
+            .background(SABg)
+    ) {
+        // Purple top bar
+        androidx.compose.foundation.layout.Row(
+            Modifier.fillMaxWidth()
+                .background(androidx.compose.ui.graphics.Color.White)
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(46.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(SAPurple, SAPurpleMid))),
+                contentAlignment = Alignment.Center,
+            ) { Text(initials, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp) }
+            Spacer(Modifier.width(12.dp))
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                Text("Super Admin 🛡️", fontSize = 12.sp, color = SALight, fontWeight = FontWeight.Medium)
+                Text("Platform Control", fontSize = 15.sp, fontWeight = FontWeight.Black, color = SAText)
+            }
+            if (canSwitch) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(androidx.compose.ui.graphics.Color.White)
+                        .border(androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFE2E8F0)), androidx.compose.foundation.shape.CircleShape)
+                        .clickable { onSwitchContext() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(Icons.Rounded.People, null, tint = SAPurple, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
         DataScreen(vm) { s ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                GradientHeroCard(
-                    eyebrow = "PLATFORM STATUS",
-                    title = "All systems operational",
-                    metricLabel = "Active subscriptions",
-                    metricValue = s.activeSubscriptions.toString(),
-                    bullets = listOf("Encrypted multi-tenant environment", "Realtime clinical websockets", "Automated billing & telemetry"),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Spacer(Modifier.height(16.dp))
+                // Purple hero card
+                androidx.compose.foundation.layout.Box(
+                    Modifier.fillMaxWidth()
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                        .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(SAPurple, SAPurpleMid, androidx.compose.ui.graphics.Color(0xFFEC4899))))
+                        .padding(20.dp)
+                ) {
+                    androidx.compose.foundation.layout.Column {
+                        androidx.compose.foundation.layout.Box(
+                            Modifier.clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f))
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                        ) {
+                            Text("PLATFORM STATUS", fontSize = 9.sp, fontWeight = FontWeight.Black, color = androidx.compose.ui.graphics.Color.White, letterSpacing = 1.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("All Systems\nOperational", fontSize = 22.sp, fontWeight = FontWeight.Black, color = androidx.compose.ui.graphics.Color.White, lineHeight = 26.sp)
+                        Spacer(Modifier.height(10.dp))
+                        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.foundation.layout.Box(
+                                Modifier.clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(androidx.compose.ui.graphics.Color.White.copy(0.22f))
+                                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                            ) { Text("${s.activeSubscriptions} Active", fontSize = 10.sp, fontWeight = FontWeight.Black, color = androidx.compose.ui.graphics.Color.White) }
+                            androidx.compose.foundation.layout.Box(
+                                Modifier.clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(androidx.compose.ui.graphics.Color.White.copy(0.22f))
+                                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                            ) { Text("${s.totalHospitals} Hospitals", fontSize = 10.sp, fontWeight = FontWeight.Black, color = androidx.compose.ui.graphics.Color.White) }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
                 SectionTitle("Global metrics")
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    MetricCard("Hospitals", s.totalHospitals.toString(), "Registered", Icons.Rounded.Apartment, t.primary, Modifier.weight(1f))
-                    MetricCard("Users", s.totalUsers.toString(), "All accounts", Icons.Rounded.Groups, t.cyan, Modifier.weight(1f))
+                    MetricCard("Hospitals", s.totalHospitals.toString(), "Registered", Icons.Rounded.Apartment, SAPurple, Modifier.weight(1f))
+                    MetricCard("Users", s.totalUsers.toString(), "All accounts", Icons.Rounded.Groups, SAPurpleMid, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    MetricCard("Patients", s.totalPatients.toString(), "Platform-wide", Icons.Rounded.People, t.teal, Modifier.weight(1f))
-                    MetricCard("Revenue", s.monthlyRevenue?.let { "₹${it.toInt()}" } ?: "—", "This month", Icons.Rounded.Payments, t.emerald, Modifier.weight(1f))
+                    MetricCard("Patients", s.totalPatients.toString(), "Platform-wide", Icons.Rounded.People, androidx.compose.ui.graphics.Color(0xFF0D9488), Modifier.weight(1f))
+                    MetricCard("Revenue", s.monthlyRevenue?.let { "₹${it.toInt()}" } ?: "—", "This month", Icons.Rounded.Payments, androidx.compose.ui.graphics.Color(0xFF10B981), Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(24.dp))
             }
@@ -104,9 +171,10 @@ fun ManageHospitalsScreen() {
                                 Column(Modifier.weight(1f)) {
                                     Text(h.name, fontWeight = FontWeight.Bold, color = t.textPrimary, fontSize = 15.sp)
                                     Text(h.city ?: "", color = t.textMuted, fontSize = 12.sp)
-                                    if (h.subscriptionStatus != null) {
+                                    val subStatus = h.subscriptionStatus
+                                    if (subStatus != null) {
                                         Spacer(Modifier.height(6.dp))
-                                        StatusBadge(h.subscriptionStatus, statusColor(h.subscriptionStatus))
+                                        StatusBadge(subStatus, statusColor(subStatus))
                                     }
                                 }
                                 Switch(

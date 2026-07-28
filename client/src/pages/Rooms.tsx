@@ -9,6 +9,7 @@ import { cn } from '../lib/cn';
 const BED_TONE: Record<string, string> = {
   AVAILABLE: 'border-emerald-500/40 bg-emerald-500/[0.08] hover:bg-emerald-500/15',
   OCCUPIED: 'border-sky-500/40 bg-sky-500/[0.08] hover:bg-sky-500/15',
+  OCCUPIED_ICU: 'border-red-500/40 bg-red-500/[0.08] hover:bg-red-500/15',
   MAINTENANCE: 'border-amber-500/40 bg-amber-500/[0.08]',
   CLEANING: 'border-slate-400/40 bg-slate-500/[0.08]',
 };
@@ -22,7 +23,7 @@ export const Rooms = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'room' | 'bed'; name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [roomData, setRoomData] = useState({ hospitalId: 'h1', name: '', type: 'Ward', capacity: 1, basePrice: 50 });
+  const [roomData, setRoomData] = useState({ name: '', type: 'Ward', capacity: 1, basePrice: 50 });
   const [bedData, setBedData] = useState({ roomId: '', bedNumber: '', pricePerDay: 50 });
 
   const fetchData = () => {
@@ -56,7 +57,16 @@ export const Rooms = () => {
     try {
       await api.post('/rooms', { ...roomData, capacity: Number(roomData.capacity), basePrice: Number(roomData.basePrice) });
       setIsRoomModalOpen(false);
-      setRoomData({ hospitalId: 'h1', name: '', type: 'Ward', capacity: 1, basePrice: 50 });
+      setRoomData({ name: '', type: 'Ward', capacity: 1, basePrice: 50 });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleBedStatusUpdate = async (bedId: string, status: string) => {
+    try {
+      await api.patch(`/beds/${bedId}/status`, { status });
       fetchData();
     } catch (err) {
       console.error(err);
@@ -233,6 +243,25 @@ export const Rooms = () => {
                             </button>
                           </div>
                           <StatusPill status={bed.status} className="mt-2 !text-[9px] !px-1.5 !py-0" />
+                          
+                          {bed.status === 'CLEANING' && (
+                            <button
+                              onClick={() => handleBedStatusUpdate(bed.id, 'AVAILABLE')}
+                              className="mt-2.5 w-full rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm hover:bg-emerald-700 transition-all cursor-pointer"
+                            >
+                              Mark Available
+                            </button>
+                          )}
+
+                          {bed.status === 'MAINTENANCE' && (
+                            <button
+                              onClick={() => handleBedStatusUpdate(bed.id, 'AVAILABLE')}
+                              className="mt-2.5 w-full rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm hover:bg-emerald-700 transition-all cursor-pointer"
+                            >
+                              Finish Maintenance
+                            </button>
+                          )}
+
                           <p className="mt-2 text-[10px] font-semibold text-[var(--text-muted)]">
                             {formatINR(bed.pricePerDay)}/day
                           </p>

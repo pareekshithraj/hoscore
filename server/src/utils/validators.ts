@@ -15,13 +15,16 @@ export const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone: z.string().min(10, 'Valid phone number required'),
+  phone: z.string().optional().nullable().or(z.literal('')),
 });
 
 export const verifyOtpSchema = z.object({
-  challengeId: z.string().uuid('Invalid challenge ID'),
+  challengeId: z.string().min(1, 'Invalid challenge ID'),
   channel: z.enum(['email', 'phone']),
-  otpCode: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+  otpCode: z.string().optional(),
+  code: z.string().optional(),
+}).refine(data => Boolean(data.otpCode || data.code), {
+  message: 'OTP code is required',
 });
 
 export const resendOtpSchema = z.object({

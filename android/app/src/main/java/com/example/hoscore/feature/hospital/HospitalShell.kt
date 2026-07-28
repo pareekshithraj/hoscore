@@ -27,8 +27,6 @@ import com.example.hoscore.core.ui.components.PillBottomBar
 fun HospitalShell(
     onLogout: () -> Unit,
     onSwitchContext: () -> Unit,
-    darkMode: Boolean,
-    onToggleDark: () -> Unit,
     canSwitch: Boolean,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -76,13 +74,12 @@ fun HospitalShell(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Crossfade(targetState = tab, modifier = Modifier.fillMaxSize().padding(bottom = 78.dp), label = "hospitalTab") { current ->
+        Crossfade(targetState = tab, modifier = Modifier.fillMaxSize().padding(bottom = 64.dp), label = "hospitalTab") { current ->
             when (current) {
                 0 -> HospitalDashboardScreen(
-                    darkMode = darkMode,
-                    onToggleDark = onToggleDark,
                     onSwitchContext = onSwitchContext,
                     canSwitch = canSwitch,
+                    onOpenTab = { tab = it },
                 )
                 1 -> QueueScreen()
                 2 -> PatientsScreen()

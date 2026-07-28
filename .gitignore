@@ -22,3 +22,6 @@ outputs/
 client/.env.production
 client/.env*.local
 server/.env*.local
+*.apk
+screenshot.png
+window_dump.xml

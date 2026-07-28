@@ -1,277 +1,585 @@
 package com.example.hoscore.feature.patient
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.LocalPharmacy
-import androidx.compose.material.icons.rounded.Payments
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material.icons.rounded.Vaccines
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hoscore.core.network.ServiceLocator
-import com.example.hoscore.core.ui.components.GradientHeroCard
-import com.example.hoscore.core.ui.components.HoscoreCard
-import com.example.hoscore.core.ui.components.SectionTitle
-import com.example.hoscore.core.ui.theme.HoscoreTokens
 
+// ─── Patient portal colour tokens ────────────────────────────────────────────
+private val PBlue     = Color(0xFF3B5BDB)
+private val PBlueMid  = Color(0xFF5C7CFA)
+private val PBlueSoft = Color(0xFFEEF2FF)
+private val PTeal     = Color(0xFF0D9488)
+private val PTealSoft = Color(0xFFCCFBF1)
+private val PAmber    = Color(0xFFF59E0B)
+private val PAmberSoft = Color(0xFFFEF3C7)
+private val PPurple   = Color(0xFF7C3AED)
+private val PPurpleSoft = Color(0xFFEDE9FE)
+private val PPink     = Color(0xFFEC4899)
+private val PPinkSoft = Color(0xFFFCE7F3)
+private val PRed      = Color(0xFFEF4444)
+private val PRedSoft  = Color(0xFFFEE2E2)
+private val PGreen    = Color(0xFF10B981)
+private val PGreenSoft = Color(0xFFD1FAE5)
+private val BGLight   = Color(0xFFF0F4FF)
+private val TextDark  = Color(0xFF0F172A)
+private val TextMid   = Color(0xFF475569)
+private val TextLight = Color(0xFF94A3B8)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatientDashboardScreen(
-    darkMode: Boolean,
-    onToggleDark: () -> Unit,
     onSwitchContext: () -> Unit,
     onLogout: () -> Unit,
     canSwitch: Boolean,
     onOpenTab: (Int) -> Unit,
+    onFindHospitals: () -> Unit,
 ) {
-    val t = HoscoreTokens.current
-    val user = ServiceLocator.sessionStore.user
-    val name = user?.name?.ifBlank { "Patient" } ?: "Patient"
+    val user    = ServiceLocator.sessionStore.user
+    val name    = user?.name?.ifBlank { "Patient" } ?: "Patient"
     val initials = name.split(" ").filter { it.isNotEmpty() }.take(2)
         .joinToString("") { it.first().uppercase() }.ifEmpty { "P" }
+    val firstName = name.split(" ").firstOrNull() ?: name
 
-    Column(
-        Modifier.fillMaxSize().background(t.screenBg).verticalScroll(rememberScrollState()),
+    val apptVm: AppointmentsVM = viewModel()
+    val apptState by apptVm.state.collectAsState()
+    val rxVm: PrescriptionsVM = viewModel()
+    val rxState by rxVm.state.collectAsState()
+    val billsVm: BillsVM = viewModel()
+    val billsState by billsVm.state.collectAsState()
+    val recordsVm: PatientRecordsVM = viewModel()
+    val recordsState by recordsVm.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        apptVm.loadOnce()
+        rxVm.loadOnce()
+        billsVm.loadOnce()
+        recordsVm.loadOnce()
+    }
+
+    var isManualRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(apptState, rxState, billsState, recordsState) {
+        if (apptState !is com.example.hoscore.core.common.Resource.Loading &&
+            rxState !is com.example.hoscore.core.common.Resource.Loading &&
+            billsState !is com.example.hoscore.core.common.Resource.Loading &&
+            recordsState !is com.example.hoscore.core.common.Resource.Loading) {
+            isManualRefreshing = false
+        }
+    }
+
+    PullToRefreshBox(
+        isRefreshing = isManualRefreshing,
+        onRefresh = {
+            isManualRefreshing = true
+            apptVm.refresh()
+            rxVm.refresh()
+            billsVm.refresh()
+            recordsVm.refresh()
+        },
+        modifier = Modifier.fillMaxSize().background(BGLight)
     ) {
-        // Header
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+        // ─── Header bar ───────────────────────────────────────────────────
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Avatar
             Box(
-                Modifier.size(46.dp).clip(CircleShape).background(t.primary),
+                Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(PBlue, PBlueMid))),
                 contentAlignment = Alignment.Center,
             ) { Text(initials, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp) }
+
             Spacer(Modifier.size(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Welcome back", fontSize = 12.sp, color = t.textMuted, fontWeight = FontWeight.Medium)
-                Text(name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = t.textPrimary)
+            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            val greeting = when (hour) {
+                in 0..11 -> "Good morning 👋"
+                in 12..16 -> "Good afternoon 👋"
+                in 17..20 -> "Good evening 👋"
+                else -> "Good night 🌙"
             }
-            IconPill(if (darkMode) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, onToggleDark)
+            Column(Modifier.weight(1f)) {
+                Text(greeting, fontSize = 12.sp, color = TextLight, fontWeight = FontWeight.Medium)
+                Text(firstName, fontSize = 17.sp, fontWeight = FontWeight.Black, color = TextDark)
+            }
+
+            var showQrModal by remember { mutableStateOf(false) }
+            if (showQrModal) {
+                PatientQRModal(user?.id ?: "PAT-882910", name) { showQrModal = false }
+            }
+
+            SmallIconBtn(Icons.Rounded.QrCode2, { showQrModal = true }, PBlue)
+            Spacer(Modifier.width(8.dp))
             if (canSwitch) {
-                Spacer(Modifier.size(8.dp))
-                IconPill(Icons.Rounded.SwapHoriz, onSwitchContext)
+                SmallIconBtn(Icons.Rounded.SwapHoriz, onSwitchContext, PBlue)
+            }
+            Spacer(Modifier.width(8.dp))
+            SmallIconBtn(Icons.Rounded.CalendarMonth, { onOpenTab(1) }, PBlue)
+        }
+
+        // ─── Search ───────────────────────────────────────────────────────
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                "Let's Find Your\nDoctor",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
+                color = TextDark,
+                lineHeight = 32.sp,
+            )
+            Spacer(Modifier.height(14.dp))
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = PBlue.copy(0.1f))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .clickable { onFindHospitals() }
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Search, null, tint = PBlue, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Search doctors, specialties…", fontSize = 14.sp, color = TextLight)
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(PBlueSoft),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Tune, null, tint = PBlue, modifier = Modifier.size(18.dp))
+                    }
+                }
             }
         }
 
-        Column(Modifier.padding(horizontal = 20.dp)) {
-            // "Let's Find Your Doctor" Search Header (Matching Image 4)
-            Text("Let's Find Your\nDoctor", fontSize = 24.sp, fontWeight = FontWeight.Black, color = t.textPrimary, lineHeight = 28.sp)
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(18.dp))
 
-            // Search Bar
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
-                    .background(t.card)
-                    .clickable { onOpenTab(3) }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Search, "Search", tint = t.primary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.size(10.dp))
-                    Text("Search doctors, specialties & hospitals...", fontSize = 13.sp, color = t.textMuted)
-                }
-            }
+        // ─── Specialist chips (horizontal scroll) ────────────────────────
+        val specialists = listOf(
+            Triple("All", PBlue,   PBlueSoft),
+            Triple("Pediatric",    PPurple, PPurpleSoft),
+            Triple("Neurologist",  PAmber,  PAmberSoft),
+            Triple("Physician",    PTeal,   PTealSoft),
+            Triple("Cardiologist", PRed,    PRedSoft),
+            Triple("Dentist",      PPink,   PPinkSoft),
+        )
+        var selectedSpec by remember { mutableStateOf(0) }
 
-            Spacer(Modifier.height(16.dp))
-
-            // Specialist Filter Chips (Matching Image 4)
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SpecialistChip("Pediatric", t.primary, true)
-                SpecialistChip("Neurologist", t.amber, false)
-                SpecialistChip("Physician", t.emerald, false)
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // "Health Status Review" Blue Hero (Matching Image 2)
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp))
-                    .background(
-                        androidx.compose.ui.graphics.Brush.linearGradient(
-                            listOf(t.primary, Color(0xFF2563EB), Color(0xFF1D4ED8))
-                        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            itemsIndexed(specialists) { i, (label, color, softBg) ->
+                val selected = i == selectedSpec
+                Box(
+                    Modifier
+                        .clip(CircleShape)
+                        .background(if (selected) color else Color.White)
+                        .clickable { selectedSpec = i; onFindHospitals() }
+                        .padding(horizontal = 18.dp, vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (selected) Color.White else TextMid,
                     )
-                    .padding(20.dp)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(22.dp))
+
+        // ─── Care Summary — real counts from the patient's own records ────
+        val apptList = (apptState as? com.example.hoscore.core.common.Resource.Success)?.data ?: emptyList()
+        val rxList = (rxState as? com.example.hoscore.core.common.Resource.Success)?.data ?: emptyList()
+        val billList = (billsState as? com.example.hoscore.core.common.Resource.Success)?.data ?: emptyList()
+        val lastVital = (recordsState as? com.example.hoscore.core.common.Resource.Success)?.data?.vitals?.firstOrNull()
+
+        if (lastVital != null) {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                SectionHeader("Latest Vitals", "History") { onOpenTab(2) }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VitalMiniCard("BP", lastVital.bloodPressure ?: "--", "mmHg", PRed, PRedSoft, Modifier.weight(1f))
+                    VitalMiniCard("Heart Rate", lastVital.heartRate?.toString() ?: "--", "bpm", PPink, PPinkSoft, Modifier.weight(1f))
+                    VitalMiniCard("SpO₂", lastVital.oxygenSaturation?.toString() ?: "--", "%", PTeal, PTealSoft, Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(22.dp))
+        }
+
+        val upcomingCount = apptList.count { (it.status ?: "").lowercase() !in setOf("cancelled", "completed") }
+        val activeRxCount = rxList.count { (it.status ?: "").uppercase() != "CANCELLED" }
+        val pendingBills = billList.filter { (it.status ?: "").uppercase() != "PAID" }
+        val pendingBillTotal = pendingBills.sumOf { it.amount ?: 0.0 }
+
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            SectionHeader("Care Summary", "See All") { onOpenTab(1) }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HealthStatusCard(
+                    icon = Icons.Rounded.CalendarMonth, iconBg = PBlueSoft, iconTint = PBlue,
+                    label = "Upcoming visits", value = upcomingCount.toString(),
+                    sub = if (upcomingCount > 0) "Tap to view" else "None scheduled",
+                    badge = "Visits", badgeColor = PBlue, modifier = Modifier.weight(1f),
+                    onClick = { onOpenTab(1) },
+                )
+                HealthStatusCard(
+                    icon = Icons.Rounded.LocalPharmacy, iconBg = PTealSoft, iconTint = PTeal,
+                    label = "Prescriptions", value = activeRxCount.toString(),
+                    sub = "Active records", badge = "Records", badgeColor = PTeal,
+                    modifier = Modifier.weight(1f), onClick = { onOpenTab(2) },
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HealthStatusCard(
+                    icon = Icons.Rounded.Payments, iconBg = PAmberSoft, iconTint = PAmber,
+                    label = "Pending bills", value = pendingBills.size.toString(),
+                    sub = if (pendingBillTotal > 0) "₹${pendingBillTotal.toInt()} due" else "All settled",
+                    badge = "Billing", badgeColor = PAmber, modifier = Modifier.weight(1f),
+                    onClick = { onOpenTab(3) },
+                )
+                HealthStatusCard(
+                    icon = Icons.Rounded.LocalHospital, iconBg = PPurpleSoft, iconTint = PPurple,
+                    label = "Find care", value = "Book",
+                    sub = "Search hospitals", badge = "New", badgeColor = PPurple,
+                    modifier = Modifier.weight(1f), onClick = onFindHospitals,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(22.dp))
+
+        // ─── Upcoming Appointment card ────────────────────────────────────
+
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            SectionHeader("Upcoming Appointment", "See All") { onOpenTab(1) }
+            Spacer(Modifier.height(12.dp))
+
+            val upcoming = apptList.firstOrNull { (it.status ?: "").lowercase() != "cancelled" && (it.status ?: "").lowercase() != "completed" }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Brush.linearGradient(listOf(PBlue, Color(0xFF818CF8))))
+                    .clickable { onOpenTab(1) }
+                    .padding(18.dp),
             ) {
-                Column {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text("HEALTH STATUS REVIEW", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.White.copy(0.8f), letterSpacing = 1.sp)
-                            Text("Vitals & Biomarkers", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
-                        }
+                if (upcoming != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.clip(CircleShape).background(Color.White.copy(0.2f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                            Modifier
+                                .size(58.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.22f)),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text("Normal", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
+                            Text("DR", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(upcoming.doctorName ?: "Doctor Appointment", fontWeight = FontWeight.Black, color = Color.White, fontSize = 15.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Box(
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.2f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                ) {
+                                    Text((upcoming.status ?: "CONFIRMED").uppercase(), fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                }
+                            }
+                            Text("${upcoming.hospitalName ?: "Hospital Visit"} · ${upcoming.department ?: "General"}", color = Color.White.copy(0.75f), fontSize = 12.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                WhitePill(upcoming.date ?: "Upcoming")
+                                WhitePill(upcoming.time ?: "Scheduled")
+                            }
                         }
                     }
-
-                    Spacer(Modifier.height(14.dp))
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PatientMetricTile("SpO2", "98.5%", "Oxygen Saturation", Modifier.weight(1f))
-                        PatientMetricTile("Heart Rate", "78 bpm", "Pulse Rate", Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PatientMetricTile("Blood Count", "Now 116/70", "Blood Pressure", Modifier.weight(1f))
-                        PatientMetricTile("Glucose Level", "90 mg/dL", "Fasting Glucose", Modifier.weight(1f))
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Text("No Upcoming Appointments", fontWeight = FontWeight.Black, color = Color.White, fontSize = 16.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Tap to explore hospitals & schedule your next visit", color = Color.White.copy(0.8f), fontSize = 12.sp)
                     }
                 }
             }
+        }
 
-            Spacer(Modifier.height(22.dp))
-            SectionTitle("Upcoming appointment")
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(22.dp))
 
-            // Doctor Appointment Hero Card (Matching Image 4)
-            HoscoreCard(Modifier.fillMaxWidth(), onClick = { onOpenTab(1) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(52.dp).clip(CircleShape).background(t.primary.copy(0.15f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("DR", color = t.primary, fontWeight = FontWeight.Black, fontSize = 16.sp)
-                    }
-                    Spacer(Modifier.size(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Dr. Tanjana Jhon", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp)
-                            Spacer(Modifier.size(6.dp))
-                            Box(
-                                Modifier.clip(CircleShape).background(t.amber.copy(0.15f)).padding(horizontal = 6.dp, vertical = 2.dp),
-                            ) {
-                                Text("★ 4.9", fontSize = 10.sp, fontWeight = FontWeight.Black, color = t.amber)
-                            }
-                        }
-                        Text("Neurologist · 45 Reviews", color = t.textMuted, fontSize = 12.sp)
-                        Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(
-                                Modifier.clip(CircleShape).background(t.primary.copy(0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
-                            ) {
-                                Text("14 Jun", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = t.primary)
-                            }
-                            Box(
-                                Modifier.clip(CircleShape).background(t.emerald.copy(0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
-                            ) {
-                                Text("14:30 PM", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = t.emerald)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(22.dp))
-            SectionTitle("Quick portal access")
+        // ─── Quick Access grid ────────────────────────────────────────────
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            SectionHeader("Quick Access", "") {}
             Spacer(Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickAction("Appointments", Icons.Rounded.CalendarMonth, t.primary, Modifier.weight(1f)) { onOpenTab(1) }
-                QuickAction("Records", Icons.Rounded.LocalPharmacy, t.teal, Modifier.weight(1f)) { onOpenTab(2) }
+                QuickCard("Appointments", Icons.Rounded.CalendarMonth, PBlue,   PBlueSoft,   Modifier.weight(1f)) { onOpenTab(1) }
+                QuickCard("Records",      Icons.Rounded.LocalPharmacy, PTeal,   PTealSoft,   Modifier.weight(1f)) { onOpenTab(2) }
+                QuickCard("Bills",        Icons.Rounded.Payments,      PAmber,  PAmberSoft,  Modifier.weight(1f)) { onOpenTab(3) }
+                QuickCard("Hospitals",    Icons.Rounded.LocalHospital, PPurple, PPurpleSoft, Modifier.weight(1f)) { onFindHospitals() }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickAction("Bills", Icons.Rounded.Payments, t.amber, Modifier.weight(1f)) { onOpenTab(3) }
-                QuickAction("Find Hospital", Icons.Rounded.Search, t.cyan, Modifier.weight(1f)) { onOpenTab(3) }
-            }
+        }
+        Spacer(Modifier.height(28.dp))
+    }
+    }
+}
 
-            Spacer(Modifier.height(24.dp))
+// ─────────────────────────────────────────────────────────────────────────────
+// Components
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun VitalMiniCard(label: String, value: String, unit: String, color: Color, bg: Color, modifier: Modifier = Modifier) {
+    Box(modifier.clip(RoundedCornerShape(14.dp)).background(bg).padding(12.dp)) {
+        Column {
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = color)
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Black, color = TextDark)
+                Spacer(Modifier.width(2.dp))
+                Text(unit, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMid, modifier = Modifier.padding(bottom = 2.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun SpecialistChip(label: String, color: Color, selected: Boolean) {
-    val t = HoscoreTokens.current
+private fun HealthStatusCard(
+    icon: ImageVector,
+    iconBg: Color,
+    iconTint: Color,
+    label: String,
+    value: String,
+    sub: String,
+    badge: String,
+    badgeColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(14.dp),
+    ) {
+        Column {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(iconBg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(iconBg)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(badge, fontSize = 9.sp, fontWeight = FontWeight.Black, color = badgeColor)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Black, color = TextDark)
+            Text(label, fontSize = 11.sp, color = TextMid)
+            Spacer(Modifier.height(4.dp))
+            Text(sub, fontSize = 10.sp, color = iconTint, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun QuickCard(
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    bgColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .clickable { onClick() }
+            .padding(12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bgColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextDark, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun SmallIconBtn(icon: ImageVector, onClick: () -> Unit, tint: Color = Color(0xFF64748B)) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(Color.White)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, actionLabel: String, onAction: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Black, color = TextDark, modifier = Modifier.weight(1f))
+        if (actionLabel.isNotEmpty()) {
+            Text(
+                actionLabel,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PBlue,
+                modifier = Modifier.clickable { onAction() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun WhitePill(text: String) {
     Box(
         Modifier
             .clip(CircleShape)
-            .background(if (selected) color else t.card)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .background(Color.White.copy(0.22f))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
     ) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Black, color = if (selected) Color.White else t.textMuted)
+        Text(text, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }
 
 @Composable
-private fun PatientMetricTile(title: String, value: String, sub: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.15f))
-            .padding(12.dp)
-    ) {
-        Column {
-            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Spacer(Modifier.height(2.dp))
-            Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(sub, fontSize = 9.5.sp, color = Color.White.copy(0.75f))
-        }
-    }
-}
+private fun PatientQRModal(patientId: String, patientName: String, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text("Digital Health Pass", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextDark)
+                Text(patientName, fontSize = 13.sp, color = TextMid, fontWeight = FontWeight.Medium)
+            }
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .border(2.dp, PBlue.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        val size = this.size
+                        val step = size.width / 7f
+                        // Draw QR corner targets and code pattern
+                        drawRect(color = Color.Black, topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
+                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(step * 0.4f, step * 0.4f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
+                        drawRect(color = Color.Black, topLeft = androidx.compose.ui.geometry.Offset(step * 0.7f, step * 0.7f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
+                        
+                        drawRect(color = Color.Black, topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 2, 0f), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
+                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 1.6f, step * 0.4f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
+                        drawRect(color = Color.Black, topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 1.3f, step * 0.7f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
 
-@Composable
-private fun IconPill(icon: ImageVector, onClick: () -> Unit) {
-    val t = HoscoreTokens.current
-    Box(
-        Modifier.size(40.dp).clip(CircleShape).background(t.card).clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = t.textSecondary, modifier = Modifier.size(20.dp)) }
-}
-
-@Composable
-fun QuickAction(label: String, icon: ImageVector, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val t = HoscoreTokens.current
-    HoscoreCard(modifier = modifier, onClick = onClick) {
-        Column {
-            Box(
-                Modifier.size(42.dp).clip(CircleShape).background(color.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) { Icon(icon, label, tint = color, modifier = Modifier.size(21.dp)) }
-            Spacer(Modifier.height(12.dp))
-            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = t.textPrimary)
-        }
-    }
+                        drawRect(color = Color.Black, topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - step * 2), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
+                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(step * 0.4f, size.height - step * 1.6f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
+                        drawRect(color = Color.Black, topLeft = androidx.compose.ui.geometry.Offset(step * 0.7f, size.height - step * 1.3f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "ID: ${patientId.take(12).uppercase()}",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 15.sp,
+                    color = PBlue
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("Show this QR at reception or self-service kiosk for check-in", fontSize = 11.sp, color = TextLight)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = PBlue)
+            ) {
+                Text("Done", fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color.White
+    )
 }

@@ -419,7 +419,7 @@ export const Landing = () => {
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Security Compliance</p>
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <p className="text-sm font-extrabold text-white tracking-wider">HIPAA / GDPR / FHIR</p>
+                <p className="text-sm font-extrabold text-white tracking-wider">HIPAA / GDPR Ready Architecture</p>
               </div>
               <p className="text-[10px] text-blue-400/80 font-bold uppercase tracking-wider">End-to-End Encryption</p>
             </div>

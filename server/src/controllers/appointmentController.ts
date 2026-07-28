@@ -3,6 +3,8 @@ import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { findOrCreatePatient } from '../utils/patientResolver.js';
+import { parseDateSafe } from '../utils/dateUtils.js';
+import { normalizeTimeString } from './hospitalController.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -18,9 +20,10 @@ export const getAllAppointments = async (req: Request, res: Response) => {
 };
 
 async function getNextAppointmentToken(hospitalId: string, appointmentDate: Date): Promise<number> {
-  const startOfDay = new Date(appointmentDate);
+  const safeDate = parseDateSafe(appointmentDate) || new Date();
+  const startOfDay = new Date(safeDate);
   startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(appointmentDate);
+  const endOfDay = new Date(safeDate);
   endOfDay.setHours(23, 59, 59, 999);
 
   const highest = await prisma.appointment.findFirst({
@@ -36,24 +39,48 @@ async function getNextAppointmentToken(hospitalId: string, appointmentDate: Date
 }
 
 export const createAppointment = async (req: Request, res: Response) => {
-  const { hospitalId, patientName, doctorId, time, date, contact, email, isHoscoreUser, manualCareNote } = req.body;
+  const { hospitalId, patientName, doctorId, time, date, contact, email, isHoscoreUser, manualCareNote, sixDigitId, patientId } = req.body;
   const activeHospitalId = hospitalId || hid(req);
   try {
-    // Reuse an existing hospital-connected patient (matched by phone/email/6-digit
-    // id — never name alone) or create one with the same HOSCORE/manual rules the
-    // Register Patient path uses, so both flows stay consistent.
-    const { patient } = await findOrCreatePatient(activeHospitalId, {
-      name: patientName,
-      contact,
-      email,
-      isHoscoreUser,
-      manualCareNote,
-    });
-    const apptDate = new Date(date);
+    let targetPatientId = patientId;
+    let targetName = patientName;
+
+    if (!targetPatientId && sixDigitId) {
+      const found = await prisma.patient.findUnique({ where: { sixDigitId: String(sixDigitId) } });
+      if (found) {
+        targetPatientId = found.id;
+        targetName = found.name;
+      }
+    }
+
+    if (!targetPatientId) {
+      const { patient } = await findOrCreatePatient(activeHospitalId, {
+        name: patientName || 'Walk-in Patient',
+        contact,
+        email,
+        isHoscoreUser,
+        manualCareNote,
+      });
+      targetPatientId = patient.id;
+      targetName = patient.name;
+    }
+
+    const apptDate = parseDateSafe(date) || new Date();
     const tokenNumber = await getNextAppointmentToken(activeHospitalId, apptDate);
     const appointment = await prisma.appointment.create({
-      data: { hospitalId: activeHospitalId, patientId: patient.id, doctorId: doctorId || null, time, date: apptDate, tokenNumber, status: 'PENDING' },
+      data: {
+        hospitalId: activeHospitalId,
+        patientId: targetPatientId,
+        doctorId: doctorId || null,
+        time: time || '10:00 AM',
+        date: apptDate,
+        tokenNumber,
+        status: 'PENDING'
+      },
+      include: { patient: true, doctor: true }
     });
+
+    await logAudit(req, 'CREATE', 'Appointment', appointment.id, `Created appointment for ${targetName} (Token #${tokenNumber})`);
     res.status(201).json(appointment);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to create appointment' }); }
 };
@@ -63,6 +90,11 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
   const userId = req.user?.userId;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   if (!hospitalId || !date || !time) return res.status(400).json({ error: 'Hospital, date, and time are required' });
+
+  const apptDate = parseDateSafe(date);
+  if (!apptDate) {
+    return res.status(400).json({ error: 'Invalid date format. Please use YYYY-MM-DD or DD/MM/YYYY' });
+  }
 
   try {
     const hospital = await prisma.hospital.findFirst({ where: { id: hospitalId, isActive: true } });
@@ -84,7 +116,27 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
       targetPatientId = dependent.id;
     }
 
-    const apptDate = new Date(date);
+    const startOfDay = new Date(apptDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(apptDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const normRequestedTime = normalizeTimeString(time);
+    const existingAppointments = await prisma.appointment.findMany({
+      where: {
+        hospitalId,
+        date: { gte: startOfDay, lte: endOfDay },
+        ...(doctorId ? { doctorId } : {}),
+        status: { notIn: ['CANCELLED'] },
+      },
+      select: { time: true }
+    });
+
+    const isBooked = existingAppointments.some(a => normalizeTimeString(a.time) === normRequestedTime);
+    if (isBooked) {
+      return res.status(400).json({ error: `The ${normRequestedTime} slot is already booked. Please select an available time.` });
+    }
+
     const tokenNumber = await getNextAppointmentToken(hospitalId, apptDate);
     const appointment = await prisma.appointment.create({
       data: {
@@ -96,7 +148,11 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
         tokenNumber,
         status: 'PENDING',
       },
-      include: { doctor: { select: { name: true, specialty: true } }, hospital: { select: { name: true } } },
+      include: {
+        patient: { select: { id: true, name: true, sixDigitId: true, contact: true } },
+        doctor: { select: { name: true, specialty: true } },
+        hospital: { select: { name: true } }
+      },
     });
 
     await logAudit(req, 'CREATE', 'Appointment', appointment.id, `Patient booked appointment at ${hospital.name}`);

@@ -77,7 +77,7 @@ export const payOffline = async (req: Request, res: Response) => {
 
 export const createRazorpayOrder = async (req: Request, res: Response) => {
   try {
-    const existing = await prisma.billing.findFirst({ where: { id: req.params.id } });
+    const existing = await prisma.billing.findFirst({ where: { id: req.params.id, hospitalId: hid(req) } });
     if (!existing) return res.status(404).json({ error: 'Billing record not found' });
     if (existing.status === 'PAID') return res.status(400).json({ error: 'Already paid' });
 
@@ -101,6 +101,100 @@ export const createRazorpayOrder = async (req: Request, res: Response) => {
   }
 };
 
+// ---------- Patient-context payments ----------
+// Patients live in `patient` context, so they can never satisfy requireFeature(BILLING).
+// These two endpoints mirror the staff Razorpay flow but authorise by bill OWNERSHIP:
+// the bill's admission must belong to the caller's own patient profile (or a dependent).
+async function resolveOwnedBilling(userId: string, billingId: string) {
+  const profile = await prisma.patient.findUnique({ where: { userId }, select: { id: true } });
+  if (!profile) return null;
+
+  const billing = await prisma.billing.findFirst({
+    where: {
+      id: billingId,
+      admission: {
+        patient: {
+          OR: [{ id: profile.id }, { parentId: profile.id }],
+        },
+      },
+    },
+    include: { admission: { include: { patient: true } }, hospital: true },
+  });
+
+  return billing;
+}
+
+export const createPatientBillOrder = async (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const existing = await resolveOwnedBilling(userId, String(req.params.id));
+    if (!existing) return res.status(404).json({ error: 'Bill not found for your account' });
+    if (existing.status === 'PAID') return res.status(400).json({ error: 'This bill is already paid' });
+
+    const order = await razorpay.orders.create({
+      amount: Math.round(existing.totalAmount * 100),
+      currency: 'INR',
+      receipt: existing.id,
+    });
+
+    await prisma.billing.update({ where: { id: existing.id }, data: { razorpayOrderId: order.id } });
+    res.json({ orderId: order.id, amount: order.amount, currency: order.currency });
+  } catch (err) {
+    console.error('Patient bill order error:', err);
+    res.status(500).json({ error: 'Failed to start payment' });
+  }
+};
+
+export const verifyPatientBillPayment = async (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Incomplete payment confirmation' });
+    }
+
+    const profile = await prisma.patient.findUnique({ where: { userId }, select: { id: true } });
+    if (!profile) return res.status(404).json({ error: 'Patient profile not found' });
+
+    const existing = await prisma.billing.findFirst({
+      where: {
+        razorpayOrderId: razorpay_order_id,
+        admission: { patient: { OR: [{ id: profile.id }, { parentId: profile.id }] } },
+      },
+      include: { admission: { include: { patient: true } }, hospital: true },
+    });
+
+    if (!existing) return res.status(404).json({ error: 'Order not found for your account' });
+    if (existing.status === 'PAID') return res.status(400).json({ error: 'This bill is already paid' });
+
+    const generatedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+      .update(razorpay_order_id + '|' + razorpay_payment_id)
+      .digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
+      return res.status(400).json({ error: 'Invalid payment signature' });
+    }
+
+    const billing = await prisma.billing.update({
+      where: { id: existing.id },
+      data: { status: 'PAID', paymentMethod: 'ONLINE', razorpayPaymentId: razorpay_payment_id, paidAt: new Date() },
+    });
+
+    const receiptUrl = await generateAndUploadReceipt(billing, existing.hospital, existing.admission.patient.name);
+    await prisma.billing.update({ where: { id: billing.id }, data: { receiptUrl } });
+
+    res.json({ success: true, receiptUrl });
+  } catch (err) {
+    console.error('Patient bill verify error:', err);
+    res.status(500).json({ error: 'Failed to verify payment' });
+  }
+};
+
 export const verifyRazorpayPayment = async (req: Request, res: Response) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
@@ -109,7 +203,7 @@ export const verifyRazorpayPayment = async (req: Request, res: Response) => {
       where: { razorpayOrderId: razorpay_order_id },
       include: { admission: { include: { patient: true } }, hospital: true }
     });
-    
+
     if (!existing) return res.status(404).json({ error: 'Order not found' });
     if (existing.status === 'PAID') return res.status(400).json({ error: 'Already paid' });
 

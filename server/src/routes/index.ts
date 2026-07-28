@@ -20,6 +20,7 @@ import * as queueController from '../controllers/queueController.js';
 import * as labController from '../controllers/labController.js';
 import * as vitalsController from '../controllers/vitalsController.js';
 import * as dischargeController from '../controllers/dischargeController.js';
+import * as reportController from '../controllers/reportController.js';
 import * as auditController from '../controllers/auditController.js';
 import * as shiftController from '../controllers/shiftController.js';
 import * as feedbackController from '../controllers/feedbackController.js';
@@ -65,6 +66,7 @@ router.post('/payments/demo-order', paymentController.createDemoPaymentOrder);
 router.post('/payments/demo-verify', paymentController.verifyDemoPaymentOrder);
 router.get('/hospitals', hospitalController.listHospitals);
 router.get('/hospitals/:id', hospitalController.getHospital);
+router.get('/hospitals/:hospitalId/available-slots', hospitalController.getAvailableSlots);
 // Public wayfinding: patient-facing published map + family location-share link.
 router.get('/hospitals/:hospitalId/public-map', mapController.getPublicMap);
 router.get('/shared-location/:token', mapController.getSharedLocation);
@@ -119,6 +121,10 @@ router.post('/patient/appointments', requirePatientContext, appointmentControlle
 router.get('/patient/prescriptions', patientPortalController.getMyPrescriptions);
 router.get('/patient/records', patientPortalController.getMyRecords);
 router.get('/patient/bills', patientPortalController.getMyBills);
+// Patients pay their own bills from patient context (requireFeature(BILLING) can never
+// pass here); both endpoints authorise by bill ownership, not by hospital feature flags.
+router.post('/patient/bills/:id/pay-order', requirePatientContext, billingController.createPatientBillOrder);
+router.post('/patient/bills/pay-verify', requirePatientContext, billingController.verifyPatientBillPayment);
 
 // Sovereign Health Features: Vaccinations & Access Controls
 router.get('/patient/vaccinations', patientPortalController.getVaccinations);
@@ -212,9 +218,16 @@ router.post('/billing/:id/razorpay-order', requireFeature(FEATURES.BILLING), bil
 router.post('/billing/razorpay-verify', requireFeature(FEATURES.BILLING), billingController.verifyRazorpayPayment);
 router.delete('/billing/:id', requireFeature(FEATURES.BILLING), billingController.deleteBilling);
 
+// Rooms & Beds
+router.get('/beds', requireFeature(FEATURES.ROOMS), bedController.getAllBeds);
+router.post('/beds', requireFeature(FEATURES.ROOMS), bedController.createBed);
+router.patch('/beds/:id/status', requireFeature(FEATURES.ROOMS), bedController.updateBedStatus);
+router.delete('/beds/:id', requireFeature(FEATURES.ROOMS), bedController.deleteBed);
+
 // Doctors
 router.get('/doctors', requireFeature(FEATURES.DOCTORS), miscController.getAllDoctors);
 router.post('/doctors', requireFeature(FEATURES.DOCTORS), miscController.createDoctor);
+router.patch('/doctors/:id', requireFeature(FEATURES.DOCTORS), miscController.updateDoctor);
 router.delete('/doctors/:id', requireFeature(FEATURES.DOCTORS), miscController.deleteDoctor);
 
 // Inventory
@@ -309,6 +322,9 @@ router.delete('/insurance/:id', requireFeature(FEATURES.CLAIMS), insuranceContro
 router.get('/expenses', requireFeature(FEATURES.EXPENSES), expenseController.getAll);
 router.post('/expenses', requireFeature(FEATURES.EXPENSES), expenseController.create);
 router.put('/expenses/:id', requireFeature(FEATURES.EXPENSES), expenseController.update);
-router.delete('/expenses/:id', requireFeature(FEATURES.EXPENSES), expenseController.remove);
+// Reports
+router.get('/reports/billing', requireFeature(FEATURES.BILLING), reportController.billingReport);
+router.get('/reports/patients', requireFeature(FEATURES.PATIENTS), reportController.patientReport);
+router.get('/reports/analytics', requireFeature(FEATURES.ANALYTICS), reportController.analyticsReport);
 
 export default router;

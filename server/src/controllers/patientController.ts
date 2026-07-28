@@ -44,6 +44,48 @@ async function checkDoctorAccess(patientId: string, hospitalId: string | undefin
   return false;
 }
 
+/**
+ * Builds the `where.OR` used to pull clinical records (vitals, labs) for one patient.
+ *
+ * Records are keyed by `patientId`, but legacy/manual rows were written with only a
+ * free-text `patientName`. Matching on name alone leaks records between two patients
+ * who share a name, so name matching is allowed ONLY when both hold:
+ *   - the row has no `patientId` at all (nothing better to key on), and
+ *   - the name is unambiguous — exactly one patient with that name in this hospital.
+ * If the name is shared, we fall back to `patientId`-only and the orphan rows stay
+ * hidden rather than being attributed to the wrong chart.
+ */
+async function clinicalRecordFilter(
+  patient: { id: string; name: string | null },
+  hospitalId: string | undefined
+): Promise<any[]> {
+  const byId = [{ patientId: patient.id }];
+  if (!patient.name) return byId;
+
+  const sameName = await prisma.patient.count({
+    where: {
+      name: { equals: patient.name, mode: 'insensitive' },
+      ...(hospitalId
+        ? {
+            OR: [
+              { hospitalId },
+              { appointments: { some: { hospitalId } } },
+              { admissions: { some: { bed: { room: { hospitalId } } } } },
+            ],
+          }
+        : {}),
+    },
+  });
+
+  // More than one patient answers to this name — name matching is unsafe here.
+  if (sameName > 1) return byId;
+
+  return [
+    ...byId,
+    { AND: [{ patientId: null }, { patientName: { equals: patient.name, mode: 'insensitive' as const } }] },
+  ];
+}
+
 async function checkHospitalAccess(patientId: string, hospitalId: string | undefined): Promise<boolean> {
   if (!hospitalId) return false;
   const isPatientConnected = await prisma.patient.findFirst({
@@ -178,27 +220,16 @@ export const getPatientById = async (req: Request, res: Response) => {
     });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    // Enrich chart with vitals + labs (not Prisma relations — keyed by patientId)
+    // Enrich chart with vitals + labs using safe deduplication by patientId
+    const clinicalOR = await clinicalRecordFilter(patient, hospitalId);
     const [vitals, labOrders] = await Promise.all([
       prisma.vitalRecord.findMany({
-        where: {
-          hospitalId,
-          OR: [
-            { patientId: patient.id },
-            ...(patient.name ? [{ patientName: { equals: patient.name, mode: 'insensitive' as const } }] : []),
-          ],
-        },
+        where: { hospitalId, OR: clinicalOR },
         orderBy: { recordedAt: 'desc' },
         take: 40,
       }),
       prisma.labOrder.findMany({
-        where: {
-          hospitalId,
-          OR: [
-            { patientId: patient.id },
-            ...(patient.name ? [{ patientName: { equals: patient.name, mode: 'insensitive' as const } }] : []),
-          ],
-        },
+        where: { hospitalId, OR: clinicalOR },
         orderBy: { orderedAt: 'desc' },
         take: 40,
       }),
@@ -214,41 +245,51 @@ export const getPatientById = async (req: Request, res: Response) => {
 export const getPatientBySixDigitId = async (req: Request, res: Response) => {
   try {
     const { sixDigitId } = req.params;
-    const role = (req as any).user?.role;
     const hospitalId = hid(req);
 
     const patient = await prisma.patient.findUnique({
       where: { sixDigitId: String(sixDigitId) },
       include: {
-        admissions: { include: { bed: { include: { room: true } }, billing: true } },
-        prescriptions: { where: { hospitalId }, include: { doctor: true } },
-        appointments: { where: { hospitalId }, include: { doctor: true } },
+        admissions: { include: { bed: { include: { room: true } }, billing: true }, orderBy: { admissionDate: 'desc' } },
+        prescriptions: { include: { doctor: true }, orderBy: { date: 'desc' } },
+        appointments: { include: { doctor: true }, orderBy: { date: 'desc' } },
       },
     });
 
-    if (!patient) return res.status(404).json({ error: 'Patient profile not found' });
+    if (!patient) return res.status(404).json({ error: 'Patient profile not found for this Hoscore ID' });
 
-    // Secure boundary for doctors
-    if (role === 'DOCTOR') {
-      const hasAccess = await checkDoctorAccess(patient.id, hospitalId, (req as any).user?.email);
-      if (!hasAccess) {
-        return res.status(403).json({
-          error: 'Security Restriction: You do not have an active or past appointment/admission with this patient at your hospital. Access is restricted.'
-        });
-      }
-    } else {
-      const hasAccess = await checkHospitalAccess(patient.id, hospitalId);
-      if (!hasAccess) {
-        return res.status(403).json({
-          error: 'Access denied: Patient is not registered or has no active records at your hospital.'
-        });
-      }
-    }
+    // Fetch vitals, lab orders, and vaccinations for complete clinical picture
+    const [vitals, labOrders, vaccinations] = await Promise.all([
+      prisma.vitalRecord.findMany({
+        where: {
+          OR: [
+            { patientId: patient.id },
+            ...(patient.name ? [{ patientName: { equals: patient.name, mode: 'insensitive' as const } }] : []),
+          ],
+        },
+        orderBy: { recordedAt: 'desc' },
+        take: 50,
+      }),
+      prisma.labOrder.findMany({
+        where: {
+          OR: [
+            { patientId: patient.id },
+            ...(patient.name ? [{ patientName: { equals: patient.name, mode: 'insensitive' as const } }] : []),
+          ],
+        },
+        orderBy: { orderedAt: 'desc' },
+        take: 50,
+      }),
+      prisma.vaccination.findMany({
+        where: { patientId: patient.id },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
-    // Log the read event
-    await logAudit(req, 'READ', 'Patient', patient.id, `Accessed patient chart/medical profile for ${patient.name}`);
+    // Log the read event for audit trail
+    await logAudit(req, 'READ', 'Patient', patient.id, `Scanned/searched patient profile #${patient.sixDigitId} (${patient.name})`);
 
-    res.json(patient);
+    res.json({ ...patient, vitals, labOrders, vaccinations });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to search patient profile' });

@@ -1,7 +1,6 @@
 package com.example.hoscore.feature.superadmin
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,8 +31,6 @@ import com.example.hoscore.core.ui.theme.HoscoreTokens
 fun SuperAdminShell(
     onLogout: () -> Unit,
     onSwitchContext: () -> Unit,
-    darkMode: Boolean,
-    onToggleDark: () -> Unit,
     canSwitch: Boolean,
 ) {
     val t = HoscoreTokens.current
@@ -48,9 +45,9 @@ fun SuperAdminShell(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Crossfade(targetState = tab, modifier = Modifier.fillMaxSize().padding(bottom = 78.dp), label = "adminTab") { current ->
+        Crossfade(targetState = tab, modifier = Modifier.fillMaxSize().padding(bottom = 64.dp), label = "adminTab") { current ->
             when (current) {
-                0 -> SuperAdminOverviewScreen(darkMode, onToggleDark, onSwitchContext, canSwitch)
+                0 -> SuperAdminOverviewScreen(onSwitchContext, canSwitch)
                 1 -> ManageHospitalsScreen()
                 2 -> ManageUsersScreen()
                 else -> Column(Modifier.fillMaxSize()) {

@@ -591,7 +591,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
   const challengeId = String(req.body.challengeId || '').trim();
   const channel = String(req.body.channel || '').trim() as ChallengeChannel;
-  const otpCode = String(req.body.otpCode || '').trim();
+  const otpCode = String(req.body.otpCode || req.body.code || '').trim();
 
   try {
     const loaded = await getChallengeOrError(challengeId);

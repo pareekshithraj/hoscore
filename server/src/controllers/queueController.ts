@@ -7,15 +7,13 @@ const hid = (req: Request) => (req as any).user?.hospitalId;
 
 function getRoomForQueue(entry: any) {
   const dept = (entry.department || '').toLowerCase();
-  const doc = (entry.doctorName || '').toLowerCase();
-  
-  if (dept.includes('cardio') || doc.includes('sarah')) return 'Room 102';
-  if (dept.includes('pediat') || doc.includes('rahul')) return 'Room 104';
-  if (dept.includes('ortho') || doc.includes('anil')) return 'Room 106';
+  if (dept.includes('cardio')) return 'Cardiology OPD';
+  if (dept.includes('pediat')) return 'Pediatrics OPD';
+  if (dept.includes('ortho')) return 'Orthopedics OPD';
   if (dept.includes('lab') || dept.includes('diagnos')) return 'Lab Room';
   if (dept.includes('bill') || dept.includes('financ')) return 'Billing Desk';
   if (dept.includes('pharm')) return 'Pharmacy';
-  return 'Room 101'; // default room
+  return 'OPD Consultation Room';
 }
 
 async function broadcastQueuePositionUpdates(hospitalId: string | null, doctorId: string | null) {

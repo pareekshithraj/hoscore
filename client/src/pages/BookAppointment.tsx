@@ -34,9 +34,30 @@ export const BookAppointment = () => {
     email: '',
     contact: '',
     doctorId: '',
-    date: '',
-    time: '09:00 AM'
+    date: new Date().toISOString().split('T')[0],
+    time: ''
   });
+
+  const [availableSlots, setAvailableSlots] = useState<{ isOpen: boolean; slots: { time: string; isBooked: boolean }[] }>({ isOpen: true, slots: [] });
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!hospitalId || !formData.date) return;
+    setSlotsLoading(true);
+    fetch(`${BASE_URL}/hospitals/${hospitalId}/available-slots?date=${formData.date}&doctorId=${formData.doctorId}`)
+      .then(r => r.json())
+      .then(data => {
+        setAvailableSlots(data);
+        setSlotsLoading(false);
+        if (data.isOpen && data.slots && data.slots.length > 0) {
+          const firstAvail = data.slots.find((s: any) => !s.isBooked)?.time;
+          if (firstAvail && (!formData.time || data.slots.find((s: any) => s.time === formData.time)?.isBooked)) {
+            setFormData(prev => ({ ...prev, time: firstAvail }));
+          }
+        }
+      })
+      .catch(() => setSlotsLoading(false));
+  }, [hospitalId, formData.date, formData.doctorId]);
 
   useEffect(() => {
     if (!user) return;
@@ -102,6 +123,9 @@ export const BookAppointment = () => {
         time: data.time,
         date: new Date(data.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
         doctorName: data.doctor?.name,
+        hospitalName: data.hospital?.name || hospital.name,
+        sixDigitId: data.patient?.sixDigitId || user?.id?.slice(-6) || '882910',
+        patientName: data.patient?.name || formData.patientName || user?.name || 'Patient'
       });
     } catch (err) {
       setError('Failed to book appointment. Please try again.');
@@ -151,6 +175,7 @@ export const BookAppointment = () => {
   }
 
   if (booked) {
+    const qrData = `HOSCORE:${booked.sixDigitId}:${booked.id}:TOKEN-${booked.token}`;
     return (
       <div className={isDashboardRoute ? "flex items-center justify-center p-6 w-full" : "min-h-screen bg-[#060913] flex items-center justify-center p-6 relative overflow-hidden"}>
         {!isDashboardRoute && (
@@ -159,39 +184,70 @@ export const BookAppointment = () => {
             <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#881337] opacity-20 blur-[120px] pointer-events-none" />
           </>
         )}
-        <div className="max-w-md w-full glass-card border border-white/5 rounded-[40px] p-10 text-center space-y-8 relative z-10" style={{ animation: 'slideUp 0.5s ease-out' }}>
-          <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/20 animate-bounce">
-            <CheckCircle className="w-10 h-10 text-emerald-500" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-3xl font-black text-white">Appointment Confirmed!</h2>
-            <p className="text-slate-400 text-sm">Your clinical session is successfully registered at <span className="font-bold text-white">{hospital.name}</span></p>
+        <div className="max-w-md w-full glass-card border border-white/10 rounded-[40px] p-8 text-center space-y-6 relative z-10 shadow-2xl" style={{ animation: 'slideUp 0.5s ease-out' }}>
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-6 h-6 text-emerald-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-400">Appointment Confirmed</span>
+            </div>
+            <span className="text-[11px] font-bold text-slate-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/10">HOSCORE PASS</span>
           </div>
 
-          <div className="bg-gradient-to-br from-rose-600 to-red-700 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl shadow-rose-950/30">
-            <Ticket className="absolute -top-4 -right-4 w-24 h-24 text-white/10 -rotate-12" />
-            <p className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-1">Your Token Number</p>
-            <p className="text-6xl font-black mb-6">#{booked.token}</p>
-            <div className="grid grid-cols-2 gap-4 text-left border-t border-white/20 pt-6">
-              <div>
-                <p className="text-rose-200 text-[10px] font-bold uppercase">Time Slot</p>
-                <p className="font-extrabold">{booked.time}</p>
+          {/* Modern Digital Ticket Pass Card */}
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-[#0f172a] rounded-3xl p-6 border border-rose-500/30 text-white relative overflow-hidden shadow-2xl">
+            <Ticket className="absolute -top-6 -right-6 w-32 h-32 text-rose-500/10 -rotate-12 pointer-events-none" />
+
+            <div className="text-left space-y-1 mb-4 border-b border-white/10 pb-4">
+              <p className="text-xs text-rose-400 font-bold uppercase tracking-wider">{booked.hospitalName}</p>
+              <p className="text-lg font-black text-white">{booked.patientName}</p>
+              <p className="text-xs text-slate-400">HOSCORE ID: <span className="font-mono font-bold text-rose-300">#{booked.sixDigitId}</span></p>
+            </div>
+
+            <div className="flex items-center justify-between my-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4">
+              <div className="text-left">
+                <p className="text-[10px] text-rose-300 font-black uppercase tracking-widest">Token Number</p>
+                <p className="text-5xl font-black text-white">#{booked.token}</p>
               </div>
-              <div>
-                <p className="text-rose-200 text-[10px] font-bold uppercase">Date</p>
-                <p className="font-extrabold">{booked.date}</p>
+              <div className="bg-white p-2 rounded-xl shadow-lg">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`}
+                  alt="HOSCORE QR"
+                  className="w-20 h-20 rounded-lg"
+                />
               </div>
             </div>
-            {booked.doctorName && <p className="mt-4 text-sm font-bold text-white/80">Doctor: {booked.doctorName}</p>}
+
+            <div className="grid grid-cols-2 gap-3 text-left border-t border-white/10 pt-4 text-xs">
+              <div>
+                <p className="text-slate-400 font-medium">Time Slot</p>
+                <p className="font-extrabold text-white">{booked.time}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 font-medium">Date</p>
+                <p className="font-extrabold text-white">{booked.date}</p>
+              </div>
+            </div>
+            {booked.doctorName && (
+              <div className="mt-3 text-left pt-3 border-t border-white/5 text-xs">
+                <p className="text-slate-400">Attending Doctor</p>
+                <p className="font-bold text-rose-300">{booked.doctorName}</p>
+              </div>
+            )}
           </div>
 
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-left">
-            <p className="text-sm text-amber-400 font-medium leading-relaxed">📋 Please arrive 15 minutes before your scheduled time with a valid HOSCORE ID.</p>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3.5 text-left flex items-start gap-3">
+            <span className="text-lg">📱</span>
+            <p className="text-xs text-emerald-300 font-medium leading-relaxed">Present this QR code or Token #{booked.token} at the hospital reception kiosk for automated check-in.</p>
           </div>
-          
-          <Link to={homePath} className="block w-full py-4 bg-white/5 border border-white/10 text-white font-bold rounded-2xl hover:bg-white/10 active:scale-[0.98] transition-all cursor-pointer">
-            Return to Dashboard
-          </Link>
+
+          <div className="flex gap-3">
+            <button onClick={() => window.print()} className="flex-1 py-3.5 bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold rounded-2xl transition-all cursor-pointer text-sm">
+              🖨️ Print Pass
+            </button>
+            <Link to={homePath} className="flex-1 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-2xl transition-all cursor-pointer text-sm text-center">
+              Dashboard →
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -314,28 +370,27 @@ export const BookAppointment = () => {
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-300">Preferred Date</label>
                   <input required type="date" min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3.5 bg-black/40 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-rose-500/50 transition-all text-sm color-scheme-dark"
+                    onClick={(e) => (e.currentTarget as any).showPicker?.()}
+                    className="w-full px-4 py-3.5 bg-black/40 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-rose-500/50 transition-all text-sm color-scheme-dark cursor-pointer"
                     value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-300">Preferred Time</label>
-                  <select required className="w-full px-4 py-3.5 bg-black/40 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-rose-500/50 transition-all appearance-none cursor-pointer text-sm"
-                    value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})}>
-                    <option value="09:00 AM" className="bg-[#0a0f1d] text-white">09:00 AM</option>
-                    <option value="09:30 AM" className="bg-[#0a0f1d] text-white">09:30 AM</option>
-                    <option value="10:00 AM" className="bg-[#0a0f1d] text-white">10:00 AM</option>
-                    <option value="10:30 AM" className="bg-[#0a0f1d] text-white">10:30 AM</option>
-                    <option value="11:00 AM" className="bg-[#0a0f1d] text-white">11:00 AM</option>
-                    <option value="11:30 AM" className="bg-[#0a0f1d] text-white">11:30 AM</option>
-                    <option value="12:00 PM" className="bg-[#0a0f1d] text-white">12:00 PM</option>
-                    <option value="02:00 PM" className="bg-[#0a0f1d] text-white">02:00 PM</option>
-                    <option value="02:30 PM" className="bg-[#0a0f1d] text-white">02:30 PM</option>
-                    <option value="03:00 PM" className="bg-[#0a0f1d] text-white">03:00 PM</option>
-                    <option value="03:30 PM" className="bg-[#0a0f1d] text-white">03:30 PM</option>
-                    <option value="04:00 PM" className="bg-[#0a0f1d] text-white">04:00 PM</option>
-                    <option value="04:30 PM" className="bg-[#0a0f1d] text-white">04:30 PM</option>
-                  </select>
+                  <label className="text-sm font-bold text-slate-300">Preferred Time Slot (30-min intervals)</label>
+                  {slotsLoading ? (
+                    <div className="text-slate-400 text-xs py-3 px-4 bg-black/20 border border-white/5 rounded-2xl animate-pulse">Loading hospital 30-min slots...</div>
+                  ) : !availableSlots.isOpen ? (
+                    <div className="text-rose-400 text-xs font-bold py-3 px-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">Hospital is closed on this date.</div>
+                  ) : (
+                    <select required className="w-full px-4 py-3.5 bg-black/40 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-rose-500/50 transition-all appearance-none cursor-pointer text-sm font-semibold"
+                      value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})}>
+                      {availableSlots.slots.map((s: any) => (
+                        <option key={s.time} value={s.time} disabled={s.isBooked} className={s.isBooked ? 'bg-[#0a0f1d] text-slate-500' : 'bg-[#0a0f1d] text-white font-bold'}>
+                          {s.time} {s.isBooked ? '— (Booked)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <button type="submit" disabled={submitting}
