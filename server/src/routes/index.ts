@@ -271,6 +271,7 @@ router.delete('/groups/members/:id', requireFeature(FEATURES.GROUPS), groupContr
 
 // OPD Queue
 router.get('/queue', requireFeature(FEATURES.QUEUE), queueController.getQueue);
+router.get('/queue/pending-appointments', requireFeature(FEATURES.QUEUE), queueController.getPendingAppointments);
 router.post('/queue', requireFeature(FEATURES.QUEUE), queueController.addToQueue);
 router.patch('/queue/:id/status', requireFeature(FEATURES.QUEUE), queueController.updateQueueStatus);
 router.delete('/queue/:id', requireFeature(FEATURES.QUEUE), queueController.deleteFromQueue);

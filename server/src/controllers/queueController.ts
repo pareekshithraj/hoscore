@@ -186,3 +186,24 @@ export const deleteFromQueue = async (req: Request, res: Response) => {
   } catch (err) { res.status(500).json({ error: 'Failed to remove from queue' }); }
 };
 
+export const getPendingAppointments = async (req: Request, res: Response) => {
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+    
+    const pending = await prisma.appointment.findMany({
+      where: {
+        hospitalId: hid(req),
+        status: 'PENDING',
+        date: { gte: today, lt: tomorrow }
+      },
+      include: { patient: true, doctor: true },
+      orderBy: { time: 'asc' },
+    });
+    
+    res.json(pending);
+  } catch (err) { 
+    res.status(500).json({ error: 'Failed to fetch pending appointments' }); 
+  }
+};
+

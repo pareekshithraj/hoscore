@@ -96,10 +96,9 @@ export const OPDQueue = () => {
 
   const loadPendingAppointments = useCallback(async () => {
     try {
-      const res = await api.get('/appointments');
+      const res = await api.get('/queue/pending-appointments');
       if (Array.isArray(res)) {
-        const pending = res.filter((a: any) => a.status === 'PENDING');
-        setPendingAppointments(pending);
+        setPendingAppointments(res);
       }
     } catch {}
   }, []);
