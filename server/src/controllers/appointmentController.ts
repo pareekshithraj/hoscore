@@ -5,6 +5,7 @@ import { logAudit } from '../utils/auditLogger.js';
 import { findOrCreatePatient } from '../utils/patientResolver.js';
 import { parseDateSafe } from '../utils/dateUtils.js';
 import { normalizeTimeString } from './hospitalController.js';
+import { broadcastToHospital } from '../services/websocket.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -156,6 +157,19 @@ export const createPatientAppointment = async (req: AuthRequest, res: Response) 
     });
 
     await logAudit(req, 'CREATE', 'Appointment', appointment.id, `Patient booked appointment at ${hospital.name}`);
+
+    // WebSocket push — shows a live toast on the hospital portal immediately
+    const formattedDate = apptDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    broadcastToHospital(hospitalId, 'NEW_APPOINTMENT', {
+      appointmentId: appointment.id,
+      tokenNumber,
+      patientName: appointment.patient?.name || 'Patient',
+      date: formattedDate,
+      time,
+      doctorName: appointment.doctor?.name,
+      message: `New booking: ${appointment.patient?.name || 'Patient'} — Token #${tokenNumber} on ${formattedDate} at ${time}`,
+    });
+
     res.status(201).json(appointment);
   } catch (error) {
     console.error(error);

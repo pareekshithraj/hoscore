@@ -1,15 +1,145 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { BASE_URL } from '../utils/apiConfig';
 
+// ── New-booking live toast ───────────────────────────────────────────────────
+interface BookingToast {
+  id: number;
+  patientName: string;
+  tokenNumber: number;
+  date: string;
+  time: string;
+  doctorName?: string;
+}
+
+function NewBookingToast({ toast, onDismiss }: { toast: BookingToast; onDismiss: (id: number) => void }) {
+  const navigate = useNavigate();
+  // Auto-dismiss after 10 s
+  useEffect(() => {
+    const t = setTimeout(() => onDismiss(toast.id), 10000);
+    return () => clearTimeout(t);
+  }, [toast.id, onDismiss]);
+
+  return (
+    <div
+      style={{
+        background: 'var(--bg-card, #1c2030)',
+        border: '1px solid #2563eb55',
+        borderLeft: '4px solid #2563eb',
+        borderRadius: 14,
+        padding: '14px 16px',
+        minWidth: 280,
+        maxWidth: 340,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        animation: 'slideInRight 0.3s ease',
+        cursor: 'pointer',
+      }}
+      onClick={() => { navigate('/calendar'); onDismiss(toast.id); }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: 1 }}>
+          📅 New Booking
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDismiss(toast.id); }}
+          style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
+        >
+          ✕
+        </button>
+      </div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary, #f1f5f9)' }}>
+        {toast.patientName}
+        <span style={{ marginLeft: 8, background: '#2563eb22', color: '#60a5fa', borderRadius: 6, padding: '1px 8px', fontSize: 12, fontWeight: 700 }}>
+          Token #{toast.tokenNumber}
+        </span>
+      </div>
+      <div style={{ fontSize: 12, color: '#94a3b8' }}>
+        {toast.date} · {toast.time}
+        {toast.doctorName && <> · <span style={{ color: '#7dd3fc' }}>{toast.doctorName}</span></>}
+      </div>
+      <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Click to open Calendar →</div>
+    </div>
+  );
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const isSimulator = location.pathname === '/dashboard/simulator';
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
+  const [toasts, setToasts] = useState<BookingToast[]>([]);
+  const toastIdRef = useRef(0);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  // Simulator renders fullscreen without layout chrome
+  const dismissToast = useCallback((id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // WebSocket — connect once; listen for NEW_APPOINTMENT from server
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    // WebSocket not available on Vercel serverless — skip
+    const hostname = window.location.hostname;
+    const isServerless =
+      hostname.endsWith('.vercel.app') ||
+      hostname === 'hoscore.in' ||
+      hostname === 'www.hoscore.in';
+    if (isServerless) return;
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let host = window.location.host;
+    try {
+      if (BASE_URL.startsWith('http')) {
+        const url = new URL(BASE_URL);
+        host = url.host;
+      }
+    } catch {}
+    const wsUrl = `${wsProtocol}//${host}/ws?token=${token}`;
+
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'NEW_APPOINTMENT') {
+            const d = payload.data;
+            setToasts(prev => [
+              ...prev,
+              {
+                id: ++toastIdRef.current,
+                patientName: d.patientName || 'Patient',
+                tokenNumber: d.tokenNumber,
+                date: d.date,
+                time: d.time,
+                doctorName: d.doctorName,
+              },
+            ]);
+          }
+        } catch {}
+      };
+
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+    } catch {}
+
+    return () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
   if (isSimulator) {
     return <>{children}</>;
   }
@@ -18,7 +148,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden dashboard-theme">
       {/* Fixed Sidebar */}
       <Sidebar isMobileOpen={isMobileNavOpen} onCloseMobile={closeMobileNav} />
-      
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         <Header onOpenMenu={() => setIsMobileNavOpen(true)} />
@@ -26,6 +156,31 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           {children}
         </main>
       </div>
+
+      {/* Live booking toasts — bottom-right stack */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          alignItems: 'flex-end',
+        }}
+      >
+        {toasts.map(t => (
+          <NewBookingToast key={t.id} toast={t} onDismiss={dismissToast} />
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(60px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </div>
   );
 };

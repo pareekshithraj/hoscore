@@ -102,3 +102,4 @@ export async function sendWelcomeEmail(to: string, name: string) {
     `,
   });
 }
+
