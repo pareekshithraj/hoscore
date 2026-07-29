@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Modal } from './Modal';
 import { ShieldCheck } from 'lucide-react';
 
@@ -15,57 +15,7 @@ export const DigitalQRPassModal: React.FC<DigitalQRPassModalProps> = ({
   patientName,
   sixDigitId,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    if (!isOpen || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const size = canvas.width;
-    ctx.clearRect(0, 0, size, size);
-
-    // Draw white background
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, size, size);
-
-    // Draw high quality QR pattern
-    ctx.fillStyle = '#0F172A';
-    const grid = 15;
-    const cellSize = size / grid;
-
-    // Helper to draw QR corner target finder
-    const drawFinderPattern = (x: number, y: number) => {
-      ctx.fillStyle = '#0F172A';
-      ctx.fillRect(x * cellSize, y * cellSize, 4 * cellSize, 4 * cellSize);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect((x + 0.6) * cellSize, (y + 0.6) * cellSize, 2.8 * cellSize, 2.8 * cellSize);
-      ctx.fillStyle = '#0ea5e9';
-      ctx.fillRect((x + 1.2) * cellSize, (y + 1.2) * cellSize, 1.6 * cellSize, 1.6 * cellSize);
-    };
-
-    // Draw 3 corner targets
-    drawFinderPattern(1, 1);
-    drawFinderPattern(10, 1);
-    drawFinderPattern(1, 10);
-
-    // Deterministic data cells generated from sixDigitId
-    const seed = (sixDigitId || '123456').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    ctx.fillStyle = '#0F172A';
-
-    for (let r = 0; r < grid; r++) {
-      for (let c = 0; c < grid; c++) {
-        // Skip corner finder zones
-        if ((r <= 5 && c <= 5) || (r <= 5 && c >= 9) || (r >= 9 && c <= 5)) continue;
-
-        const val = Math.sin(seed * (r + 1) * 31 + (c + 1) * 17);
-        if (val > 0.05) {
-          ctx.fillRect(c * cellSize + 1, r * cellSize + 1, cellSize - 2, cellSize - 2);
-        }
-      }
-    }
-  }, [isOpen, sixDigitId]);
+  const qrData = `HOSCORE:${sixDigitId || '882910'}:TOKEN-1`;
 
   if (!isOpen) return null;
 
@@ -92,9 +42,9 @@ export const DigitalQRPassModal: React.FC<DigitalQRPassModalProps> = ({
             </span>
           </div>
 
-          {/* QR Canvas */}
+          {/* QR Img */}
           <div className="my-6 p-4 bg-white rounded-2xl shadow-inner inline-block border-2 border-sky-400/40">
-            <canvas ref={canvasRef} width={180} height={180} className="rounded-lg" />
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`} alt="Digital Health Pass QR Code" className="rounded-lg w-[180px] h-[180px]" />
           </div>
 
           {/* Footer note */}

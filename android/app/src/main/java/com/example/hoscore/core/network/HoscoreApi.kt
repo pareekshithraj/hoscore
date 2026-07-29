@@ -45,7 +45,10 @@ interface HoscoreApi {
     suspend fun getAnalytics(): Analytics
 
     @GET("queue")
-    suspend fun getQueue(): List<QueueItem>
+    suspend fun getQueue(@Query("date") date: String? = null): List<QueueItem>
+
+    @GET("queue/pending-appointments")
+    suspend fun getPendingAppointments(@Query("date") date: String? = null): List<Appointment>
 
     @POST("queue")
     suspend fun createQueueItem(@Body body: CreateQueueRequest): QueueItem

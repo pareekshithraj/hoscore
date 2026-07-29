@@ -61,6 +61,7 @@ fun PatientAppointmentsScreen(onBook: () -> Unit = {}) {
     val vm: AppointmentsVM = viewModel()
     
     var rescheduleTarget by remember { mutableStateOf<String?>(null) }
+    var rescheduleTime by remember { mutableStateOf("10:00 AM") }
     
     if (rescheduleTarget != null) {
         val datePickerState = rememberDatePickerState()
@@ -71,7 +72,7 @@ fun PatientAppointmentsScreen(onBook: () -> Unit = {}) {
                     // Fast demo format: YYYY-MM-DD
                     val ms = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
                     val dt = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                    vm.reschedule(rescheduleTarget!!, dt.toString(), "10:00")
+                    vm.reschedule(rescheduleTarget!!, dt.toString(), rescheduleTime)
                     rescheduleTarget = null
                 }) {
                     Text("Confirm")
@@ -81,7 +82,14 @@ fun PatientAppointmentsScreen(onBook: () -> Unit = {}) {
                 TextButton(onClick = { rescheduleTarget = null }) { Text("Cancel") }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(state = datePickerState, modifier = Modifier.weight(1f, false))
+            androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.OutlinedTextField(
+                value = rescheduleTime,
+                onValueChange = { rescheduleTime = it },
+                label = { Text("Time (e.g. 10:00 AM)") },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp)
+            )
         }
     }
 
@@ -148,7 +156,7 @@ fun PatientAppointmentsScreen(onBook: () -> Unit = {}) {
                                         shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = t.primary.copy(alpha = 0.12f))
                                     ) {
-                                        Text("🎟️ View Digital Health Pass & QR", color = t.primary, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                                        Text("🎟️ View Token", color = t.primary, fontWeight = FontWeight.Black, fontSize = 12.sp)
                                     }
                                     if (cancellable) {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

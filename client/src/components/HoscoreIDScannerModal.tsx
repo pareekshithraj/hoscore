@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Modal } from './Modal';
 import { QrCode, Search, User, Calendar, FileText, Heart, Activity, ShieldCheck, CheckCircle2, Clock, Plus, Stethoscope } from 'lucide-react';
 import { api } from '../services/api';
@@ -26,9 +27,49 @@ export const HoscoreIDScannerModal: React.FC<HoscoreIDScannerModalProps> = ({
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<any | null>(null);
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5QrcodeScanner(
+          "qr-reader",
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          false
+        );
+        scannerRef.current.render(onScanSuccess, onScanFailure);
+      }
+    } else {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(console.error);
+        scannerRef.current = null;
+      }
+    }
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(console.error);
+        scannerRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  const onScanSuccess = (decodedText: string, decodedResult: any) => {
+    const parts = decodedText.split(':');
+    if (parts.length >= 2 && parts[0] === 'HOSCORE') {
+      const extractedId = parts[1];
+      setSixDigitId(extractedId);
+      handleSearch(undefined, extractedId);
+    }
+  };
+
+  const onScanFailure = (error: any) => {
+    // ignore background scan failures
+  };
+
+  const handleSearch = async (e?: React.FormEvent, idToSearch?: string) => {
     if (e) e.preventDefault();
-    const cleanId = sixDigitId.replace(/[^0-9]/g, '');
+    const targetId = idToSearch || sixDigitId;
+    const cleanId = targetId.replace(/[^0-9]/g, '');
     if (!cleanId || cleanId.length !== 6) {
       setError('Please enter a valid 6-digit Hoscore ID (e.g., 882910)');
       return;
@@ -83,8 +124,11 @@ export const HoscoreIDScannerModal: React.FC<HoscoreIDScannerModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Hoscore ID Scanner & Clinical Search">
       <div className="space-y-5 p-1">
+        {/* QR Scanner Container */}
+        <div id="qr-reader" className="w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-900/50"></div>
+
         {/* Search / Scan Header */}
-        <form onSubmit={handleSearch} className="flex gap-2">
+        <form onSubmit={(e) => handleSearch(e)} className="flex gap-2">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
             <input

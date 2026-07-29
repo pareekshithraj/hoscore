@@ -20,9 +20,19 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,24 +54,55 @@ import com.example.hoscore.core.ui.components.StatusBadge
 import com.example.hoscore.core.ui.components.statusColor
 import com.example.hoscore.core.ui.theme.HoscoreTokens
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QueueScreen() {
     val t = HoscoreTokens.current
     val vm: QueueVM = viewModel()
     LaunchedEffect(Unit) { vm.start() }
     val state by vm.state.collectAsState()
+    val pendingState by vm.pendingState.collectAsState()
+    
+    var showDatePicker by remember { mutableStateOf(false) }
+    if (showDatePicker) {
+        val dpState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val ms = dpState.selectedDateMillis ?: System.currentTimeMillis()
+                    val dt = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                    vm.setDate(dt.toString())
+                    showDatePicker = false
+                }) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(dpState)
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(t.screenBg)) {
-        HoscoreTopBar("OPD Queue", "Live patient flow")
+        HoscoreTopBar(
+            "OPD Queue", 
+            "Date: ${vm.selectedDate}",
+            trailingIcon = Icons.Rounded.CalendarMonth,
+            onTrailing = { showDatePicker = true }
+        )
         when (val s = state) {
             is Resource.Loading -> LoadingSkeleton()
             is Resource.Error -> ErrorState(s.message, onRetry = { vm.refresh() })
             is Resource.Success -> {
-                if (s.data.isEmpty()) {
+                val pendingList = (pendingState as? Resource.Success)?.data ?: emptyList()
+                val queueList = s.data
+
+                if (queueList.isEmpty() && pendingList.isEmpty()) {
                     EmptyState("Queue is empty", "Patients checked in will show here.", Icons.Rounded.Groups)
                 } else {
-                    val waitingCount = s.data.count { it.status.uppercase() == "WAITING" }
-                    val consultCount = s.data.count { it.status.uppercase() == "IN_CONSULTATION" }
+                    val waitingCount = queueList.count { it.status.uppercase() == "WAITING" }
+                    val consultCount = queueList.count { it.status.uppercase() == "IN_CONSULTATION" }
                     
                     LazyColumn(
                         Modifier.fillMaxSize(),
@@ -79,7 +120,46 @@ fun QueueScreen() {
                                 }
                             }
                         }
-                        items(s.data, key = { it.id }) { q ->
+                        
+                        if (pendingList.isNotEmpty()) {
+                            item {
+                                Text("Pending Online Bookings", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                            }
+                            items(pendingList, key = { "pending_${it.id}" }) { apt ->
+                                HoscoreCard(Modifier.fillMaxWidth()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            Modifier.size(46.dp).clip(androidx.compose.foundation.shape.CircleShape).background(t.amber.copy(0.1f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Rounded.EventAvailable, null, tint = t.amber, modifier = Modifier.size(20.dp))
+                                        }
+                                        Spacer(Modifier.size(14.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(apt.patientName ?: "Unknown", fontWeight = FontWeight.Bold, color = t.textPrimary, fontSize = 15.sp)
+                                            Text(
+                                                listOfNotNull(apt.doctorName?.let { "Dr. $it" }, apt.department).joinToString(" · "),
+                                                color = t.textMuted, fontSize = 12.sp,
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { vm.checkIn(apt) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = t.amber),
+                                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                                    ) {
+                                        Text("Check In to Queue", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                            item {
+                                Text("Active Queue", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp, modifier = Modifier.padding(top = 16.dp))
+                            }
+                        }
+
+                        items(queueList, key = { it.id }) { q ->
                             HoscoreCard(Modifier.fillMaxWidth()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(

@@ -79,29 +79,30 @@ export const OPDQueue = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [filterDoctor, setFilterDoctor] = useState('ALL');
   const [now, setNow] = useState(Date.now());
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [pendingAppointments, setPendingAppointments] = useState<any[]>([]);
 
   const loadQueue = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await api.get('/queue');
+      const res = await api.get(`/queue?date=${selectedDate}`);
       setQueue(Array.isArray(res) ? res : []);
     } catch {
       /* keep last good state */
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [selectedDate]);
 
   const loadPendingAppointments = useCallback(async () => {
     try {
-      const res = await api.get('/queue/pending-appointments');
+      const res = await api.get(`/queue/pending-appointments?date=${selectedDate}`);
       if (Array.isArray(res)) {
         setPendingAppointments(res);
       }
     } catch {}
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => { loadQueue(); loadPendingAppointments(); }, [loadQueue, loadPendingAppointments]);
   useEffect(() => {
@@ -399,6 +400,12 @@ export const OPDQueue = () => {
               <option key={name} value={name}>{name}</option>
             ))}
           </select>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2.5 text-sm font-semibold text-[var(--text-primary)]"
+          />
           <button
             onClick={() => { loadQueue(); loadPendingAppointments(); }}
             className="rounded-xl border border-[var(--card-border)] p-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"

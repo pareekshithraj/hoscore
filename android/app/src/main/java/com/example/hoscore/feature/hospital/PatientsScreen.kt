@@ -33,6 +33,9 @@ import com.example.hoscore.core.ui.components.HoscoreTopBar
 import com.example.hoscore.core.ui.components.StatusBadge
 import com.example.hoscore.core.ui.theme.HoscoreTokens
 import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 @Composable
 fun PatientsScreen() {
@@ -46,18 +49,50 @@ fun PatientsScreen() {
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var isSearching by remember { mutableStateOf(false) }
 
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        if (result.contents != null) {
+            val parts = result.contents.split(":")
+            if (parts.size >= 2 && parts[0] == "HOSCORE") {
+                val extractedId = parts[1]
+                isSearching = true
+                scope.launch {
+                    val res = apiCall { ServiceLocator.api.getPatientBySixDigitId(extractedId) }
+                    isSearching = false
+                    if (res is Resource.Success) {
+                        selectedChart = res.data
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = t.screenBg,
         topBar = { HoscoreTopBar("Patients", "Registered patient directory") },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showScanModal = true },
-                containerColor = t.primary,
-                contentColor = Color.White,
-                icon = { Icon(Icons.Rounded.QrCodeScanner, null) },
-                text = { Text("Scan / Search ID", fontWeight = FontWeight.Bold) }
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                androidx.compose.material3.SmallFloatingActionButton(
+                    onClick = { showScanModal = true },
+                    containerColor = t.card,
+                    contentColor = t.primary
+                ) {
+                    Icon(Icons.Rounded.Edit, null)
+                }
+                Spacer(Modifier.height(8.dp))
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        scanLauncher.launch(ScanOptions().apply {
+                            setOrientationLocked(false)
+                            setPrompt("Scan Hoscore QR Code")
+                        })
+                    },
+                    containerColor = t.primary,
+                    contentColor = Color.White,
+                    icon = { Icon(Icons.Rounded.QrCodeScanner, null) },
+                    text = { Text("Scan QR Pass", fontWeight = FontWeight.Bold) }
+                )
+            }
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.hoscore.core.common.Resource
 import com.example.hoscore.core.network.*
 import com.example.hoscore.core.ui.components.HoscoreCard
@@ -686,28 +687,12 @@ private fun StaffQRBadgeDialog(staff: StaffMember, onDismiss: () -> Unit) {
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                        val size = this.size
-                        val step = size.width / 7f
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
-                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(step * 0.4f, step * 0.4f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 0.7f, step * 0.7f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
-                        
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 2, 0f), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
-                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 1.6f, step * 0.4f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(size.width - step * 1.3f, step * 0.7f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
-
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - step * 2), size = androidx.compose.ui.geometry.Size(step * 2, step * 2))
-                        drawRect(color = Color.White, topLeft = androidx.compose.ui.geometry.Offset(step * 0.4f, size.height - step * 1.6f), size = androidx.compose.ui.geometry.Size(step * 1.2f, step * 1.2f))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 0.7f, size.height - step * 1.3f), size = androidx.compose.ui.geometry.Size(step * 0.6f, step * 0.6f))
-
-                        // QR Data Modules Matrix
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 3f, step * 1f), size = androidx.compose.ui.geometry.Size(step, step))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 4f, step * 2.5f), size = androidx.compose.ui.geometry.Size(step, step))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 2.5f, step * 4f), size = androidx.compose.ui.geometry.Size(step, step))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 5f, step * 4.5f), size = androidx.compose.ui.geometry.Size(step, step))
-                        drawRect(color = Color(0xFF4F46E5), topLeft = androidx.compose.ui.geometry.Offset(step * 3.8f, step * 5.5f), size = androidx.compose.ui.geometry.Size(step, step))
-                    }
+                    val qrData = java.net.URLEncoder.encode("HOSCORE:${staff.id}:STAFF", "UTF-8")
+                    AsyncImage(
+                        model = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$qrData",
+                        contentDescription = "Staff QR Code",
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
                 Spacer(Modifier.height(14.dp))
                 Text("ID: STF-${staff.id.take(8).uppercase()}", fontWeight = FontWeight.Black, fontSize = 14.sp, color = t.primary)

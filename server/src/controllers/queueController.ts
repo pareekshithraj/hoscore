@@ -63,7 +63,8 @@ async function broadcastQueuePositionUpdates(hospitalId: string | null, doctorId
 
 export const getQueue = async (req: Request, res: Response) => {
   try {
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = req.query.date ? new Date(req.query.date as string) : new Date(); 
+    today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
     const queue = await prisma.oPDQueue.findMany({
       where: { hospitalId: hid(req), date: { gte: today, lt: tomorrow } },
@@ -188,7 +189,8 @@ export const deleteFromQueue = async (req: Request, res: Response) => {
 
 export const getPendingAppointments = async (req: Request, res: Response) => {
   try {
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = req.query.date ? new Date(req.query.date as string) : new Date(); 
+    today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
     
     const pending = await prisma.appointment.findMany({

@@ -2,6 +2,8 @@ package com.example.hoscore.feature.hospital
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.example.hoscore.core.common.Resource
 import com.example.hoscore.core.network.Admission
 import com.example.hoscore.core.network.Analytics
@@ -74,7 +76,18 @@ class HospitalDashboardVM : ViewModel() {
 class QueueVM : ViewModel() {
     private val _state = MutableStateFlow<Resource<List<QueueItem>>>(Resource.Loading)
     val state: StateFlow<Resource<List<QueueItem>>> = _state.asStateFlow()
+
+    private val _pendingState = MutableStateFlow<Resource<List<Appointment>>>(Resource.Loading)
+    val pendingState: StateFlow<Resource<List<Appointment>>> = _pendingState.asStateFlow()
+
     private var started = false
+
+    var selectedDate by androidx.compose.runtime.mutableStateOf(java.time.LocalDate.now().toString())
+
+    fun setDate(date: String) {
+        selectedDate = date
+        refresh()
+    }
 
     fun start() {
         if (started) return
@@ -84,7 +97,8 @@ class QueueVM : ViewModel() {
     }
 
     fun refresh() {
-        viewModelScope.launch { _state.value = apiCall { getQueue() } }
+        viewModelScope.launch { _state.value = apiCall { getQueue(selectedDate) } }
+        viewModelScope.launch { _pendingState.value = apiCall { getPendingAppointments(selectedDate) } }
     }
 
     fun advance(item: QueueItem) {
@@ -95,6 +109,23 @@ class QueueVM : ViewModel() {
         }
         viewModelScope.launch {
             apiCall { updateQueueStatus(item.id, mapOf("status" to next)) }
+            refresh()
+        }
+    }
+
+    fun checkIn(appointment: Appointment) {
+        viewModelScope.launch {
+            apiCall {
+                createQueueItem(
+                    CreateQueueRequest(
+                        patientId = appointment.patient?.id,
+                        patientName = appointment.patientName ?: "Unknown",
+                        department = appointment.department,
+                        doctorId = appointment.doctor?.id,
+                        doctorName = appointment.doctorName
+                    )
+                )
+            }
             refresh()
         }
     }

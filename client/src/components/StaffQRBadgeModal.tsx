@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Modal } from './Modal';
 import { ShieldCheck, UserCheck, Stethoscope } from 'lucide-react';
 
@@ -17,49 +17,7 @@ export const StaffQRBadgeModal: React.FC<StaffQRBadgeModalProps> = ({
   roleOrSpecialty,
   staffId,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    if (!isOpen || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const size = canvas.width;
-    ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, size, size);
-
-    ctx.fillStyle = '#4F46E5';
-    const grid = 15;
-    const cellSize = size / grid;
-
-    const drawFinderPattern = (x: number, y: number) => {
-      ctx.fillStyle = '#4F46E5';
-      ctx.fillRect(x * cellSize, y * cellSize, 4 * cellSize, 4 * cellSize);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect((x + 0.6) * cellSize, (y + 0.6) * cellSize, 2.8 * cellSize, 2.8 * cellSize);
-      ctx.fillStyle = '#6366F1';
-      ctx.fillRect((x + 1.2) * cellSize, (y + 1.2) * cellSize, 1.6 * cellSize, 1.6 * cellSize);
-    };
-
-    drawFinderPattern(1, 1);
-    drawFinderPattern(10, 1);
-    drawFinderPattern(1, 10);
-
-    const seed = (staffId || 'STF-88190').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    ctx.fillStyle = '#0F172A';
-
-    for (let r = 0; r < grid; r++) {
-      for (let c = 0; c < grid; c++) {
-        if ((r <= 5 && c <= 5) || (r <= 5 && c >= 9) || (r >= 9 && c <= 5)) continue;
-        const val = Math.sin(seed * (r + 4) * 23 + (c + 1) * 13);
-        if (val > 0.06) {
-          ctx.fillRect(c * cellSize + 1, r * cellSize + 1, cellSize - 2, cellSize - 2);
-        }
-      }
-    }
-  }, [isOpen, staffId]);
+  const qrData = `HOSCORE:${staffId}:STAFF`;
 
   if (!isOpen) return null;
 
@@ -86,7 +44,7 @@ export const StaffQRBadgeModal: React.FC<StaffQRBadgeModalProps> = ({
           </div>
 
           <div className="my-5 p-4 bg-white rounded-2xl shadow-inner inline-block border-2 border-indigo-400/40">
-            <canvas ref={canvasRef} width={180} height={180} className="rounded-lg" />
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`} alt="Staff QR Badge" className="rounded-lg w-[180px] h-[180px]" />
           </div>
 
           <p className="text-xs text-slate-400 font-semibold px-2">
