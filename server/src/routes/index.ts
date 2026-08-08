@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, optionalAuthenticate, requireFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
+import { authenticate, requireFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
 import * as authController from '../controllers/authController.js';
 import * as hospitalController from '../controllers/hospitalController.js';
 import * as superAdminController from '../controllers/superAdminController.js';
@@ -57,9 +57,12 @@ router.post('/auth/login', validate(loginSchema), authController.login);
 router.post('/auth/start-otp-login', validate(otpLoginSchema), authController.startOtpLogin);
 router.post('/auth/verify-otp', validate(verifyOtpSchema), authController.verifyOtp);
 router.post('/auth/resend-otp', validate(resendOtpSchema), authController.resendOtp);
+router.get('/auth/challenge/:challengeId', authController.getChallengeStatus);
 router.post('/auth/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
 router.post('/auth/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 router.post('/auth/verify-msg91-access-token', validate(verifyMsg91Schema), authController.verifyMsg91AccessToken);
+router.get('/auth/msg91-widget-config', authController.getMsg91WidgetConfig);
+router.get('/internal/cron/cleanup-challenges', authController.runChallengeCleanup);
 router.post('/create-order', paymentController.createRazorpayOrder);
 router.post('/verify-payment', paymentController.verifyRazorpayPayment);
 router.post('/payments/demo-order', paymentController.createDemoPaymentOrder);
@@ -72,7 +75,7 @@ router.get('/hospitals/:hospitalId/public-map', mapController.getPublicMap);
 router.get('/shared-location/:token', mapController.getSharedLocation);
 router.post('/hospitals/register/initiate', validate(initiateHospitalRegisterSchema), hospitalController.initiateHospitalRegistration);
 router.post('/hospitals/register/complete', validate(completeHospitalRegisterSchema), hospitalController.completeHospitalRegistration);
-router.post('/hospitals/register', optionalAuthenticate, validate(hospitalRegisterSchema), hospitalController.registerHospital);
+router.post('/hospitals/register', authenticate, validate(hospitalRegisterSchema), hospitalController.registerHospital);
 
 
 // ================= AUTHENTICATED ROUTES =================
@@ -109,30 +112,30 @@ router.get('/hospitals/staff', requireFeature(FEATURES.STAFF), hospitalControlle
 router.patch('/hospitals/staff/:id', requireFeature(FEATURES.STAFF), hospitalController.updateStaffMembership);
 
 // ================= PATIENT PORTAL =================
-router.get('/patient/dashboard', patientPortalController.getPatientDashboard);
-router.post('/patient/skip-alert', patientPortalController.skipAlert);
-router.get('/patient/dependents', patientPortalController.getDependents);
-router.post('/patient/dependents', patientPortalController.createDependent);
-router.patch('/patient/appointments/:id/close', patientPortalController.closeAppointment);
-router.patch('/patient/appointments/:id/cancel', patientPortalController.cancelAppointment);
-router.patch('/patient/appointments/:id/reschedule', patientPortalController.rescheduleAppointment);
-router.get('/patient/appointments', patientPortalController.getMyAppointments);
+router.get('/patient/dashboard', requirePatientContext, patientPortalController.getPatientDashboard);
+router.post('/patient/skip-alert', requirePatientContext, patientPortalController.skipAlert);
+router.get('/patient/dependents', requirePatientContext, patientPortalController.getDependents);
+router.post('/patient/dependents', requirePatientContext, patientPortalController.createDependent);
+router.patch('/patient/appointments/:id/close', requirePatientContext, patientPortalController.closeAppointment);
+router.patch('/patient/appointments/:id/cancel', requirePatientContext, patientPortalController.cancelAppointment);
+router.patch('/patient/appointments/:id/reschedule', requirePatientContext, patientPortalController.rescheduleAppointment);
+router.get('/patient/appointments', requirePatientContext, patientPortalController.getMyAppointments);
 router.post('/patient/appointments', requirePatientContext, appointmentController.createPatientAppointment);
-router.get('/patient/prescriptions', patientPortalController.getMyPrescriptions);
-router.get('/patient/records', patientPortalController.getMyRecords);
-router.get('/patient/bills', patientPortalController.getMyBills);
+router.get('/patient/prescriptions', requirePatientContext, patientPortalController.getMyPrescriptions);
+router.get('/patient/records', requirePatientContext, patientPortalController.getMyRecords);
+router.get('/patient/bills', requirePatientContext, patientPortalController.getMyBills);
 // Patients pay their own bills from patient context (requireFeature(BILLING) can never
 // pass here); both endpoints authorise by bill ownership, not by hospital feature flags.
 router.post('/patient/bills/:id/pay-order', requirePatientContext, billingController.createPatientBillOrder);
 router.post('/patient/bills/pay-verify', requirePatientContext, billingController.verifyPatientBillPayment);
 
 // Sovereign Health Features: Vaccinations & Access Controls
-router.get('/patient/vaccinations', patientPortalController.getVaccinations);
-router.post('/patient/vaccinations', patientPortalController.recordVaccination);
-router.get('/patient/access-grants', patientPortalController.getAccessGrants);
-router.get('/patient/access-logs', patientPortalController.getAccessLogs);
-router.post('/patient/access-grants/revoke', patientPortalController.revokeDoctorAccess);
-router.post('/patient/access-grants/restore', patientPortalController.restoreDoctorAccess);
+router.get('/patient/vaccinations', requirePatientContext, patientPortalController.getVaccinations);
+router.post('/patient/vaccinations', requirePatientContext, patientPortalController.recordVaccination);
+router.get('/patient/access-grants', requirePatientContext, patientPortalController.getAccessGrants);
+router.get('/patient/access-logs', requirePatientContext, patientPortalController.getAccessLogs);
+router.post('/patient/access-grants/revoke', requirePatientContext, patientPortalController.revokeDoctorAccess);
+router.post('/patient/access-grants/restore', requirePatientContext, patientPortalController.restoreDoctorAccess);
 // Patient indoor location + family share
 router.get('/patient/location', requirePatientContext, mapController.getMyLocation);
 router.post('/patient/location/share', requirePatientContext, mapController.shareMyLocation);
@@ -218,12 +221,6 @@ router.put('/billing/:id/pay-offline', requireFeature(FEATURES.BILLING), billing
 router.post('/billing/:id/razorpay-order', requireFeature(FEATURES.BILLING), billingController.createRazorpayOrder);
 router.post('/billing/razorpay-verify', requireFeature(FEATURES.BILLING), billingController.verifyRazorpayPayment);
 router.delete('/billing/:id', requireFeature(FEATURES.BILLING), billingController.deleteBilling);
-
-// Rooms & Beds
-router.get('/beds', requireFeature(FEATURES.ROOMS), bedController.getAllBeds);
-router.post('/beds', requireFeature(FEATURES.ROOMS), bedController.createBed);
-router.patch('/beds/:id/status', requireFeature(FEATURES.ROOMS), bedController.updateBedStatus);
-router.delete('/beds/:id', requireFeature(FEATURES.ROOMS), bedController.deleteBed);
 
 // Doctors
 router.get('/doctors', requireFeature(FEATURES.DOCTORS), miscController.getAllDoctors);
@@ -324,6 +321,7 @@ router.delete('/insurance/:id', requireFeature(FEATURES.CLAIMS), insuranceContro
 router.get('/expenses', requireFeature(FEATURES.EXPENSES), expenseController.getAll);
 router.post('/expenses', requireFeature(FEATURES.EXPENSES), expenseController.create);
 router.put('/expenses/:id', requireFeature(FEATURES.EXPENSES), expenseController.update);
+router.delete('/expenses/:id', requireFeature(FEATURES.EXPENSES), expenseController.remove);
 // Reports
 router.get('/reports/billing', requireFeature(FEATURES.BILLING), reportController.billingReport);
 router.get('/reports/patients', requireFeature(FEATURES.PATIENTS), reportController.patientReport);

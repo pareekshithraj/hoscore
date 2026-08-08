@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 import { BASE_URL } from '../utils/apiConfig';
+import { clearAuthStorage } from '../utils/authStorage';
 
 interface ContextItem {
   type: 'hospital' | 'patient' | 'superadmin';
@@ -68,34 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   // Client-side notification list
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    return [
-      {
-        id: 'init-1',
-        title: 'System Encrypted & Active',
-        message: 'HOSCORE clinical environment initialized in secure mode.',
-        type: 'SUCCESS',
-        createdAt: new Date(),
-        isRead: false,
-      },
-      {
-        id: 'init-2',
-        title: 'Shift Schedule Synced',
-        message: 'The shift schedules for this week have been updated and rostered.',
-        type: 'INFO',
-        createdAt: new Date(Date.now() - 30 * 60 * 1000),
-        isRead: false,
-      },
-      {
-        id: 'init-3',
-        title: 'IV Fluids Reorder Alert',
-        message: 'Stock check warning: Saline IV Bags are low in Central Pharmacy.',
-        type: 'WARNING',
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        isRead: false,
-      }
-    ];
-  });
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const toggleTheme = () => {
     setTheme(prev => {
@@ -148,19 +122,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    const storedContexts = localStorage.getItem('contexts');
-    const storedActive = localStorage.getItem('activeContext');
-    const storedSelected = localStorage.getItem('selectedPatientId');
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-      if (storedContexts) setContexts(JSON.parse(storedContexts));
-      if (storedActive) setActiveContext(JSON.parse(storedActive));
-      if (storedSelected) setSelectedPatientIdState(storedSelected);
-    }
-    setIsLoading(false);
+    const restoreSession = async () => {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      const storedContexts = localStorage.getItem('contexts');
+      const storedActive = localStorage.getItem('activeContext');
+      const storedSelected = localStorage.getItem('selectedPatientId');
+
+      if (!storedToken || !storedUser) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const meRes = await fetch(`${BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+        if (!meRes.ok) throw new Error('Session expired');
+
+        const me = await meRes.json();
+        const ctxRes = await fetch(`${BASE_URL}/auth/contexts`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+        if (!ctxRes.ok) throw new Error('Failed to load contexts');
+
+        const ctxData = await ctxRes.json();
+        const parsedUser = JSON.parse(storedUser);
+        const parsedContexts = ctxData.contexts || (storedContexts ? JSON.parse(storedContexts) : []);
+        const parsedActive = storedActive ? JSON.parse(storedActive) : parsedContexts[0] || null;
+
+        setToken(storedToken);
+        setUser({
+          id: me.id,
+          name: me.name,
+          email: me.email,
+          isSuperAdmin: me.isSuperAdmin ?? parsedUser.isSuperAdmin,
+        });
+        setContexts(parsedContexts);
+        setActiveContext(parsedActive);
+        localStorage.setItem('user', JSON.stringify({
+          id: me.id,
+          name: me.name,
+          email: me.email,
+          isSuperAdmin: me.isSuperAdmin,
+        }));
+        localStorage.setItem('contexts', JSON.stringify(parsedContexts));
+        if (parsedActive) {
+          localStorage.setItem('activeContext', JSON.stringify(parsedActive));
+        }
+        if (storedSelected) setSelectedPatientIdState(storedSelected);
+      } catch {
+        clearAuthStorage();
+        setUser(null);
+        setToken(null);
+        setContexts([]);
+        setActiveContext(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
   useEffect(() => {
@@ -204,11 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setContexts([]);
     setActiveContext(null);
     setSelectedPatientIdState(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('contexts');
-    localStorage.removeItem('activeContext');
-    localStorage.removeItem('selectedPatientId');
+    clearAuthStorage();
   };
 
   const switchContext = async (ctx: ContextItem, password?: string): Promise<boolean> => {

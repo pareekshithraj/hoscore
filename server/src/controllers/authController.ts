@@ -18,12 +18,13 @@ import {
   OTP_TTL_MS,
   smsTargetFromPhone,
 } from '../utils/otp.js';
+import { cleanupExpiredChallenges } from '../services/challengeCleanup.js';
 import { normalizePhone } from '../utils/phone.js';
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 const OTP_REVERIFY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
 
-type ChallengePurpose = 'register' | 'login' | 'reset_password';
+type ChallengePurpose = 'register' | 'hospital_register' | 'login' | 'reset_password';
 type ChallengeChannel = 'email' | 'phone';
 
 interface ChallengeSummary {
@@ -80,7 +81,7 @@ function hasChallengeIssue(result: ChallengeResult | LoadedChallenge): result is
   return 'error' in result;
 }
 
-function buildChallengeSummary(challenge: AuthChallenge, user: Pick<User, 'email' | 'phone'>): ChallengeSummary {
+export function buildChallengeSummary(challenge: AuthChallenge, user: Pick<User, 'email' | 'phone'>): ChallengeSummary {
   return {
     challengeId: challenge.id,
     purpose: challenge.purpose as ChallengePurpose,
@@ -100,11 +101,15 @@ function buildChallengeSummary(challenge: AuthChallenge, user: Pick<User, 'email
 }
 
 function challengePurposeCopy(purpose: ChallengePurpose) {
-  if (purpose === 'register') {
+  if (purpose === 'register' || purpose === 'hospital_register') {
     return {
       emailSubject: 'Your HOSCORE email verification code',
-      emailIntro: 'Use this code to verify your HOSCORE account.',
-      smsText: 'Use this OTP to verify your HOSCORE account.',
+      emailIntro: purpose === 'hospital_register'
+        ? 'Use this code to verify your hospital registration.'
+        : 'Use this code to verify your HOSCORE account.',
+      smsText: purpose === 'hospital_register'
+        ? 'Use this OTP to verify your hospital registration.'
+        : 'Use this OTP to verify your HOSCORE account.',
     };
   }
   if (purpose === 'reset_password') {
@@ -487,12 +492,10 @@ export const startOtpLogin = async (req: Request, res: Response) => {
 
   try {
     const user = await findUserByIdentifier(identifier);
-    if (!user) {
-      return res.status(404).json({ error: 'No account found for that email or phone number.' });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+    if (!user || !user.isActive) {
+      return res.json({
+        message: 'If an account exists for that email or phone, verification codes have been sent.',
+      });
     }
 
     const purpose: ChallengePurpose = user.isVerified ? 'login' : 'register';
@@ -546,10 +549,15 @@ export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const user = await findUserByIdentifier(identifier);
     if (!user) {
-      return res.status(404).json({ error: 'No account found for that email or phone number.' });
+      return res.json({
+        message: 'If an account exists for that email or phone, verification codes have been sent.',
+      });
     }
 
-    const issued = await createChallenge(user, 'reset_password', { email: true, phone: false });
+    const issued = await createChallenge(user, 'reset_password', {
+      email: true,
+      phone: Boolean(user.phone),
+    });
     if (hasChallengeIssue(issued)) {
       return res.status(issued.status).json({ error: issued.error });
     }
@@ -575,10 +583,15 @@ export const resetPassword = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid reset token' });
     }
 
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || !user.isActive) {
+      return res.status(403).json({ error: 'Account is not active.' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     await prisma.user.update({
       where: { id: payload.userId },
-      data: { password: hashedPassword },
+      data: { password: hashedPassword, lastOtpVerifiedAt: new Date() },
     });
 
     return res.json({ message: 'Password updated successfully. You can log in now.' });
@@ -620,6 +633,12 @@ export const verifyOtp = async (req: Request, res: Response) => {
     }
 
     if (!storedHash || !expiresAt || expiresAt < new Date()) {
+      if (channel === 'phone' && challenge.smsFallback) {
+        return res.status(400).json({
+          error: 'Use the SMS verification widget to verify your phone number.',
+          useWidget: true,
+        });
+      }
       return res.status(401).json({ error: 'OTP code expired. Please request a new code.' });
     }
 
@@ -656,6 +675,17 @@ export const verifyOtp = async (req: Request, res: Response) => {
     });
 
     const complete = (!updated.requireEmail || updated.emailVerified) && (!updated.requirePhone || updated.phoneVerified);
+
+    if (updated.purpose === 'hospital_register') {
+      return res.json({
+        message: complete
+          ? 'Verification complete. You can finish hospital registration.'
+          : `${channel === 'email' ? 'Email' : 'Phone'} verified. Verify the remaining channel to continue.`,
+        challenge: buildChallengeSummary(updated, updated.user),
+        registrationReady: complete,
+      });
+    }
+
     if (!complete) {
       return res.json({
         message: `${channel === 'email' ? 'Email' : 'Phone'} verified. Verify the remaining channel to continue.`,
@@ -736,6 +766,17 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
         });
 
         const complete = (!updated.requireEmail || updated.emailVerified) && (!updated.requirePhone || updated.phoneVerified);
+
+        if (updated.purpose === 'hospital_register') {
+          return res.json({
+            message: complete
+              ? 'Verification complete. You can finish hospital registration.'
+              : 'Phone verified. Verify the remaining channel to continue.',
+            challenge: buildChallengeSummary(updated, updated.user),
+            registrationReady: complete,
+          });
+        }
+
         if (!complete) {
           return res.json({
             message: 'Phone verified. Verify the remaining channel to continue.',
@@ -759,29 +800,7 @@ export const verifyMsg91AccessToken = async (req: Request, res: Response) => {
       }
     }
 
-    // SECURITY: never auto-create an account from a widget token alone. A valid
-    // MSG91 access token only proves phone-number control, not registration intent.
-    // Phone verification must be tied to an existing user/challenge.
-    if (!user) {
-      return res.status(404).json({ error: 'No account found for this number. Please register first.' });
-    }
-
-
-    if (!user.isVerified) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          isVerified: true,
-          emailVerifiedAt: new Date(),
-          phoneVerifiedAt: user.phone ? new Date() : user.phoneVerifiedAt,
-          lastOtpVerifiedAt: new Date(),
-        },
-      });
-      await ensurePatientProfile(user);
-    }
-
-    const session = await buildSession(user.id);
-    return res.json({ message: 'OTP verified successfully', ...session });
+    return res.status(400).json({ error: 'challengeId is required for phone verification.' });
   } catch (error) {
     console.error('MSG91 widget verification error:', error);
     return res.status(500).json({ error: 'Failed to verify OTP widget access token' });
@@ -799,12 +818,14 @@ export const switchContext = async (req: Request, res: Response) => {
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (password) {
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        await logAudit(req, 'CONTEXT_SWITCH_FAILED', 'User', user.id, `Failed password verification for context switch to ${contextType}`);
-        return res.status(401).json({ error: 'Incorrect password. Context switch denied.' });
-      }
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required to switch context.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      await logAudit(req, 'CONTEXT_SWITCH_FAILED', 'User', user.id, `Failed password verification for context switch to ${contextType}`);
+      return res.status(401).json({ error: 'Incorrect password. Context switch denied.' });
     }
 
     let role = 'PATIENT';
@@ -826,6 +847,9 @@ export const switchContext = async (req: Request, res: Response) => {
       activeHospitalId = hospitalId;
       permissions = permissionsForRole(role, membership.permissions || membership.staffType?.permissions);
     } else if (contextType === 'patient') {
+      if (!user.patientProfile) {
+        return res.status(403).json({ error: 'No patient profile found for this account.' });
+      }
       role = 'PATIENT';
       permissions = [];
     } else {
@@ -901,6 +925,45 @@ export const getMyContexts = async (req: Request, res: Response) => {
   }
 };
 
+export const getMsg91WidgetConfig = async (_req: Request, res: Response) => {
+  const widgetId = process.env.MSG91_WIDGET_ID;
+  const tokenAuth = process.env.MSG91_WIDGET_TOKEN_AUTH;
+  if (!widgetId || !tokenAuth) {
+    return res.status(503).json({ error: 'SMS widget is not configured on the server.' });
+  }
+  return res.json({ widgetId, tokenAuth });
+};
+
+export const runChallengeCleanup = async (req: Request, res: Response) => {
+  const authHeader = String(req.headers.authorization || '');
+  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const secret = bearer || String(req.headers['x-cron-secret'] || '');
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const deleted = await cleanupExpiredChallenges();
+  return res.json({ ok: true, deleted });
+};
+
+export const getChallengeStatus = async (req: Request, res: Response) => {
+  const challengeId = String(req.params.challengeId || '').trim();
+
+  try {
+    const loaded = await getChallengeOrError(challengeId);
+    if (hasChallengeIssue(loaded)) {
+      return res.status(loaded.status).json({ error: loaded.error });
+    }
+
+    const { challenge } = loaded;
+    return res.json({
+      challenge: buildChallengeSummary(challenge, challenge.user),
+    });
+  } catch (error) {
+    console.error('Get challenge status error:', error);
+    return res.status(500).json({ error: 'Failed to load verification challenge' });
+  }
+};
+
 export const getMe = async (req: Request, res: Response) => {
   const userId = (req as any).user?.userId;
   try {
@@ -928,4 +991,4 @@ export const getMe = async (req: Request, res: Response) => {
   } catch (error) {
     return res.status(500).json({ error: 'Failed to get user' });
   }
-};
+};

@@ -14,7 +14,7 @@ export const isMsg91Live = Boolean(AUTH_KEY);
 
 const SMS_OTP_URL = 'https://control.msg91.com/api/v5/otp';
 const EMAIL_URL = 'https://control.msg91.com/api/v5/email/send';
-const WIDGET_VERIFY_URL = 'https://api.msg91.com/api/v5/widget/verifyAccessToken';
+const WIDGET_VERIFY_URL = 'https://control.msg91.com/api/v5/widget/verifyAccessToken';
 
 export function buildVerifyAccessTokenPayload(accessToken: string, authKey: string) {
   return {
@@ -112,6 +112,9 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
   }
 
   if (!AUTH_KEY) {
+    if (process.env.NODE_ENV === 'production') {
+      return { verified: false, error: 'SMS verification is not configured.' };
+    }
     console.log(`📱 [MOCK MSG91 WIDGET] Verified access token for demo flow`);
     return { verified: true, response: { mocked: true } };
   }
@@ -119,8 +122,8 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
   try {
     const response = await axios.post(
       WIDGET_VERIFY_URL,
-      { 'access-token': accessToken },
-      { headers: { authkey: AUTH_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
+      buildVerifyAccessTokenPayload(accessToken, AUTH_KEY as string),
+      { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
     );
 
     const payload = response?.data ?? {};
@@ -171,4 +174,4 @@ export async function verifyMsg91AccessToken(accessToken: string): Promise<{ ver
   }
 }
 
-export const verifyMsg91WidgetAccessToken = verifyMsg91AccessToken;
+export const verifyMsg91WidgetAccessToken = verifyMsg91AccessToken;

@@ -87,9 +87,11 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100, // Increased for development/testing
+  max: isProd ? 25 : 100,
   message: { error: 'Too many login attempts, please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -97,7 +99,7 @@ const loginLimiter = rateLimit({
 
 const otpSendLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 20, // Increased for development/testing
+  max: isProd ? 8 : 20,
   message: { error: 'Too many OTP requests. Please wait 10 minutes before requesting a new code.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -105,7 +107,7 @@ const otpSendLimiter = rateLimit({
 
 const otpVerifyLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 20, // Increased for development/testing
+  max: isProd ? 10 : 20,
   message: { error: 'Too many failed verification attempts. Please wait 5 minutes before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,

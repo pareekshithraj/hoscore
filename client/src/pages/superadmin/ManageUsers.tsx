@@ -69,7 +69,7 @@ export const ManageUsers = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-zinc-350 flex items-center gap-1.5 font-mono">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-zinc-300 flex items-center gap-1.5 font-mono">
                       <Mail className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
                       {u.email}
                     </span>
@@ -87,7 +87,7 @@ export const ManageUsers = () => {
                         </span>
                       )}
                       {!u.memberships?.length && !u.patientProfile && (
-                        <span className="text-[10px] text-slate-400 dark:text-zinc-550 font-semibold italic">No active membership</span>
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-semibold italic">No active membership</span>
                       )}
                     </div>
                   </td>

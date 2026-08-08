@@ -79,14 +79,6 @@ export const PatientDashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // WebSocket is not supported on Vercel serverless — skip silently
-    const hostname = window.location.hostname;
-    const isServerless =
-      hostname.endsWith('.vercel.app') ||
-      hostname === 'hoscore.in' ||
-      hostname === 'www.hoscore.in';
-    if (isServerless) return;
-
     const wsUrl = getWsUrl(token);
     let ws: WebSocket;
 

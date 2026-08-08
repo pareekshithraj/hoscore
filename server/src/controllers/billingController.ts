@@ -23,9 +23,20 @@ export const getAllBillings = async (req: Request, res: Response) => {
 
 export const createBilling = async (req: Request, res: Response) => {
   const { admissionId, roomCharges, doctorFees, pharmacyFees, labFees } = req.body;
+  const hospitalId = hid(req);
   const total = (roomCharges || 0) + (doctorFees || 0) + (pharmacyFees || 0) + (labFees || 0);
   try {
-    const billing = await prisma.billing.create({ data: { admissionId, roomCharges, doctorFees, pharmacyFees, labFees, totalAmount: total, hospitalId: hid(req) } });
+    const admission = await prisma.admission.findFirst({
+      where: {
+        id: admissionId,
+        bed: { room: { hospitalId } },
+      },
+    });
+    if (!admission) {
+      return res.status(404).json({ error: 'Admission not found in this hospital.' });
+    }
+
+    const billing = await prisma.billing.create({ data: { admissionId, roomCharges, doctorFees, pharmacyFees, labFees, totalAmount: total, hospitalId } });
     res.status(201).json(billing);
   } catch { res.status(500).json({ error: 'Failed to create billing' }); }
 };

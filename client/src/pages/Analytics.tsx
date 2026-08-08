@@ -9,12 +9,17 @@ import { api } from '../services/api';
 
 export const Analytics = () => {
   const [data, setData] = useState<any>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api.get('/analytics')
-       .then(res => setData(res))
-       .catch(err => console.error(err));
+      .then((res) => setData(res))
+      .catch((err) => setError(err?.message || 'Failed to load analytics.'));
   }, []);
+
+  if (error) {
+    return <div className="p-8 text-center text-red-600 font-medium">{error}</div>;
+  }
 
   if (!data) return <div className="p-8 text-center text-slate-500 animate-pulse font-medium">Loading aggregated analytics...</div>;
 

@@ -40,8 +40,11 @@ async function getNextAppointmentToken(hospitalId: string, appointmentDate: Date
 }
 
 export const createAppointment = async (req: Request, res: Response) => {
-  const { hospitalId, patientName, doctorId, time, date, contact, email, isHoscoreUser, manualCareNote, sixDigitId, patientId } = req.body;
-  const activeHospitalId = hospitalId || hid(req);
+  const { patientName, doctorId, time, date, contact, email, isHoscoreUser, manualCareNote, sixDigitId, patientId } = req.body;
+  const activeHospitalId = hid(req);
+  if (!activeHospitalId) {
+    return res.status(403).json({ error: 'Hospital context required' });
+  }
   try {
     let targetPatientId = patientId;
     let targetName = patientName;

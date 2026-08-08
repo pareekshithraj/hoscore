@@ -34,8 +34,13 @@ export const MyBills = () => {
       // Patient-context endpoints — the staff /billing/* routes are feature-gated
       // to hospital context and always reject a patient session.
       const orderData = await api.post(`/patient/bills/${billId}/pay-order`, {});
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!razorpayKey) {
+        setNotice({ tone: 'error', text: 'Online payments are not configured. Please contact the hospital.' });
+        return;
+      }
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_xxxx',
+        key: razorpayKey,
         amount: orderData.amount,
         currency: orderData.currency,
         name: 'Hoscore Payments',

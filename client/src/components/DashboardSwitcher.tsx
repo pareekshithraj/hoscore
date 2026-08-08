@@ -77,7 +77,7 @@ export const DashboardSwitcher = () => {
         <div className="text-left hidden sm:block">
           <p className="text-xs font-bold leading-none">{activeContext ? getContextLabel(activeContext) : 'Select'}</p>
         </div>
-        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-zinc-550 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -104,7 +104,7 @@ export const DashboardSwitcher = () => {
                   className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all text-left cursor-pointer border ${
                     isActive 
                       ? 'bg-blue-50/40 dark:bg-zinc-900 border-blue-200 dark:border-zinc-800 text-blue-700 dark:text-white font-bold' 
-                      : 'hover:bg-slate-50 dark:hover:bg-zinc-900/50 border-transparent text-slate-700 dark:text-zinc-350 hover:text-slate-900 dark:hover:text-zinc-100'
+                      : 'hover:bg-slate-50 dark:hover:bg-zinc-900/50 border-transparent text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100'
                   }`}
                 >
                   <div className={`w-7 h-7 ${ctxBg} rounded-md flex items-center justify-center flex-shrink-0`}>
@@ -115,7 +115,7 @@ export const DashboardSwitcher = () => {
                       {getContextLabel(ctx)}
                     </p>
                     {ctx.department && ctx.type === 'hospital' && (
-                      <p className="text-[9px] text-slate-400 dark:text-zinc-550 font-semibold">{ctx.department}</p>
+                      <p className="text-[9px] text-slate-400 dark:text-zinc-500 font-semibold">{ctx.department}</p>
                     )}
                   </div>
                   {isActive && (

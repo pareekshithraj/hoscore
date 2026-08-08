@@ -85,7 +85,7 @@ export const Groups = () => {
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-805 dark:text-zinc-200 leading-none">{m.memberName}</p>
-                        <p className="text-[9px] text-slate-450 dark:text-zinc-500 font-bold block mt-0.5 leading-none">{m.role}</p>
+                        <p className="text-[9px] text-slate-500 dark:text-zinc-500 font-bold block mt-0.5 leading-none">{m.role}</p>
                       </div>
                     </div>
                     <button onClick={() => handleRemoveMember(m.id)} className="p-1 text-slate-350 hover:text-rose-500 dark:hover:text-rose-400 opacity-0 group-hover/member:opacity-100 transition-all cursor-pointer">
@@ -115,13 +115,13 @@ export const Groups = () => {
           <div className="bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-sm font-black text-slate-900 dark:text-zinc-100 uppercase tracking-wider">Create Group</h3>
-              <button onClick={() => setShowGroupForm(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-400 dark:text-zinc-550 rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowGroupForm(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-400 dark:text-zinc-500 rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-4">
-              <div><label className="text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Group Name</label><input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 placeholder-slate-405 focus:outline-none focus:ring-2 focus:ring-blue-500/25" placeholder="e.g., Night Shift ICU" /></div>
-              <div><label className="text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Description</label><input value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 placeholder-slate-405 focus:outline-none focus:ring-2 focus:ring-blue-500/25" placeholder="Optional description" /></div>
+              <div><label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Group Name</label><input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25" placeholder="e.g., Night Shift ICU" /></div>
+              <div><label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Description</label><input value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25" placeholder="Optional description" /></div>
               <div>
-                <label className="text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-wider block mb-2">Color Tag</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-2">Color Tag</label>
                 <div className="flex flex-wrap gap-2">{PRESET_COLORS.map(c => (<button key={c} onClick={() => setGroupForm(f => ({ ...f, color: c }))} className={`w-8 h-8 rounded-xl transition-all cursor-pointer ${groupForm.color === c ? 'ring-2 ring-offset-2 dark:ring-offset-zinc-950 ring-slate-400 scale-110' : 'hover:scale-105'}`} style={{ backgroundColor: c }} />))}</div>
               </div>
               <button onClick={handleCreateGroup} disabled={!groupForm.name} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-4">Create Group</button>
@@ -136,11 +136,11 @@ export const Groups = () => {
           <div className="bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-sm font-black text-slate-900 dark:text-zinc-100 uppercase tracking-wider">Add Member</h3>
-              <button onClick={() => setShowMemberForm(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-400 dark:text-zinc-550 rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowMemberForm(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-400 dark:text-zinc-500 rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-4">
-              <div><label className="text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Name</label><input value={memberForm.memberName} onChange={e => setMemberForm(f => ({ ...f, memberName: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25" /></div>
-              <div><label className="text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Role</label><select value={memberForm.role} onChange={e => setMemberForm(f => ({ ...f, role: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none cursor-pointer"><option>Doctor</option><option>Nurse</option><option>Technician</option><option>Admin</option><option>Specialist</option></select></div>
+              <div><label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Name</label><input value={memberForm.memberName} onChange={e => setMemberForm(f => ({ ...f, memberName: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25" /></div>
+              <div><label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Role</label><select value={memberForm.role} onChange={e => setMemberForm(f => ({ ...f, role: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none cursor-pointer"><option>Doctor</option><option>Nurse</option><option>Technician</option><option>Admin</option><option>Specialist</option></select></div>
               <button onClick={handleAddMember} disabled={!memberForm.memberName} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-4">Add Member</button>
             </div>
           </div>

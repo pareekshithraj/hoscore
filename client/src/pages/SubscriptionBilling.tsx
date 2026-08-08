@@ -199,7 +199,7 @@ export const SubscriptionBilling = () => {
 
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm transition-all duration-300">
-          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-550 text-sm mb-2"><Users className="w-4 h-4" /> Team members</div>
+          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-500 text-sm mb-2"><Users className="w-4 h-4" /> Team members</div>
           <p className="text-3xl font-black text-slate-900 dark:text-zinc-205">{activeUsers}</p>
           {paidActive && <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">{subscription.billedSeats} seats paid</p>}
           <Link to="/dashboard/staff" className="inline-flex items-center gap-1 text-sm text-rose-600 dark:text-rose-400 font-bold mt-3 hover:underline">
@@ -207,12 +207,12 @@ export const SubscriptionBilling = () => {
           </Link>
         </div>
         <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm transition-all duration-300">
-          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-550 text-sm mb-2"><Calendar className="w-4 h-4" /> Status</div>
+          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-500 text-sm mb-2"><Calendar className="w-4 h-4" /> Status</div>
           <p className="text-lg font-bold text-slate-900 dark:text-zinc-205">{statusLabel}</p>
           <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 capitalize">{subscription.plan.toLowerCase()} plan</p>
         </div>
         <div className="bg-white dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm transition-all duration-300">
-          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-550 text-sm mb-2"><IndianRupee className="w-4 h-4" /> Amount due</div>
+          <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-500 text-sm mb-2"><IndianRupee className="w-4 h-4" /> Amount due</div>
           <p className="text-3xl font-black text-slate-900 dark:text-zinc-205 flex items-baseline gap-0.5"><IndianRupee className="w-6 h-6" />{annualAmount.toLocaleString()}</p>
           <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">per year ({activeUsers} × ₹{subscription.pricePerUser})</p>
         </div>
@@ -298,7 +298,7 @@ export const SubscriptionBilling = () => {
                 {snapshot.payments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/10 transition-colors">
                     <td className="py-3.5 pr-4 text-xs font-semibold text-slate-600 dark:text-zinc-400 font-mono">{new Date(p.paidAt || p.createdAt).toLocaleDateString()}</td>
-                    <td className="py-3.5 pr-4 text-xs font-semibold text-slate-700 dark:text-zinc-350 capitalize">{p.paymentType.toLowerCase().replace('_', ' ')}</td>
+                    <td className="py-3.5 pr-4 text-xs font-semibold text-slate-700 dark:text-zinc-300 capitalize">{p.paymentType.toLowerCase().replace('_', ' ')}</td>
                     <td className="py-3.5 pr-4 text-xs font-semibold text-slate-750 dark:text-zinc-300 font-mono">{p.userCount}</td>
                     <td className="py-3.5 pr-4 text-xs font-bold text-slate-800 dark:text-zinc-100 font-mono">₹{p.amount}</td>
                     <td className="py-3.5"><span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border ${p.status === 'PAID' ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-250/20 dark:border-emerald-500/15' : p.status === 'FAILED' ? 'bg-rose-100 dark:bg-rose-950/20 text-rose-700 dark:text-rose-450 border-rose-250/20 dark:border-rose-550/15' : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'}`}>{p.status}</span></td>

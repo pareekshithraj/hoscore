@@ -3,21 +3,30 @@ import { api } from '../../services/api';
 import { Activity, FlaskConical, Bed } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
+import { PageError } from '../../components/PageError';
+
 export const MyRecords = () => {
   const { selectedPatientId } = useAuth();
   const [data, setData] = useState<any>({ vitals: [], labs: [], admissions: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadRecords = () => {
     setLoading(true);
+    setError('');
     const url = selectedPatientId ? `/patient/records?patientId=${selectedPatientId}` : '/patient/records';
     api.get(url)
       .then(setData)
-      .catch(console.error)
+      .catch((err) => setError(err?.message || 'Failed to load records.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadRecords();
   }, [selectedPatientId]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (error) return <PageError message={error} onRetry={loadRecords} />;
 
   return (
     <div className="space-y-8">

@@ -11,7 +11,7 @@ import {
   assertCanAddUser,
 } from '../services/subscriptionService.js';
 import { signUrl, signHospitalPhotos } from '../services/r2.js';
-import { createChallenge, buildSession } from './authController.js';
+import { createChallenge, buildSession, buildChallengeSummary } from './authController.js';
 import { pick } from '../utils/pick.js';
 import { parseDateSafe } from '../utils/dateUtils.js';
 
@@ -130,14 +130,14 @@ export const initiateHospitalRegistration = async (req: Request, res: Response) 
       { expiresIn: '30m' }
     );
 
-    const challengeRes = await createChallenge(user, 'register', { email: true, phone: Boolean(user.phone) });
+    const challengeRes = await createChallenge(user, 'hospital_register', { email: true, phone: Boolean(user.phone) });
     if ('error' in challengeRes) {
       return res.status(challengeRes.status || 400).json({ error: challengeRes.error });
     }
 
     return res.status(200).json({
       message: 'Hospital registration initiated. Verify OTP to complete.',
-      challenge: challengeRes.challenge,
+      challenge: buildChallengeSummary(challengeRes.challenge, user),
       pendingHospitalToken,
     });
   } catch (error: any) {
@@ -169,6 +169,15 @@ export const completeHospitalRegistration = async (req: Request, res: Response) 
 
     if (!challenge || challenge.userId !== decoded.userId) {
       return res.status(400).json({ error: 'Invalid challenge or registration mismatch.' });
+    }
+
+    if (challenge.purpose !== 'hospital_register') {
+      return res.status(400).json({ error: 'Invalid registration challenge.' });
+    }
+
+    if (challenge.expiresAt < new Date()) {
+      await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+      return res.status(410).json({ error: 'Verification request expired. Please start again.' });
     }
 
     const isFullyVerified = (!challenge.requireEmail || challenge.emailVerified) && (!challenge.requirePhone || challenge.phoneVerified);
@@ -244,7 +253,12 @@ export const completeHospitalRegistration = async (req: Request, res: Response) 
     await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
     await prisma.user.update({
       where: { id: user.id },
-      data: { isVerified: true, emailVerifiedAt: new Date(), lastOtpVerifiedAt: new Date() },
+      data: {
+        isVerified: true,
+        emailVerifiedAt: challenge.emailVerified ? new Date() : user.emailVerifiedAt,
+        phoneVerifiedAt: challenge.phoneVerified ? new Date() : user.phoneVerifiedAt,
+        lastOtpVerifiedAt: new Date(),
+      },
     });
 
     const session = await buildSession(user.id);
@@ -262,46 +276,24 @@ export const completeHospitalRegistration = async (req: Request, res: Response) 
 // Register a new hospital (authenticated path requires password confirm)
 export const registerHospital = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
-  const { hospitalName, address, country, city, state, contact, description, adminName, adminEmail, adminPassword, adminPhone } = req.body;
+  if (!userId) {
+    return res.status(403).json({
+      error: 'Public hospital registration requires OTP verification. Use POST /hospitals/register/initiate instead.',
+    });
+  }
+
+  const { hospitalName, address, country, city, state, contact, description, adminPassword } = req.body;
 
   try {
-    let user;
-    if (userId) {
-      user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      if (adminPassword) {
-        const isMatch = await bcrypt.compare(adminPassword, user.password);
-        if (!isMatch) {
-          return res.status(401).json({ error: 'Incorrect password. Password verification required to register hospital.' });
-        }
-      }
-    } else {
-      const cleanEmail = String(adminEmail || '').trim().toLowerCase();
-      if (!cleanEmail || !adminPassword || !adminName) {
-        return res.status(400).json({ error: 'Admin name, email, and password are required for hospital registration.' });
-      }
-      if (adminPassword.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-      }
-
-      const existingUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
-      if (existingUser) {
-        const isMatch = await bcrypt.compare(adminPassword, existingUser.password);
-        if (!isMatch) {
-          return res.status(400).json({ error: 'An account with this email already exists. Please log in first or check your password.' });
-        }
-        user = existingUser;
-      } else {
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
-        user = await prisma.user.create({
-          data: {
-            name: adminName,
-            email: cleanEmail,
-            password: hashedPassword,
-            phone: adminPhone || null,
-            isActive: true,
-          },
-        });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.isVerified) {
+      return res.status(403).json({ error: 'Please verify your account before registering a hospital.' });
+    }
+    if (adminPassword) {
+      const isMatch = await bcrypt.compare(adminPassword, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Incorrect password. Password verification required to register hospital.' });
       }
     }
 
@@ -442,20 +434,22 @@ export const inviteStaff = async (req: AuthRequest, res: Response) => {
     // Attach the role to the existing identity if the email is already known,
     // never creating a duplicate account.
     let user = await prisma.user.findUnique({ where: { email } });
-      // Fix 4: If phone number belongs to an existing account, attach membership to that user
-      if (phone) {
-        const phoneClash = await prisma.user.findUnique({ where: { phone } });
-        if (phoneClash) {
-          user = phoneClash;
-        }
+    if (phone) {
+      const phoneClash = await prisma.user.findUnique({ where: { phone } });
+      if (phoneClash && phoneClash.email !== email) {
+        return res.status(400).json({ error: 'This phone number belongs to a different account. Use matching email and phone.' });
       }
-      if (!user) {
+      if (!user && phoneClash) {
+        user = phoneClash;
+      }
+    }
+    if (!user) {
         const initialPassword = password && password.length >= 6
           ? password
           : crypto.randomBytes(24).toString('hex');
         const hashedPassword = await bcrypt.hash(initialPassword, 10);
         user = await prisma.user.create({
-          data: { name, email, password: hashedPassword, phone: phone || null, isVerified: true },
+          data: { name, email, password: hashedPassword, phone: phone || null, isVerified: false },
         });
       }
 

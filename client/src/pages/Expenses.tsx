@@ -5,16 +5,32 @@ import { Receipt, Plus } from 'lucide-react';
 export const Expenses = () => {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ title: '', category: 'GENERAL', amount: '', vendor: '' });
 
+  const loadExpenses = () => {
+    setLoading(true);
+    setError('');
+    api.get('/expenses')
+      .then(setExpenses)
+      .catch((err) => setError(err?.message || 'Failed to load expenses.'))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => { loadExpenses(); }, []);
-  const loadExpenses = () => api.get('/expenses').then(setExpenses);
 
   const handleAdd = async () => {
-    await api.post('/expenses', { ...form, amount: Number(form.amount) });
-    setShowForm(false);
-    loadExpenses();
+    try {
+      await api.post('/expenses', { ...form, amount: Number(form.amount) });
+      setShowForm(false);
+      loadExpenses();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save expense.');
+    }
   };
+
+  if (loading) return <div className="p-8 text-center text-slate-500">Loading expenses...</div>;
 
   return (
     <div className="space-y-6">
@@ -22,6 +38,8 @@ export const Expenses = () => {
         <div><h2 className="text-2xl font-extrabold">Expense Tracker</h2></div>
         <button onClick={() => setShowForm(true)} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex gap-2"><Plus className="w-4"/> Log Expense</button>
       </div>
+
+      {error && <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm font-medium">{error}</div>}
 
       <div className="grid gap-4">
         {expenses.map(e => (

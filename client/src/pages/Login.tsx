@@ -39,9 +39,13 @@ interface ChallengeSummary {
 export const Login = () => {
   const { user, activeContext, login } = useAuth();
   const location = useLocation();
-  const nextPath = typeof location.state?.next === 'string' && location.state.next.startsWith('/patient')
-    ? location.state.next
-    : null;
+  const searchParams = new URLSearchParams(location.search);
+  const nextFromQuery = searchParams.get('next');
+  const nextPath =
+    (typeof location.state?.next === 'string' && location.state.next.startsWith('/')
+      ? location.state.next
+      : null)
+    || (nextFromQuery?.startsWith('/') ? nextFromQuery : null);
 
   const [mode, setMode] = useState<Mode>(location.state?.mode === 'register' ? 'register' : 'login');
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');
@@ -65,6 +69,7 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('hoscore_remember_me') === '1');
   // Phone is verified through the MSG91 widget (window.sendOtp / window.verifyOtp),
   // not the backend OTP. We track its verification locally and hold the session
   // returned by the widget endpoint until email is also verified.
@@ -80,6 +85,11 @@ export const Login = () => {
     if (digits.length === 10) return `91${digits}`;
     return digits;
   };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('hoscore_remember_identifier');
+    if (saved) setIdentifier(saved);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -99,10 +109,12 @@ export const Login = () => {
     const challengeIdParam = params.get('challengeId');
     if (challengeIdParam && !challenge) {
       setIsLoading(true);
-      postJson('/auth/resend-otp', { challengeId: challengeIdParam })
-        .then((data) => {
+      fetch(`${BASE_URL}/auth/challenge/${challengeIdParam}`)
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Challenge not found');
           if (data.challenge) {
-            beginChallenge(data.challenge, data.message || 'Complete the verification code(s) sent to you.');
+            beginChallenge(data.challenge, 'Complete the verification code(s) sent to you.');
           }
         })
         .catch((err) => {
@@ -169,6 +181,13 @@ export const Login = () => {
 
   const finishAuthResponse = (data: any) => {
     if (data?.token && data?.user && data?.contexts && data?.activeContext) {
+      if (rememberMe && identifier) {
+        localStorage.setItem('hoscore_remember_me', '1');
+        localStorage.setItem('hoscore_remember_identifier', identifier);
+      } else {
+        localStorage.removeItem('hoscore_remember_me');
+        localStorage.removeItem('hoscore_remember_identifier');
+      }
       login(data.user, data.token, data.contexts, data.activeContext);
     }
   };
@@ -295,9 +314,9 @@ export const Login = () => {
   }, [pendingSession, emailVerifiedLocal, phoneVerifiedLocal, challenge]);
 
   if (user && activeContext) {
-    if (activeContext.type === 'superadmin') return <Navigate to="/super-admin" replace />;
+    if (activeContext.type === 'superadmin') return <Navigate to={nextPath || '/super-admin'} replace />;
     if (activeContext.type === 'patient') return <Navigate to={nextPath || '/patient'} replace />;
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={nextPath || '/dashboard'} replace />;
   }
 
 
@@ -361,6 +380,37 @@ export const Login = () => {
     setIsLoading(true);
     setError('');
     try {
+      const verifyOtpFn = (window as any).verifyOtp;
+      const useWidget = typeof verifyOtpFn === 'function' && (
+        challenge?.warnings?.some((w) => w.toLowerCase().includes('sms')) || challenge?.requiredChannels.phone
+      );
+
+      if (useWidget) {
+        await new Promise<void>((resolve, reject) => {
+          verifyOtpFn(
+            phoneOtp,
+            async (widgetData: { accessToken?: string; message?: string }) => {
+              try {
+                const accessToken = widgetData?.accessToken || widgetData?.message;
+                if (!accessToken) throw new Error('Phone verification did not return an access token.');
+                const resData = await postJson('/auth/verify-msg91-access-token', {
+                  challengeId: challenge?.challengeId,
+                  accessToken,
+                  identifier: widgetPhone || regPhone || identifier,
+                });
+                setPhoneVerifiedLocal(true);
+                applyChallengeResponse(resData);
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            },
+            (err: unknown) => reject(new Error((err as { message?: string })?.message || 'Phone verification failed.')),
+          );
+        });
+        return;
+      }
+
       const resData = await postJson('/auth/verify-otp', {
         challengeId: challenge?.challengeId,
         channel: 'phone',
@@ -661,6 +711,8 @@ export const Login = () => {
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input
               type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
               className="w-4 h-4 rounded border-white/10 bg-[#23202E] text-red-650 focus:ring-red-600 focus:ring-offset-0 cursor-pointer"
             />
             <span className="text-slate-400 font-medium">Remember me</span>
@@ -859,7 +911,7 @@ export const Login = () => {
                   className="w-4 h-4 rounded border-white/10 bg-[#23202E] text-red-600 focus:ring-red-600 focus:ring-offset-0 cursor-pointer"
                 />
                 <span className="text-xs text-slate-400 font-medium">
-                  I agree to the <a href="#" className="text-red-500 hover:underline">Terms & Conditions</a>
+                  I agree to the <Link to="/terms" className="text-red-500 hover:underline">Terms & Conditions</Link>
                 </span>
               </label>
               <button

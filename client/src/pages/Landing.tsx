@@ -448,7 +448,7 @@ export const Landing = () => {
                 <li><Link to="/patient/find" className="hover:text-rose-400 transition-colors">Find Network Hospitals</Link></li>
                 <li><Link to="/login" className="hover:text-rose-400 transition-colors">Secure Health Timeline</Link></li>
                 <li><Link to="/login" className="hover:text-rose-400 transition-colors">Digital Vitals Tracking</Link></li>
-                <li><a href="#" className="hover:text-rose-400 transition-colors">Emergency Health Pass</a></li>
+                <li><Link to="/privacy-policy" className="hover:text-rose-400 transition-colors">Emergency Health Pass</Link></li>
               </ul>
             </div>
 
@@ -460,7 +460,7 @@ export const Landing = () => {
                 <li><Link to="/register-hospital" className="hover:text-rose-400 transition-colors">List Your Hospital</Link></li>
                 <li><Link to="/for-hospitals" className="hover:text-rose-400 transition-colors">Real-Time Queue Console</Link></li>
                 <li><Link to="/for-hospitals" className="hover:text-rose-400 transition-colors">Institutional Pricing</Link></li>
-                <li><a href="#" className="hover:text-rose-400 transition-colors">Partner Verification</a></li>
+                <li><Link to="/for-hospitals" className="hover:text-rose-400 transition-colors">Partner Verification</Link></li>
               </ul>
             </div>
 

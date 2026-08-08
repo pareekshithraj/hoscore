@@ -17,8 +17,17 @@ export const getLogs = async (req: Request, res: Response) => {
 
 export const createLog = async (req: Request, res: Response) => {
   try {
-    const safeData = pick(req.body, ['action', 'entity', 'entityId', 'details', 'userId', 'userName', 'userRole']);
-    const log = await prisma.auditLog.create({ data: { ...safeData, hospitalId: hid(req) } });
+    const authUser = (req as any).user;
+    const safeData = pick(req.body, ['action', 'entity', 'entityId', 'details']);
+    const log = await prisma.auditLog.create({
+      data: {
+        ...safeData,
+        hospitalId: hid(req),
+        userId: authUser?.userId || null,
+        userName: authUser?.name || 'Unknown',
+        userRole: authUser?.role || 'UNKNOWN',
+      },
+    });
     res.status(201).json(log);
   } catch (err) { res.status(500).json({ error: 'Failed to create audit log' }); }
 };

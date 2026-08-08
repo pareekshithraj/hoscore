@@ -44,7 +44,7 @@ export const Header = ({ onOpenMenu }: { onOpenMenu?: () => void }) => {
           <button
             type="button"
             onClick={onOpenMenu}
-            className="lg:hidden w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900 text-slate-600 dark:text-zinc-350 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+            className="lg:hidden w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
             aria-label="Open navigation"
           >
             <Menu className="w-4 h-4" />
@@ -83,7 +83,7 @@ export const Header = ({ onOpenMenu }: { onOpenMenu?: () => void }) => {
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
-          className="p-2 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-150 hover:bg-slate-100 dark:hover:bg-zinc-905 rounded-lg transition-all cursor-pointer relative border border-transparent hover:border-slate-200/50 dark:hover:border-zinc-800/80 active:scale-95"
+          className="p-2 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all cursor-pointer relative border border-transparent hover:border-slate-200/50 dark:hover:border-zinc-800/80 active:scale-95"
           title="Toggle Theme"
         >
           {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
@@ -93,7 +93,7 @@ export const Header = ({ onOpenMenu }: { onOpenMenu?: () => void }) => {
         <div className="relative" ref={notifRef}>
           <button 
             onClick={() => setNotifOpen(!notifOpen)}
-            className="flex p-2 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-150 hover:bg-slate-100 dark:hover:bg-zinc-905 rounded-lg relative transition-all cursor-pointer border border-transparent hover:border-slate-200/50 dark:hover:border-zinc-800/80 active:scale-95"
+            className="flex p-2 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg relative transition-all cursor-pointer border border-transparent hover:border-slate-200/50 dark:hover:border-zinc-800/80 active:scale-95"
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
@@ -136,7 +136,7 @@ export const Header = ({ onOpenMenu }: { onOpenMenu?: () => void }) => {
                         <span className="text-[11px] font-bold text-slate-800 dark:text-zinc-200">
                           {n.title}
                         </span>
-                        <span className="text-[8px] text-slate-400 dark:text-zinc-550 font-bold font-mono">
+                        <span className="text-[8px] text-slate-400 dark:text-zinc-500 font-bold font-mono">
                           {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>

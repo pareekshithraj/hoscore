@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { hasFeature } from '../utils/features';
 
@@ -11,6 +11,7 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, requireContext, requireFeature }: ProtectedRouteProps) => {
   const { user, activeContext, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -21,7 +22,7 @@ export const ProtectedRoute = ({ children, requireContext, requireFeature }: Pro
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ next: location.pathname + location.search }} />;
   }
 
   // If a specific context type is required, validate it

@@ -1,6 +1,9 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../index.js';
+
+const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
 
 interface Client {
   ws: WebSocket;
@@ -13,7 +16,7 @@ const clients: Client[] = [];
 export function initWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
-  wss.on('connection', (ws, req) => {
+  wss.on('connection', async (ws, req) => {
     // Authenticate via query param token
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const token = url.searchParams.get('token');
@@ -24,7 +27,32 @@ export function initWebSocket(server: Server) {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars') as any;
+      const decoded = jwt.verify(token, getJwtSecret()) as any;
+
+      const dbUser = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { isActive: true },
+      });
+      if (!dbUser?.isActive) {
+        ws.close(4003, 'Account suspended');
+        return;
+      }
+
+      if (decoded.contextType === 'hospital' && decoded.hospitalId) {
+        const membership = await prisma.membership.findFirst({
+          where: {
+            userId: decoded.userId,
+            hospitalId: decoded.hospitalId,
+            status: 'ACTIVE',
+            hospital: { isActive: true },
+          },
+        });
+        if (!membership) {
+          ws.close(4004, 'No hospital access');
+          return;
+        }
+      }
+
       const client: Client = { ws, hospitalId: decoded.hospitalId, userId: decoded.userId };
       clients.push(client);
 

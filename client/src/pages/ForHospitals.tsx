@@ -595,8 +595,8 @@ export const ForHospitals = () => {
             </div>
             <div className="flex items-center gap-8 text-sm font-semibold text-slate-500">
               <Link to="/" className="hover:text-blue-600 transition-colors">Patient Home</Link>
-              <a href="#" className="hover:text-blue-600 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-blue-600 transition-colors">Terms</a>
+              <Link to="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy</Link>
+              <Link to="/terms-of-service" className="hover:text-blue-600 transition-colors">Terms</Link>
             </div>
           </div>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

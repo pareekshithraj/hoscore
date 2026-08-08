@@ -219,7 +219,7 @@ export const Staff = () => {
                       <QrCode className="w-3.5 h-3.5" />
                       Staff Badge
                     </button>
-                    <button onClick={() => startEditMembership(membership)} className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850 text-xs font-bold transition-all cursor-pointer">
+                    <button onClick={() => startEditMembership(membership)} className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer">
                       <Edit2 className="w-3.5 h-3.5" />
                       Edit Access
                     </button>
@@ -272,7 +272,7 @@ export const Staff = () => {
                       })}
                     </div>
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => setEditingMembershipId('')} className="px-4 py-2 border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-sm font-bold text-slate-600 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850 rounded-lg cursor-pointer">Cancel</button>
+                      <button onClick={() => setEditingMembershipId('')} className="px-4 py-2 border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-sm font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">Cancel</button>
                       <button onClick={saveMembership} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
                         <Save className="w-4 h-4" />
                         Save Access
@@ -327,7 +327,7 @@ export const Staff = () => {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
+          <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
             {(() => {
               const filteredStaff = staff.filter((member) => {
                 const matchesSearch = 
@@ -363,7 +363,7 @@ export const Staff = () => {
                     {member.role.charAt(0) + member.role.slice(1).toLowerCase()}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-350">{member.department}</td>
+                <td className="px-6 py-4 text-sm text-slate-600 dark:text-zinc-300">{member.department}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-zinc-300 font-medium">
                     {shiftIcons[member.shift]}
@@ -374,7 +374,7 @@ export const Staff = () => {
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                     member.status === 'On Duty' 
                       ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-500/25' 
-                      : 'bg-slate-100 dark:bg-zinc-900 text-slate-650 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'
+                      : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${member.status === 'On Duty' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                     {member.status}
@@ -397,38 +397,38 @@ export const Staff = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-350 mb-1">Full Name</label>
-              <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" placeholder="Full name" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-405 focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Full Name</label>
+              <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" placeholder="Full name" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-350 mb-1">Role</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Role</label>
               <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25">
                 {roles.map(r => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-350 mb-1">Department</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Department</label>
               <select value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25">
                 {departments.map(d => <option key={d}>{d}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-350 mb-1">Shift</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Shift</label>
               <select value={formData.shift} onChange={e => setFormData({...formData, shift: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25">
                 {shifts.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-350 mb-1">Contact</label>
-              <input required value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" placeholder="+1 234 567 890" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-405 focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Contact</label>
+              <input required value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" placeholder="+1 234 567 890" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-350 mb-1">Email</label>
-              <input required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" placeholder="staff@hospital.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-405 focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+              <label className="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Email</label>
+              <input required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" placeholder="staff@hospital.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
             </div>
           </div>
           <div className="pt-4 flex gap-3">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-sm font-bold text-slate-600 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850 rounded-lg cursor-pointer">Cancel</button>
+            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-sm font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 cursor-pointer">Add Staff</button>
           </div>
         </form>
@@ -438,7 +438,7 @@ export const Staff = () => {
         <div className="space-y-4">
           <p className="text-sm text-slate-500 dark:text-zinc-400">Are you sure you want to delete this staff member? This action is permanent.</p>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-sm font-bold text-slate-650 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850 rounded-lg cursor-pointer">Cancel</button>
+            <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 border border-slate-200/60 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 text-sm font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">Cancel</button>
             <button onClick={confirmDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer">Delete</button>
           </div>
         </div>

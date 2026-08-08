@@ -138,15 +138,23 @@ export const OPDQueue = () => {
 
   const handleAdd = async () => {
     if (!form.patientName.trim()) return;
-    await api.post('/queue', form);
-    setShowForm(false);
-    setForm({ patientName: '', doctorName: selectedDoctor?.name || '', department: 'General', estimatedWait: 15, isHoscoreUser: true, manualCareNote: '' });
-    loadQueue(true);
+    try {
+      await api.post('/queue', form);
+      setShowForm(false);
+      setForm({ patientName: '', doctorName: selectedDoctor?.name || '', department: 'General', estimatedWait: 15, isHoscoreUser: true, manualCareNote: '' });
+      loadQueue(true);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to add patient to queue.');
+    }
   };
 
   const handleStatus = async (id: string, status: string) => {
-    await api.patch(`/queue/${id}/status`, { status });
-    loadQueue(true);
+    try {
+      await api.patch(`/queue/${id}/status`, { status });
+      loadQueue(true);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update queue status.');
+    }
   };
 
   const loadPatientDetails = async (patientId: string) => {

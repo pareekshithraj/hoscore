@@ -45,7 +45,7 @@ export function useApi<T>(endpoint: string, autoFetch: boolean = true) {
 
   useEffect(() => {
     if (autoFetch) {
-      refetch().catch(() => {});
+      refetch().catch((err) => setError(err instanceof Error ? err : new Error(String(err))));
     }
   }, [autoFetch, refetch]);
 

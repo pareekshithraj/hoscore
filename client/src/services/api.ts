@@ -1,4 +1,5 @@
 import { BASE_URL } from '../utils/apiConfig';
+import { clearAuthStorage } from '../utils/authStorage';
 
 async function parseError(response: Response): Promise<string> {
   try {
@@ -9,7 +10,7 @@ async function parseError(response: Response): Promise<string> {
   }
 }
 
-async function request(method: string, endpoint: string, data?: unknown) {
+async function request(method: string, endpoint: string, data?: any) {
   const token = localStorage.getItem('token');
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     method,
@@ -21,9 +22,9 @@ async function request(method: string, endpoint: string, data?: unknown) {
   });
   if (!response.ok) {
     if (response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      clearAuthStorage();
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/login?next=${next}`;
     }
     throw new Error(await parseError(response));
   }

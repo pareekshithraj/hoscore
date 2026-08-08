@@ -33,12 +33,14 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     // Check user suspension status
     const dbUser = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { isActive: true }
+      select: { isActive: true, isSuperAdmin: true },
     });
     
     if (!dbUser || !dbUser.isActive) {
       return res.status(401).json({ error: 'Your account has been suspended by an administrator.' });
     }
+
+    decoded.isSuperAdmin = dbUser.isSuperAdmin;
 
     // Fix 6: Real-time permission & membership sync for hospital context
     if (decoded.contextType === 'hospital' && decoded.hospitalId) {
@@ -71,10 +73,11 @@ export const optionalAuthenticate = async (req: AuthRequest, _res: Response, nex
     const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
     const dbUser = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { isActive: true },
+      select: { isActive: true, isSuperAdmin: true },
     });
 
     if (dbUser && dbUser.isActive) {
+      decoded.isSuperAdmin = dbUser.isSuperAdmin;
       req.user = decoded;
     }
   } catch (_error) {

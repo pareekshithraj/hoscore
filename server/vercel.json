@@ -2,6 +2,12 @@
   "version": 2,
   "buildCommand": "npm run vercel-build",
   "installCommand": "npm install --include=dev",
+  "crons": [
+    {
+      "path": "/api/internal/cron/cleanup-challenges",
+      "schedule": "0 * * * *"
+    }
+  ],
   "functions": {
     "api/index.js": {
       "maxDuration": 30,

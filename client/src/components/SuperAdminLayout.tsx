@@ -70,7 +70,7 @@ export const SuperAdminLayout: React.FC<{ children: React.ReactNode }> = ({ chil
           
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-zinc-905 hover:bg-slate-50 dark:hover:bg-zinc-850 text-slate-400 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-100 rounded-full p-1.5 border border-slate-200 dark:border-zinc-800 shadow-md transition-all active:scale-95 cursor-pointer z-50"
+            className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-400 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-100 rounded-full p-1.5 border border-slate-200 dark:border-zinc-800 shadow-md transition-all active:scale-95 cursor-pointer z-50"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}

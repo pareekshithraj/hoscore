@@ -156,6 +156,7 @@ function App() {
                     <Route path="/billing" element={<FeatureGate feature="billing"><Billing /></FeatureGate>} />
                     <Route path="/analytics" element={<FeatureGate feature="analytics"><Analytics /></FeatureGate>} />
                     <Route path="/map" element={<FeatureGate feature="map"><MapBuilder /></FeatureGate>} />
+                    <Route path="/simulator" element={<Navigate to="/dashboard/map" replace />} />
                     <Route path="/calendar" element={<FeatureGate feature="calendar"><CalendarSchedule /></FeatureGate>} />
                     <Route path="/notices" element={<FeatureGate feature="notices"><NoticeBoard /></FeatureGate>} />
                     <Route path="/leaves" element={<FeatureGate feature="leaves"><LeaveManagement /></FeatureGate>} />
