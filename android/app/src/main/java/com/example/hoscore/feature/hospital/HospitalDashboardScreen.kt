@@ -23,8 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.example.hoscore.core.common.Resource
+import com.example.hoscore.core.qr.HoscorePassDialog
+import com.example.hoscore.core.qr.HoscoreQrCodec
 import com.example.hoscore.core.network.ServiceLocator
 import com.example.hoscore.core.network.Stats
 import com.example.hoscore.core.ui.components.DonutChart
@@ -92,8 +93,17 @@ fun HospitalDashboardScreen(
                 Text(hospitalName, fontSize = 15.sp, fontWeight = FontWeight.Black, color = TextDark, maxLines = 1)
             }
             var showHospitalQR by remember { mutableStateOf(false) }
-            if (showHospitalQR) {
-                HospitalQRModal(hospitalName, ctx?.hospitalId ?: "HSP-MAIN") { showHospitalQR = false }
+            val hospitalId = ctx?.hospitalId.orEmpty()
+            if (showHospitalQR && hospitalId.isNotBlank()) {
+                HoscorePassDialog(
+                    title = "HOSPITAL KIOSK PASS",
+                    name = hospitalName,
+                    idLabel = "HSP-${hospitalId.take(8).uppercase()}",
+                    payload = HoscoreQrCodec.encodeHospital(hospitalId),
+                    caption = "Patients scan this at reception to pick this hospital — same QR as the web dashboard.",
+                    accent = HTeal,
+                    onDismiss = { showHospitalQR = false },
+                )
             }
 
             HIconBtn(Icons.Rounded.QrCode2, { showHospitalQR = true }, HTeal)
@@ -452,57 +462,4 @@ private fun HospitalErrorContent(msg: String, onRetry: () -> Unit) {
     }
 }
 
-@Composable
-private fun HospitalQRModal(hospitalName: String, hospitalId: String, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text("Hospital Official QR Pass", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextDark)
-                Text(hospitalName, fontSize = 13.sp, color = TextMid, fontWeight = FontWeight.Medium)
-            }
-        },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(180.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .border(2.dp, HTeal.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val qrData = java.net.URLEncoder.encode("HOSCORE:$hospitalId:HOSPITAL", "UTF-8")
-                    AsyncImage(
-                        model = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$qrData",
-                        contentDescription = "Hospital QR Code",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "ID: HSP-${hospitalId.take(8).uppercase()}",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 15.sp,
-                    color = HTeal
-                )
-                Spacer(Modifier.height(4.dp))
-                Text("Display at OPD desk or kiosk for patient auto-checkin & hospital selection", fontSize = 11.sp, color = TextLight)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = HTeal)
-            ) {
-                Text("Done", fontWeight = FontWeight.Bold)
-            }
-        },
-        containerColor = Color.White
-    )
-}
+// HospitalQRModal removed — use HoscorePassDialog with HoscoreQrCodec.encodeHospital.

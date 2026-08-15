@@ -36,10 +36,11 @@ import com.example.hoscore.core.ui.components.HoscoreCard
 import com.example.hoscore.core.ui.components.HoscoreTopBar
 import com.example.hoscore.core.ui.components.StatusBadge
 import com.example.hoscore.core.ui.theme.HoscoreTokens
+import com.example.hoscore.core.qr.HoscoreQr
+import com.example.hoscore.core.qr.HoscoreQrCodec
+import com.example.hoscore.core.qr.rememberHoscoreQrScanner
 import kotlinx.coroutines.launch
-import androidx.activity.compose.rememberLauncherForActivityResult
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import androidx.compose.runtime.rememberCoroutineScope
 
 @Composable
 fun PatientsScreen() {
@@ -53,22 +54,34 @@ fun PatientsScreen() {
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var isSearching by remember { mutableStateOf(false) }
 
-    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        if (result.contents != null) {
-            val parts = result.contents.split(":")
-            if (parts.size >= 2 && parts[0] == "HOSCORE") {
-                val extractedId = parts[1]
-                isSearching = true
-                scope.launch {
-                    val res = apiCall { ServiceLocator.api.getPatientBySixDigitId(extractedId) }
-                    isSearching = false
-                    if (res is Resource.Success) {
-                        selectedChart = res.data
+    val scanQr = rememberHoscoreQrScanner(
+        onResult = { parsed ->
+            when (parsed) {
+                is HoscoreQr.Patient -> {
+                    inputId = parsed.sixDigitId
+                    isSearching = true
+                    scope.launch {
+                        val res = apiCall { ServiceLocator.api.getPatientBySixDigitId(parsed.sixDigitId) }
+                        isSearching = false
+                        if (res is Resource.Success) selectedChart = res.data
+                        else errorMsg = "No patient found for HSC-${parsed.sixDigitId}"
                     }
                 }
+                is HoscoreQr.Visit -> {
+                    inputId = parsed.sixDigitId
+                    isSearching = true
+                    scope.launch {
+                        val res = apiCall { ServiceLocator.api.getPatientBySixDigitId(parsed.sixDigitId) }
+                        isSearching = false
+                        if (res is Resource.Success) selectedChart = res.data
+                        else errorMsg = "No patient found for HSC-${parsed.sixDigitId}"
+                    }
+                }
+                else -> errorMsg = "Scan a patient health pass or visit token QR."
             }
-        }
-    }
+        },
+        onInvalid = { errorMsg = "Unrecognized QR. Use a Hoscore patient or visit pass." },
+    )
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -85,12 +98,7 @@ fun PatientsScreen() {
                 }
                 Spacer(Modifier.height(8.dp))
                 ExtendedFloatingActionButton(
-                    onClick = {
-                        scanLauncher.launch(ScanOptions().apply {
-                            setOrientationLocked(false)
-                            setPrompt("Scan Hoscore QR Code")
-                        })
-                    },
+                    onClick = { scanQr() },
                     containerColor = t.primary,
                     contentColor = Color.White,
                     icon = { Icon(Icons.Rounded.QrCodeScanner, null) },
@@ -162,7 +170,7 @@ fun PatientsScreen() {
                                         Text(
                                             listOfNotNull(
                                                 p.age?.let { "$it yrs" }, p.gender, p.bloodGroup,
-                                            ).joinToString(" Â· ").ifEmpty { "Patient" },
+                                            ).joinToString(" · ").ifEmpty { "Patient" },
                                             color = t.textMuted, fontSize = 12.sp,
                                         )
                                     }
@@ -265,7 +273,7 @@ private fun PatientChartDialog(chart: PatientRecordChart, onDismiss: () -> Unit)
         title = {
             Column {
                 Text(localChart.name, fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 18.sp)
-                Text("HSC-${localChart.sixDigitId ?: "N/A"} Â· ${localChart.gender ?: "MALE"}", fontSize = 12.sp, color = t.primary, fontWeight = FontWeight.Bold)
+                Text("HSC-${localChart.sixDigitId ?: "N/A"} · ${localChart.gender ?: "MALE"}", fontSize = 12.sp, color = t.primary, fontWeight = FontWeight.Bold)
             }
         },
         text = {

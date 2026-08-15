@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from './Modal';
 import { Building2, ShieldCheck } from 'lucide-react';
+import { encodeHospitalQr, qrImageUrl } from '../utils/hoscoreQr';
 
 interface HospitalQRPassModalProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ export const HospitalQRPassModal: React.FC<HospitalQRPassModalProps> = ({
   hospitalName,
   hospitalId,
 }) => {
-  const qrData = `HOSCORE:${hospitalId}:HOSPITAL`;
+  const qrData = encodeHospitalQr(hospitalId);
 
   if (!isOpen) return null;
 
@@ -41,7 +42,7 @@ export const HospitalQRPassModal: React.FC<HospitalQRPassModalProps> = ({
           </div>
 
           <div className="my-5 p-4 bg-white rounded-2xl shadow-inner inline-block border-2 border-sky-400/40">
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`} alt="Hospital QR Code" className="rounded-lg w-[180px] h-[180px]" />
+            <img src={qrImageUrl(qrData, 180)} alt="Hospital QR Code" className="rounded-lg w-[180px] h-[180px]" />
           </div>
 
           <p className="text-xs text-slate-400 font-semibold px-2">

@@ -28,8 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.example.hoscore.core.common.Resource
+import com.example.hoscore.core.network.Patient
 import com.example.hoscore.core.network.ServiceLocator
+import com.example.hoscore.core.network.apiCall
+import com.example.hoscore.core.qr.HoscorePassDialog
+import com.example.hoscore.core.qr.HoscoreQrCodec
+import kotlinx.coroutines.launch
 
 // ─── Patient portal colour tokens ────────────────────────────────────────────
 private val PBlue     = Color(0xFF3B5BDB)
@@ -77,6 +82,9 @@ fun PatientDashboardScreen(
     val recordsState by recordsVm.state.collectAsState()
     val visitVm: VisitVM = viewModel()
     val visit by visitVm.visit.collectAsState()
+    val scope = rememberCoroutineScope()
+    var profile by remember { mutableStateOf<Patient?>(null) }
+    var dependents by remember { mutableStateOf<List<Patient>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         apptVm.loadOnce()
@@ -84,6 +92,14 @@ fun PatientDashboardScreen(
         billsVm.loadOnce()
         recordsVm.loadOnce()
         visitVm.load()
+        when (val dash = apiCall { ServiceLocator.api.getPatientDashboard() }) {
+            is Resource.Success -> profile = dash.data.profile
+            else -> Unit
+        }
+        when (val deps = apiCall { ServiceLocator.api.getDependents() }) {
+            is Resource.Success -> dependents = deps.data
+            else -> Unit
+        }
     }
 
     var isManualRefreshing by remember { mutableStateOf(false) }
@@ -141,11 +157,42 @@ fun PatientDashboardScreen(
             Column(Modifier.weight(1f)) {
                 Text(greeting, fontSize = 12.sp, color = TextLight, fontWeight = FontWeight.Medium)
                 Text(firstName, fontSize = 17.sp, fontWeight = FontWeight.Black, color = TextDark)
+                profile?.sixDigitId?.let {
+                    Text("HSC-$it", fontSize = 11.sp, color = PBlue, fontWeight = FontWeight.Black)
+                }
             }
 
             var showQrModal by remember { mutableStateOf(false) }
             if (showQrModal) {
-                PatientQRModal(user?.id ?: "PAT-882910", name) { showQrModal = false }
+                val six = profile?.sixDigitId.orEmpty()
+                if (six.length == 6) {
+                    HoscorePassDialog(
+                        title = "HOSCORE PASS",
+                        name = name,
+                        idLabel = "HSC-$six",
+                        payload = HoscoreQrCodec.encodePatient(six),
+                        caption = "Show this QR at reception. It is the same ID as on the web app.",
+                        accent = PBlue,
+                        onDismiss = { showQrModal = false },
+                    )
+                } else {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showQrModal = false },
+                        title = { Text("Pass not ready") },
+                        text = { Text("Your 6-digit Hoscore ID is still being issued. Pull to refresh.") },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = {
+                                showQrModal = false
+                                scope.launch {
+                                    when (val dash = apiCall { ServiceLocator.api.getPatientDashboard() }) {
+                                        is Resource.Success -> profile = dash.data.profile
+                                        else -> Unit
+                                    }
+                                }
+                            }) { Text("Refresh") }
+                        },
+                    )
+                }
             }
 
             SmallIconBtn(Icons.Rounded.QrCode2, { showQrModal = true }, PBlue)
@@ -181,6 +228,27 @@ fun PatientDashboardScreen(
                         fontSize = 12.sp,
                     )
                     Text("Tap for indoor map", color = PBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        if (dependents.isNotEmpty()) {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Text("Family IDs", fontWeight = FontWeight.Black, color = TextDark, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    itemsIndexed(dependents) { _, dep ->
+                        Column(
+                            Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
+                            Text(dep.name, fontWeight = FontWeight.Bold, color = TextDark, fontSize = 12.sp)
+                            Text(dep.sixDigitId?.let { "HSC-$it" } ?: "ID pending", fontSize = 10.sp, color = PBlue, fontWeight = FontWeight.Black)
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -552,57 +620,4 @@ private fun WhitePill(text: String) {
     }
 }
 
-@Composable
-private fun PatientQRModal(patientId: String, patientName: String, onDismiss: () -> Unit) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text("Digital Health Pass", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextDark)
-                Text(patientName, fontSize = 13.sp, color = TextMid, fontWeight = FontWeight.Medium)
-            }
-        },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(180.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .border(2.dp, PBlue.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val qrData = java.net.URLEncoder.encode("HOSCORE:$patientId:TOKEN-1", "UTF-8")
-                    AsyncImage(
-                        model = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$qrData",
-                        contentDescription = "QR Code",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "ID: ${patientId.take(12).uppercase()}",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 15.sp,
-                    color = PBlue
-                )
-                Spacer(Modifier.height(4.dp))
-                Text("Show this QR at reception or self-service kiosk for check-in", fontSize = 11.sp, color = TextLight)
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = PBlue)
-            ) {
-                Text("Done", fontWeight = FontWeight.Bold)
-            }
-        },
-        containerColor = Color.White
-    )
-}
+// PatientQRModal removed — HoscorePassDialog uses the real six-digit Hoscore ID.

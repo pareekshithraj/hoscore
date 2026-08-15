@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from './Modal';
-import { ShieldCheck, UserCheck, Stethoscope } from 'lucide-react';
+import { ShieldCheck, UserCheck } from 'lucide-react';
+import { encodeStaffQr, qrImageUrl } from '../utils/hoscoreQr';
 
 interface StaffQRBadgeModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ export const StaffQRBadgeModal: React.FC<StaffQRBadgeModalProps> = ({
   roleOrSpecialty,
   staffId,
 }) => {
-  const qrData = `HOSCORE:${staffId}:STAFF`;
+  const qrData = encodeStaffQr(staffId);
 
   if (!isOpen) return null;
 
@@ -44,7 +45,7 @@ export const StaffQRBadgeModal: React.FC<StaffQRBadgeModalProps> = ({
           </div>
 
           <div className="my-5 p-4 bg-white rounded-2xl shadow-inner inline-block border-2 border-indigo-400/40">
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`} alt="Staff QR Badge" className="rounded-lg w-[180px] h-[180px]" />
+            <img src={qrImageUrl(qrData, 180)} alt="Staff QR Badge" className="rounded-lg w-[180px] h-[180px]" />
           </div>
 
           <p className="text-xs text-slate-400 font-semibold px-2">

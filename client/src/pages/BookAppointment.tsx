@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 
 import { BASE_URL } from '../utils/apiConfig';
+import { encodeVisitQr, qrImageUrl } from '../utils/hoscoreQr';
 
 export const BookAppointment = () => {
   const { hospitalId } = useParams();
@@ -175,7 +176,7 @@ export const BookAppointment = () => {
   }
 
   if (booked) {
-    const qrData = `HOSCORE:${booked.sixDigitId}:${booked.id}:TOKEN-${booked.token}`;
+    const qrData = encodeVisitQr(booked.sixDigitId || '', booked.id, booked.token);
     return (
       <div className={isDashboardRoute ? "flex items-center justify-center p-6 w-full" : "min-h-screen bg-[#060913] flex items-center justify-center p-6 relative overflow-hidden"}>
         {!isDashboardRoute && (
@@ -210,7 +211,7 @@ export const BookAppointment = () => {
               </div>
               <div className="bg-white p-2 rounded-xl shadow-lg">
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`}
+                  src={qrImageUrl(qrData, 140)}
                   alt="HOSCORE QR"
                   className="w-20 h-20 rounded-lg"
                 />

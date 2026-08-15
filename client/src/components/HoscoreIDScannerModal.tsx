@@ -3,6 +3,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Modal } from './Modal';
 import { QrCode, Search, User, Calendar, FileText, Heart, Activity, ShieldCheck, CheckCircle2, Clock, Plus, Stethoscope } from 'lucide-react';
 import { api } from '../services/api';
+import { patientIdFromQr } from '../utils/hoscoreQr';
 
 interface HoscoreIDScannerModalProps {
   isOpen: boolean;
@@ -53,13 +54,14 @@ export const HoscoreIDScannerModal: React.FC<HoscoreIDScannerModalProps> = ({
     };
   }, [isOpen]);
 
-  const onScanSuccess = (decodedText: string, decodedResult: any) => {
-    const parts = decodedText.split(':');
-    if (parts.length >= 2 && parts[0] === 'HOSCORE') {
-      const extractedId = parts[1];
-      setSixDigitId(extractedId);
-      handleSearch(undefined, extractedId);
+  const onScanSuccess = (decodedText: string) => {
+    const extractedId = patientIdFromQr(decodedText);
+    if (!extractedId) {
+      setError('This QR is not a Hoscore patient pass. Scan a patient ID or visit token.');
+      return;
     }
+    setSixDigitId(extractedId);
+    handleSearch(undefined, extractedId);
   };
 
   const onScanFailure = (error: any) => {

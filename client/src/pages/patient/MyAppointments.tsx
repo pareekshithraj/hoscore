@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Calendar } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { encodeVisitQr, qrImageUrl } from '../../utils/hoscoreQr';
 
 export const MyAppointments = () => {
   const { selectedPatientId } = useAuth();
@@ -159,7 +160,7 @@ export const MyAppointments = () => {
               <div className="space-y-1 mb-4 border-b border-white/10 pb-3">
                 <p className="text-xs text-rose-400 font-bold uppercase tracking-wider">{selectedPassAppt.hospital?.name}</p>
                 <p className="text-lg font-black text-white">{selectedPassAppt.patient?.name || 'Patient'}</p>
-                <p className="text-xs text-slate-400">HOSCORE ID: <span className="font-mono font-bold text-rose-300">#{selectedPassAppt.patient?.sixDigitId || '882910'}</span></p>
+                <p className="text-xs text-slate-400">HOSCORE ID: <span className="font-mono font-bold text-rose-300">#{selectedPassAppt.patient?.sixDigitId || '—'}</span></p>
               </div>
 
               <div className="flex items-center justify-between my-3 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3.5">
@@ -169,7 +170,7 @@ export const MyAppointments = () => {
                 </div>
                 <div className="bg-white p-1.5 rounded-lg shadow-md">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`HOSCORE:${selectedPassAppt.patient?.sixDigitId || '882910'}:${selectedPassAppt.id}:TOKEN-${selectedPassAppt.tokenNumber || 1}`)}`}
+                    src={qrImageUrl(encodeVisitQr(selectedPassAppt.patient?.sixDigitId || '', selectedPassAppt.id, selectedPassAppt.tokenNumber || 1), 120)}
                     alt="Check-in QR"
                     className="w-16 h-16 rounded-md"
                   />

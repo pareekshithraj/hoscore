@@ -33,8 +33,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.example.hoscore.core.common.Resource
+import com.example.hoscore.core.qr.HoscorePassDialog
+import com.example.hoscore.core.qr.HoscoreQrCodec
+import com.example.hoscore.core.qr.HoscoreQrImage
+import com.example.hoscore.core.qr.SecurePassWindow
 import com.example.hoscore.core.network.AvailableSlotsResponse
 import com.example.hoscore.core.network.BookAppointmentRequest
 import com.example.hoscore.core.network.Doctor
@@ -47,9 +50,12 @@ import com.example.hoscore.core.ui.components.EmptyState
 import com.example.hoscore.core.ui.components.HoscoreCard
 import com.example.hoscore.core.ui.components.HoscoreTopBar
 import com.example.hoscore.core.ui.theme.HoscoreTokens
+import com.example.hoscore.core.qr.HoscoreQr
+import com.example.hoscore.core.qr.rememberHoscoreQrScanner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Find Hospitals — search + list, tap to book
@@ -60,9 +66,55 @@ fun FindHospitalsScreen(onBack: () -> Unit, onPick: (hospitalId: String, hospita
     val t = HoscoreTokens.current
     val vm: FindHospitalsVM = viewModel()
     var query by remember { mutableStateOf("") }
+    var scanNotice by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val scanHospitalQr = rememberHoscoreQrScanner(
+        onResult = { parsed ->
+            when (parsed) {
+                is HoscoreQr.Hospital -> {
+                    scanNotice = null
+                    scope.launch {
+                        when (val res = apiCall { ServiceLocator.api.getHospitalDetail(parsed.hospitalId) }) {
+                            is Resource.Success -> onPick(parsed.hospitalId, res.data.name)
+                            is Resource.Error -> scanNotice = res.message
+                            else -> onPick(parsed.hospitalId, "Hospital")
+                        }
+                    }
+                }
+                else -> scanNotice = "Scan the hospital kiosk QR at reception."
+            }
+        },
+        onInvalid = { scanNotice = "Could not read that QR. Try the hospital pass from the front desk." },
+    )
 
     Column(Modifier.fillMaxSize().background(t.screenBg)) {
         HoscoreTopBar("Find a Hospital", "Search and book your visit", onBack = onBack)
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = { scanHospitalQr() },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Rounded.QrCode2, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Scan hospital QR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+        if (scanNotice != null) {
+            Text(
+                scanNotice!!,
+                color = t.clinical,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
 
         OutlinedTextField(
             value = query,
@@ -410,11 +462,13 @@ fun AppointmentTicketPassScreen(
     val sessionUser = ServiceLocator.sessionStore.user
     val patientName = appointment.patientName ?: sessionUser?.name ?: "Patient"
     val hospName = appointment.hospitalName?.ifBlank { hospitalFallbackName } ?: hospitalFallbackName.ifBlank { "Clinical Facility" }
-    val sixId = appointment.sixDigitId ?: sessionUser?.id?.takeLast(6) ?: "882910"
+    val sixId = appointment.sixDigitId?.filter { it.isDigit() }.orEmpty()
     val tokenNum = appointment.tokenNumber ?: 1
     val timeSlot = appointment.time ?: "09:30 AM"
     val dateStr = appointment.date?.take(10) ?: "Today"
     val docName = appointment.doctorName ?: "General Consultation"
+
+    SecurePassWindow()
 
     Column(
         Modifier
@@ -449,7 +503,12 @@ fun AppointmentTicketPassScreen(
                         Box(
                             Modifier.clip(CircleShape).background(t.primary.copy(alpha = 0.2f)).padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text("#$sixId", fontSize = 11.sp, fontWeight = FontWeight.Black, color = t.primary)
+                            Text(
+                                if (sixId.length == 6) "HSC-$sixId" else "ID pending",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                color = t.primary,
+                            )
                         }
                     }
 
@@ -463,21 +522,13 @@ fun AppointmentTicketPassScreen(
                             Text("#$tokenNum", fontSize = 46.sp, fontWeight = FontWeight.Black, color = Color.White)
                         }
 
-                        // QR Code Box
-                        Box(
-                            Modifier
-                                .size(100.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color.White)
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val qrData = java.net.URLEncoder.encode("HOSCORE:$sixId:${appointment.id}:TOKEN-$tokenNum", "UTF-8")
-                            AsyncImage(
-                                model = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=$qrData",
-                                contentDescription = "Token QR Code",
-                                modifier = Modifier.fillMaxSize()
+                        if (sixId.length == 6) {
+                            HoscoreQrImage(
+                                payload = HoscoreQrCodec.encodeVisit(sixId, appointment.id, tokenNum),
+                                size = 100.dp,
                             )
+                        } else {
+                            Text("QR pending ID", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                         }
                     }
 

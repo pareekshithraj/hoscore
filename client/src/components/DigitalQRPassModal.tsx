@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from './Modal';
 import { ShieldCheck } from 'lucide-react';
+import { encodePatientQr, qrImageUrl } from '../utils/hoscoreQr';
 
 interface DigitalQRPassModalProps {
   isOpen: boolean;
@@ -15,7 +16,8 @@ export const DigitalQRPassModal: React.FC<DigitalQRPassModalProps> = ({
   patientName,
   sixDigitId,
 }) => {
-  const qrData = `HOSCORE:${sixDigitId || '882910'}:TOKEN-1`;
+  const id = String(sixDigitId || '').replace(/\D/g, '');
+  const qrData = encodePatientQr(id);
 
   if (!isOpen) return null;
 
@@ -38,13 +40,17 @@ export const DigitalQRPassModal: React.FC<DigitalQRPassModalProps> = ({
           <h3 className="text-xl font-black text-white tracking-tight leading-tight">{patientName}</h3>
           <div className="mt-2 inline-flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 px-3 py-1 rounded-xl">
             <span className="text-xs font-mono font-black text-sky-400 tracking-widest">
-              HSC-{sixDigitId || '882910'}
+              {id ? `HSC-${id}` : 'ID pending'}
             </span>
           </div>
 
           {/* QR Img */}
           <div className="my-6 p-4 bg-white rounded-2xl shadow-inner inline-block border-2 border-sky-400/40">
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`} alt="Digital Health Pass QR Code" className="rounded-lg w-[180px] h-[180px]" />
+            {id.length === 6 ? (
+              <img src={qrImageUrl(qrData, 180)} alt="Digital Health Pass QR Code" className="rounded-lg w-[180px] h-[180px]" />
+            ) : (
+              <p className="text-xs text-slate-500 font-bold px-4 py-10">Your 6-digit Hoscore ID is still being issued. Pull to refresh the dashboard.</p>
+            )}
           </div>
 
           {/* Footer note */}

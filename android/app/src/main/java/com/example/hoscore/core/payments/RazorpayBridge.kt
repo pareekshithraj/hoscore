@@ -54,8 +54,8 @@ suspend fun payPatientBill(activity: Activity, billId: String): Resource<Unit> {
 
     val checkout = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { cont ->
-            RazorpayBridge.pending = { success, paymentId, orderId, signature, error ->
-                if (!cont.isActive) return@pending
+            RazorpayBridge.pending = lambda@{ success, paymentId, orderId, signature, error ->
+                if (!cont.isActive) return@lambda
                 if (success && !paymentId.isNullOrBlank() && !orderId.isNullOrBlank() && !signature.isNullOrBlank()) {
                     cont.resume(Resource.Success(Triple(paymentId, orderId, signature)))
                 } else {

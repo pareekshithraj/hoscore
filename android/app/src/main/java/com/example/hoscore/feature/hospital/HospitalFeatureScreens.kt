@@ -22,7 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.example.hoscore.core.qr.HoscorePassDialog
+import com.example.hoscore.core.qr.HoscoreQrCodec
 import com.example.hoscore.core.common.Resource
 import com.example.hoscore.core.network.*
 import com.example.hoscore.core.ui.components.HoscoreCard
@@ -668,44 +669,14 @@ private fun AddStaffDialog(onDismiss: () -> Unit, onSuccess: () -> Unit) {
 @Composable
 private fun StaffQRBadgeDialog(staff: StaffMember, onDismiss: () -> Unit) {
     val t = HoscoreTokens.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text(staff.name, fontWeight = FontWeight.Black, fontSize = 18.sp, color = t.textPrimary)
-                Text(staff.role, fontSize = 12.sp, color = t.primary, fontWeight = FontWeight.Bold)
-            }
-        },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .size(180.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .border(2.dp, t.primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val qrData = java.net.URLEncoder.encode("HOSCORE:${staff.id}:STAFF", "UTF-8")
-                    AsyncImage(
-                        model = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$qrData",
-                        contentDescription = "Staff QR Code",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-                Text("ID: STF-${staff.id.take(8).uppercase()}", fontWeight = FontWeight.Black, fontSize = 14.sp, color = t.primary)
-                Spacer(Modifier.height(4.dp))
-                Text("Scan badge for duty verification & shift roster attendance", fontSize = 11.sp, color = t.textMuted)
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = t.primary)) {
-                Text("Close")
-            }
-        },
-        containerColor = t.screenBg
+    HoscorePassDialog(
+        title = "STAFF DIGITAL BADGE",
+        name = staff.name,
+        idLabel = "STF-${staff.id.take(8).uppercase()}",
+        payload = HoscoreQrCodec.encodeStaff(staff.id),
+        caption = "Scan badge for duty verification — same format as the web staff badge.",
+        accent = t.primary,
+        onDismiss = onDismiss,
     )
 }
 
