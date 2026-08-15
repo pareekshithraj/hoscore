@@ -117,11 +117,7 @@ app.use('/api/auth/reset-password', otpVerifyLimiter);
 app.use('/api/auth/verify-msg91-access-token', otpVerifyLimiter);
 app.use('/api/auth', authLimiter);
 
-
-// API Routes
-app.use('/api', routes);
-
-// Health check
+// Public live status — must be registered before authenticated /api routes.
 app.get('/api/status', async (_req: Request, res: Response) => {
   let dbUp = true;
   try {
@@ -143,6 +139,9 @@ app.get('/api/status', async (_req: Request, res: Response) => {
     services,
   });
 });
+
+// API Routes
+app.use('/api', routes);
 
 app.get('/health', async (_req: Request, res: Response) => {
   try {
