@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
 import { api } from "../services/api";
-import { Pill, Plus, X } from "lucide-react";
+import { Pill, Plus, X, Printer } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusPill } from "../components/ui/StatusPill";
+import { PatientPicker } from "../components/clinical/PatientPicker";
+import { formatMedicines, printPrescription } from "../utils/medicines";
+import { useAuth } from "../context/AuthContext";
 
 export const Prescriptions = () => {
+  const { activeContext } = useAuth();
+  const canDispense = activeContext?.role === "ADMIN" || activeContext?.role === "PHARMACIST";
+  const [query, setQuery] = useState("");
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
@@ -35,7 +41,13 @@ export const Prescriptions = () => {
   };
 
   const handleAdd = async () => {
-    await api.post("/prescriptions", form);
+    if (!form.patientId || !form.diagnosis.trim()) return;
+    const medicines = form.medicines
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((name) => ({ name, dosage: "", duration: "", instructions: "", quantity: 1 }));
+    await api.post("/prescriptions", { ...form, medicines });
     setShowForm(false);
     setForm({ patientId: "", doctorId: "", diagnosis: "", medicines: "", instructions: "" });
     loadData();
@@ -63,7 +75,16 @@ export const Prescriptions = () => {
       />
 
       <div className="grid gap-4">
-        {prescriptions.map((rx) => (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search patient or diagnosis…"
+          className="w-full max-w-md rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm"
+        />
+        {prescriptions.filter((rx) => {
+          const hay = `${rx.patient?.name || ""} ${rx.diagnosis || ""}`.toLowerCase();
+          return !query || hay.includes(query.toLowerCase());
+        }).map((rx) => (
           <div
             key={rx.id}
             className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 flex flex-col sm:flex-row justify-between items-start gap-4 shadow-sm"
@@ -83,7 +104,7 @@ export const Prescriptions = () => {
                 <div className="mt-3 bg-[var(--inner-bg)] p-3 rounded-xl text-sm border border-[var(--card-border)]">
                   <p className="font-bold text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Medications:</p>
                   <pre className="font-mono text-xs whitespace-pre-wrap text-[var(--text-primary)]">
-                    {rx.medicines}
+                    {formatMedicines(rx.medicines)}
                   </pre>
                 </div>
                 {rx.instructions && (
@@ -95,7 +116,7 @@ export const Prescriptions = () => {
             </div>
             <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-[var(--card-border)] gap-3">
               <StatusPill status={rx.status} />
-              {rx.status === "ISSUED" && (
+              {rx.status === "ISSUED" && canDispense && (
                 <button
                   onClick={() => handleStatus(rx.id, "DISPENSED")}
                   className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all px-3 py-1.5 rounded-xl shadow-sm cursor-pointer"
@@ -103,6 +124,19 @@ export const Prescriptions = () => {
                   Dispense
                 </button>
               )}
+              <button
+                onClick={() => printPrescription({
+                  patientName: rx.patient?.name,
+                  doctorName: rx.doctor?.name,
+                  diagnosis: rx.diagnosis,
+                  medicines: rx.medicines,
+                  instructions: rx.instructions,
+                  date: rx.createdAt || rx.date,
+                })}
+                className="text-xs font-bold text-blue-600 inline-flex items-center gap-1"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print
+              </button>
             </div>
           </div>
         ))}
@@ -138,18 +172,13 @@ export const Prescriptions = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <select
-                value={form.patientId}
-                onChange={(e) => setForm({ ...form, patientId: e.target.value })}
-                className="w-full p-2.5 border border-[var(--input-border)] rounded-xl bg-[var(--input-bg)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
-              >
-                <option value="">Select Patient</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <div className="col-span-2">
+                <PatientPicker
+                  value={form.patientId}
+                  patients={patients}
+                  onChange={(p) => setForm({ ...form, patientId: p?.id || "" })}
+                />
+              </div>
               <select
                 value={form.doctorId}
                 onChange={(e) => setForm({ ...form, doctorId: e.target.value })}

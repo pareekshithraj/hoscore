@@ -86,6 +86,31 @@ export async function sendLeaveApproval(
   });
 }
 
+export async function sendQueueCallNotification(
+  to: string,
+  patientName: string,
+  doctorName: string,
+  roomName: string,
+  tokenNumber: number,
+) {
+  return sendEmail({
+    to,
+    subject: `You are being called — Token #${tokenNumber}`,
+    html: `
+      <div style="font-family:system-ui;max-width:500px;margin:auto;padding:32px;background:#f8fafc;border-radius:24px">
+        <h1 style="color:#e11d48;font-size:22px;margin:0 0 8px">It's your turn</h1>
+        <p style="color:#475569">Hi ${patientName}, please go to <strong>${roomName}</strong> now.</p>
+        <div style="background:#e11d48;color:white;border-radius:16px;padding:20px;text-align:center;margin:16px 0">
+          <p style="margin:0;font-size:12px;opacity:0.8;text-transform:uppercase;letter-spacing:2px">Token</p>
+          <p style="margin:8px 0 0;font-size:40px;font-weight:900">#${tokenNumber}</p>
+        </div>
+        <p style="color:#475569;margin:0"><strong>Doctor:</strong> ${doctorName}</p>
+        <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px">Open the HOSCORE patient portal for indoor directions.</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   return sendEmail({
     to,

@@ -12,6 +12,7 @@ interface ContextItem {
   permissions?: string[];
   staffTypeId?: string;
   staffTypeName?: string;
+  impersonating?: boolean;
 }
 
 interface User {
@@ -38,6 +39,8 @@ interface AuthContextType {
   login: (userData: User, token: string, contexts: ContextItem[], activeContext: ContextItem) => void;
   logout: () => void;
   switchContext: (ctx: ContextItem, password?: string) => Promise<boolean>;
+  impersonateHospital: (hospitalId: string) => Promise<void>;
+  exitImpersonation: () => void;
   isLoading: boolean;
 
   selectedPatientId: string | null;
@@ -253,9 +256,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
 
+  const impersonateHospital = async (hospitalId: string) => {
+    if (!token) throw new Error('Not signed in');
+    const res = await fetch(`${BASE_URL}/super-admin/hospitals/${hospitalId}/impersonate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not open hospital');
+    localStorage.setItem('saBackup', JSON.stringify({
+      token,
+      activeContext,
+      contexts,
+    }));
+    setToken(data.token);
+    setActiveContext(data.activeContext);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('activeContext', JSON.stringify(data.activeContext));
+    window.location.assign('/dashboard');
+  };
+
+  const exitImpersonation = () => {
+    const raw = localStorage.getItem('saBackup');
+    if (!raw) {
+      window.location.assign('/super-admin');
+      return;
+    }
+    try {
+      const backup = JSON.parse(raw);
+      localStorage.removeItem('saBackup');
+      if (backup.token) localStorage.setItem('token', backup.token);
+      if (backup.activeContext) localStorage.setItem('activeContext', JSON.stringify(backup.activeContext));
+      if (backup.contexts) localStorage.setItem('contexts', JSON.stringify(backup.contexts));
+    } catch {
+      localStorage.removeItem('saBackup');
+    }
+    window.location.assign('/super-admin');
+  };
+
   return (
     <AuthContext.Provider value={{
-      user, token, contexts, activeContext, login, logout, switchContext, isLoading,
+      user, token, contexts, activeContext, login, logout, switchContext, impersonateHospital, exitImpersonation, isLoading,
       selectedPatientId, setSelectedPatientId, theme, toggleTheme, notifications,
       addNotification, markNotificationAsRead, clearNotifications
     }}>

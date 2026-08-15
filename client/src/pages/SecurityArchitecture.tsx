@@ -103,7 +103,7 @@ export const SecurityArchitecture: React.FC = () => {
           </p>
           <ul className="list-disc pl-6 space-y-1.5 text-slate-600 font-medium">
             <li><strong>Database Mirroring:</strong> Automated point-in-time recovery with 5-minute RPO (Recovery Point Objective).</li>
-            <li><strong>Uptime SLA:</strong> 99.999% platform availability backed by redundant load balancers and edge DDoS protection.</li>
+            <li><strong>Availability:</strong> Production runs on Vercel (hoscore.in + api.hoscore.in), Neon Postgres, and Cloudflare R2. We do not publish a 99.999% SLA on this page.</li>
             <li><strong>Automated Backups:</strong> Encrypted daily snapshots stored in air-gapped immutable storage vaults.</li>
           </ul>
         </section>

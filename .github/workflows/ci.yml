@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Server install & generate
+        working-directory: server
+        run: npm ci && npx prisma generate --schema prisma/schema.prisma
+      - name: Server typecheck
+        working-directory: server
+        run: npm run build
+      - name: Server hardening tests
+        working-directory: server
+        run: npm test
+      - name: Client install & build
+        working-directory: client
+        env:
+          VITE_API_URL: https://api.hoscore.in/api
+        run: npm ci && npm run build

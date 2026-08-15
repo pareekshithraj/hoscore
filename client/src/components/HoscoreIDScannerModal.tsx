@@ -433,7 +433,7 @@ export const HoscoreIDScannerModal: React.FC<HoscoreIDScannerModalProps> = ({
                               <button
                                 onClick={async () => {
                                   try {
-                                    await api.post('/patient/vaccinations', { id: vax.id, status: 'COMPLETED' });
+                                    await api.patch(`/vaccinations/${vax.id}/complete`, { status: 'COMPLETED' });
                                     handleSearch();
                                   } catch (err: any) {
                                     setError(err?.response?.data?.error || 'Failed to record vaccination.');

@@ -2,6 +2,10 @@ import type { Request, Response } from 'express';
 import { prisma } from '../index.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { sendToUser } from '../services/websocket.js';
+import { sendQueueCallNotification } from '../services/email.js';
+import { sendAlertSms } from '../services/msg91.js';
+import { smsTargetFromPhone } from '../utils/otp.js';
+import { sendPushToUser } from '../services/push.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -149,19 +153,45 @@ export const updateQueueStatus = async (req: Request, res: Response) => {
 
     // If patient is called, send direct WebSocket alert
     if (status === 'IN_CONSULTATION' && entry.patientId) {
+      const roomName = getRoomForQueue(entry);
       const patient = await prisma.patient.findUnique({
         where: { id: entry.patientId },
-        select: { userId: true }
+        select: { userId: true, name: true, email: true, contact: true, user: { select: { email: true, phone: true } } },
       });
+      const payload = {
+        queueId: entry.id,
+        doctorName: entry.doctorName,
+        department: entry.department,
+        tokenNumber: entry.tokenNumber,
+        roomName,
+        status: 'IN_CONSULTATION',
+      };
       if (patient?.userId) {
-        const roomName = getRoomForQueue(entry);
-        sendToUser(patient.userId, 'queue_called', {
-          queueId: entry.id,
-          doctorName: entry.doctorName,
-          department: entry.department,
-          tokenNumber: entry.tokenNumber,
+        sendToUser(patient.userId, 'queue_called', payload);
+        sendPushToUser(
+          patient.userId,
+          `Token #${entry.tokenNumber} called`,
+          `Please go to ${roomName} for ${entry.doctorName || 'your consult'} now.`,
+          { type: 'queue_called', tokenNumber: String(entry.tokenNumber || ''), roomName },
+        ).catch(() => {});
+      }
+      const email = patient?.user?.email || patient?.email;
+      const phone = patient?.user?.phone || patient?.contact;
+      if (email) {
+        sendQueueCallNotification(
+          email,
+          patient?.name || entry.patientName,
+          entry.doctorName || 'your doctor',
           roomName,
-        });
+          entry.tokenNumber,
+        ).catch(() => {});
+      }
+      const smsTo = smsTargetFromPhone(phone);
+      if (smsTo) {
+        sendAlertSms(
+          smsTo,
+          `HOSCORE: Token #${entry.tokenNumber} called. Please go to ${roomName} for ${entry.doctorName || 'your consult'} now.`,
+        ).catch(() => {});
       }
     }
 

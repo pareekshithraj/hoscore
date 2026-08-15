@@ -4,11 +4,13 @@ import { FileText, Plus, X } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { StatusPill } from '../components/ui/StatusPill';
+import { PatientPicker } from '../components/clinical/PatientPicker';
+import { printDischarge } from '../utils/medicines';
 
 export const Discharges = () => {
   const [docs, setDocs] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
+  const [form, setForm] = useState({ patientName: '', patientId: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
 
   const [bypassBillingCheck, setBypassBillingCheck] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -20,7 +22,7 @@ export const Discharges = () => {
     try {
       await api.post('/discharges', { ...form, bypassBillingCheck });
       setShowForm(false);
-      setForm({ patientName: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
+      setForm({ patientName: '', patientId: '', doctorName: '', diagnosis: '', medications: '', status: 'SIGNED' });
       setBypassBillingCheck(false);
       api.get('/discharges').then(setDocs);
     } catch (err: any) {
@@ -72,6 +74,7 @@ export const Discharges = () => {
               </div>
             </div>
             <StatusPill status={d.status} />
+            <button onClick={() => printDischarge(d)} className="text-xs font-bold text-blue-600">Print</button>
           </div>
         ))}
 
@@ -92,8 +95,11 @@ export const Discharges = () => {
               <button onClick={() => setShowForm(false)} className="p-1 hover:bg-[var(--inner-bg)] rounded-lg text-[var(--text-muted)] cursor-pointer"><X className="w-4.5 h-4.5" /></button>
             </div>
             <div className="space-y-3">
+              <PatientPicker
+                value={form.patientId}
+                onChange={(p) => setForm({ ...form, patientId: p?.id || '', patientName: p?.name || '' })}
+              />
               {[
-                { ph: 'Patient Name', k: 'patientName' },
                 { ph: 'Doctor Name', k: 'doctorName' },
                 { ph: 'Diagnosis', k: 'diagnosis' },
               ].map(f => (

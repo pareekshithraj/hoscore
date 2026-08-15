@@ -13,6 +13,7 @@ import routes from './routes/index.js';
 import { handlePaymentWebhook } from './controllers/paymentController.js';
 import { validateEnv } from './utils/validateEnv.js';
 import { cleanupExpiredChallenges } from './services/challengeCleanup.js';
+import { isRazorpayLive } from './services/razorpay.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,26 +32,21 @@ app.set('trust proxy', 1);
 // Security headers
 app.use((helmetPkg as unknown as () => import('express').RequestHandler)());
 
-// CORS — supports configured CLIENT_URL and local dev origin
+const isProd = process.env.NODE_ENV === 'production';
+
 const allowedOrigins = [
   'https://hoscore.in',
   'https://www.hoscore.in',
-  process.env.CLIENT_URL || 'https://hoscore.in',
-  'http://localhost:5173',
-  'http://localhost:5174',
-];
+  process.env.CLIENT_URL,
+  ...(!isProd ? ['http://localhost:5173', 'http://localhost:5174'] : []),
+].filter(Boolean) as string[];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (
-      !origin ||
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.vercel.app')
-    ) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (!isProd && origin.endsWith('.vercel.app')) return callback(null, true);
+    callback(null, false);
   },
   credentials: true,
 }));
@@ -86,8 +82,6 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-const isProd = process.env.NODE_ENV === 'production';
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -128,8 +122,45 @@ app.use('/api/auth', authLimiter);
 app.use('/api', routes);
 
 // Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), environment: process.env.NODE_ENV || 'development' });
+app.get('/api/status', async (_req: Request, res: Response) => {
+  let dbUp = true;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    dbUp = false;
+  }
+  const services = [
+    { name: 'API', status: 'operational' as const },
+    { name: 'Database', status: dbUp ? 'operational' as const : 'down' as const },
+    { name: 'Payments', status: isRazorpayLive ? 'operational' as const : 'test_mode' as const },
+    { name: 'Realtime queue', status: process.env.VERCEL === '1' ? 'polling' as const : 'operational' as const },
+    { name: 'ABDM / ABHA', status: 'not_connected' as const },
+  ];
+  const overall = dbUp ? 'operational' : 'degraded';
+  res.status(dbUp ? 200 : 503).json({
+    status: overall,
+    generatedAt: new Date().toISOString(),
+    services,
+  });
+});
+
+app.get('/health', async (_req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: 'ok',
+      db: 'up',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  } catch {
+    res.status(503).json({
+      status: 'degraded',
+      db: 'down',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  }
 });
 
 function publicBaseUrl(req: Request) {

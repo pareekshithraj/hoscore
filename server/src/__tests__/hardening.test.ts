@@ -36,3 +36,5 @@ export function runHardeningTests() {
 
   console.log('✅ All HOSCORE hardening unit tests passed successfully!');
 }
+
+runHardeningTests();

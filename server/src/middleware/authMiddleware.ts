@@ -14,6 +14,7 @@ export interface AuthUser {
   hospitalId: string | null;
   role: string;
   permissions?: string[];
+  impersonating?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -42,19 +43,24 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
     decoded.isSuperAdmin = dbUser.isSuperAdmin;
 
-    // Fix 6: Real-time permission & membership sync for hospital context
+    // Super-admin support session: skip membership, keep admin permissions even if the tenant is paused.
     if (decoded.contextType === 'hospital' && decoded.hospitalId) {
-      const membership = await prisma.membership.findFirst({
-        where: { userId: decoded.userId, hospitalId: decoded.hospitalId, status: 'ACTIVE', hospital: { isActive: true } },
-        include: { staffType: true },
-      });
+      if (decoded.isSuperAdmin && decoded.impersonating) {
+        decoded.role = 'ADMIN';
+        decoded.permissions = ADMIN_PERMISSIONS;
+      } else {
+        const membership = await prisma.membership.findFirst({
+          where: { userId: decoded.userId, hospitalId: decoded.hospitalId, status: 'ACTIVE', hospital: { isActive: true } },
+          include: { staffType: true },
+        });
 
-      if (!membership) {
-        return res.status(403).json({ error: 'Your access to this hospital has been revoked or deactivated.' });
+        if (!membership) {
+          return res.status(403).json({ error: 'Your access to this hospital has been revoked or deactivated.' });
+        }
+
+        decoded.role = membership.role;
+        decoded.permissions = permissionsForRole(membership.role, membership.permissions || membership.staffType?.permissions);
       }
-
-      decoded.role = membership.role;
-      decoded.permissions = permissionsForRole(membership.role, membership.permissions || membership.staffType?.permissions);
     }
 
     req.user = decoded;
@@ -108,6 +114,22 @@ export const requireFeature = (feature: string) => {
     }
     if (req.user.role === 'ADMIN' || req.user.isSuperAdmin) return next();
     if ((req.user.permissions || []).includes(feature)) return next();
+    return res.status(403).json({ error: 'Feature access denied' });
+  };
+};
+
+export const requireAnyFeature = (...features: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    if (req.user.contextType === 'patient') return next();
+    if (req.user.contextType !== 'hospital' || !req.user.hospitalId) {
+      if (!req.user.isSuperAdmin) {
+        return res.status(403).json({ error: 'Hospital context required to access this feature' });
+      }
+    }
+    if (req.user.role === 'ADMIN' || req.user.isSuperAdmin) return next();
+    const perms = req.user.permissions || [];
+    if (features.some((f) => perms.includes(f))) return next();
     return res.status(403).json({ error: 'Feature access denied' });
   };
 };

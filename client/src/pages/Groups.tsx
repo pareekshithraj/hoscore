@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UsersRound, Plus, Trash2, X, UserPlus, User } from 'lucide-react';
 import { api } from '../services/api';
+import { StaffPicker } from '../components/clinical/StaffPicker';
 
 const PRESET_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
 
@@ -9,7 +10,7 @@ export const Groups = () => {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState<string | null>(null);
   const [groupForm, setGroupForm] = useState({ name: '', description: '', color: '#3b82f6' });
-  const [memberForm, setMemberForm] = useState({ memberName: '', role: 'Nurse' });
+  const [memberForm, setMemberForm] = useState({ staffId: '', memberName: '', role: 'Nurse' });
 
   useEffect(() => { loadGroups(); }, []);
   const loadGroups = () => api.get('/groups').then(setGroups).catch(() => {});
@@ -31,7 +32,7 @@ export const Groups = () => {
     if (!showMemberForm) return;
     try {
       await api.post('/groups/members', { groupId: showMemberForm, ...memberForm });
-      setMemberForm({ memberName: '', role: 'Nurse' });
+      setMemberForm({ staffId: '', memberName: '', role: 'Nurse' });
       setShowMemberForm(null);
       loadGroups();
     } catch (e) { console.error(e); }
@@ -139,8 +140,10 @@ export const Groups = () => {
               <button onClick={() => setShowMemberForm(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-400 dark:text-zinc-500 rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-4">
-              <div><label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Name</label><input value={memberForm.memberName} onChange={e => setMemberForm(f => ({ ...f, memberName: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25" /></div>
-              <div><label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Role</label><select value={memberForm.role} onChange={e => setMemberForm(f => ({ ...f, role: e.target.value }))} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none cursor-pointer"><option>Doctor</option><option>Nurse</option><option>Technician</option><option>Admin</option><option>Specialist</option></select></div>
+              <StaffPicker
+                value={memberForm.staffId}
+                onChange={(s) => setMemberForm({ staffId: s?.id || '', memberName: s?.name || '', role: s?.role || 'Nurse' })}
+              />
               <button onClick={handleAddMember} disabled={!memberForm.memberName} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-4">Add Member</button>
             </div>
           </div>

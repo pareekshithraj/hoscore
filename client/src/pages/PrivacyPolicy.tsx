@@ -43,7 +43,7 @@ export const PrivacyPolicy: React.FC = () => {
       <section className="relative pt-28 pb-12 bg-gradient-to-b from-rose-50/40 via-white to-slate-50/50 border-b border-slate-100 overflow-hidden print:pt-6 print:pb-2">
         <div className="max-w-4xl mx-auto px-6 space-y-4 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-rose-50 to-red-50 border border-rose-200/50 text-rose-700 text-xs font-bold uppercase tracking-wider mx-auto">
-            <ShieldCheck className="w-4 h-4 text-rose-600" /> DPDP Act 2023 & HIPAA Compliant Privacy Policy
+            <ShieldCheck className="w-4 h-4 text-rose-600" /> DPDP Act 2023 Privacy Policy
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
@@ -58,7 +58,7 @@ export const PrivacyPolicy: React.FC = () => {
           </p>
 
           <p className="text-xs text-slate-500 font-medium max-w-xl mx-auto">
-            HOSCORE by Bluevolt Groups Private Limited is committed to protecting patient health data privacy under the Digital Personal Data Protection (DPDP) Act 2023, ABDM rules, and HIPAA encryption standards.
+            HOSCORE by Bluevolt Groups Private Limited protects patient health data under the Digital Personal Data Protection (DPDP) Act 2023. ABDM / ABHA linking is on the product roadmap and is not live.
           </p>
         </div>
       </section>
@@ -80,7 +80,7 @@ export const PrivacyPolicy: React.FC = () => {
               <Eye className="w-4 h-4 text-blue-600" />
               <span>Consent-Driven</span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium">Records shared only via explicit ABDM consent manager authorization.</p>
+            <p className="text-[11px] text-slate-500 font-medium">Hospital staff access is logged. Patients can revoke doctor access in the privacy page.</p>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-slate-900 font-extrabold text-xs">
@@ -99,7 +99,7 @@ export const PrivacyPolicy: React.FC = () => {
           </p>
           <ul className="list-disc pl-6 space-y-1.5 text-slate-600 font-medium">
             <li><strong>Identity & Contact Information:</strong> Full legal name, date of birth, gender, contact number, email address, physical address, and emergency contact details.</li>
-            <li><strong>Health & Clinical Records:</strong> 14-digit ABHA ID, hospital UHID, consultation notes, vitals telemetry, diagnostic lab test reports, electronic prescriptions, admission summaries, and allergy histories.</li>
+            <li><strong>Health & Clinical Records:</strong> Hospital UHID / Hoscore ID, consultation notes, vitals, lab results, e-prescriptions, admissions, and allergy history. ABHA IDs are stored only if you provide them.</li>
             <li><strong>Technical & System Telemetry:</strong> IP address, device identifier, browser type, operating system, login audit logs, and transaction timestamps.</li>
           </ul>
         </section>
@@ -112,9 +112,8 @@ export const PrivacyPolicy: React.FC = () => {
           </p>
           <ul className="list-disc pl-6 space-y-1.5 text-slate-600 font-medium">
             <li>Facilitating outpatient (OPD) token queueing, doctor appointments, and hospital bed admissions.</li>
-            <li>Generating digitally signed e-prescriptions, diagnostic orders, and inpatient billing invoices.</li>
-            <li>Linking patient health accounts to the Ayushman Bharat Digital Mission (ABDM) sandbox and health information networks upon patient authorization.</li>
-            <li>Fulfilling legal and statutory obligations including public health reporting and medico-legal audit trails.</li>
+            <li>Generating e-prescriptions, diagnostic orders, and inpatient billing invoices.</li>
+            <li>Fulfilling legal and statutory obligations including audit trails requested by the hospital that treated you.</li>
           </ul>
         </section>
 
@@ -125,7 +124,7 @@ export const PrivacyPolicy: React.FC = () => {
             Your health records are confidential. Hoscore utilizes explicit, itemized consent architecture:
           </p>
           <ul className="list-disc pl-6 space-y-1.5 text-slate-600 font-medium">
-            <li>Medical records are shared with external doctors or hospitals strictly through ABDM Consent Requests approved by you.</li>
+            <li>Medical records stay inside the hospital that created them unless you share them (print pack, QR pass, or a future ABDM consent flow).</li>
             <li>You may review, modify, or revoke active consents at any time through the Patient Portal (<code className="bg-slate-100 px-2 py-0.5 rounded text-rose-700 font-mono text-xs">/patient/privacy</code>).</li>
             <li>Withdrawal of consent does not affect the legality of data processing conducted prior to revocation.</li>
           </ul>

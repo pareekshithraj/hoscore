@@ -36,6 +36,7 @@ model User {
   memberships   Membership[]
   patientProfile Patient?
   authChallenges AuthChallenge[]
+  deviceTokens  DeviceToken[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -62,6 +63,19 @@ model AuthChallenge {
   updatedAt        DateTime @updatedAt
 
   @@index([userId, purpose])
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String
+  platform  String   @default("android")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, token])
+  @@index([userId])
 }
 
 // Links a User to a Hospital with a specific role
@@ -346,6 +360,8 @@ model Inventory {
   unit         String   @default("units")
   supplier     String?
   price        Float?
+  batchNumber  String?
+  expiryDate   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -591,6 +607,9 @@ model Feedback {
   category     String    @default("GENERAL")
   comment      String?
   isAnonymous  Boolean   @default(false)
+  reply        String?
+  repliedAt    DateTime?
+  repliedBy    String?
   createdAt    DateTime  @default(now())
 }
 
@@ -606,6 +625,7 @@ model InsuranceClaim {
   approvedAmount   Float?
   status           String    @default("SUBMITTED")
   admissionId      String?
+  billId           String?
   diagnosis        String?
   documents        String?
   submittedAt      DateTime  @default(now())

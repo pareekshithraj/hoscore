@@ -1,4 +1,4 @@
-package com.example.hoscore.feature.hospital
+﻿package com.example.hoscore.feature.hospital
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,9 +23,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hoscore.core.common.Resource
 import com.example.hoscore.core.network.CreateHospitalAppointmentRequest
+import com.example.hoscore.core.network.CreateLabOrderRequest
+import com.example.hoscore.core.network.CreatePrescriptionRequest
 import com.example.hoscore.core.network.PatientRecordChart
+import com.example.hoscore.core.network.RecordVitalsRequest
 import com.example.hoscore.core.network.ServiceLocator
 import com.example.hoscore.core.network.apiCall
+import com.example.hoscore.core.ui.components.FormField
 import com.example.hoscore.core.ui.DataScreen
 import com.example.hoscore.core.ui.components.EmptyState
 import com.example.hoscore.core.ui.components.HoscoreCard
@@ -158,7 +162,7 @@ fun PatientsScreen() {
                                         Text(
                                             listOfNotNull(
                                                 p.age?.let { "$it yrs" }, p.gender, p.bloodGroup,
-                                            ).joinToString(" · ").ifEmpty { "Patient" },
+                                            ).joinToString(" Â· ").ifEmpty { "Patient" },
                                             color = t.textMuted, fontSize = 12.sp,
                                         )
                                     }
@@ -234,17 +238,34 @@ fun PatientsScreen() {
 private fun PatientChartDialog(chart: PatientRecordChart, onDismiss: () -> Unit) {
     val t = HoscoreTokens.current
     val scope = rememberCoroutineScope()
+    var localChart by remember(chart.id) { mutableStateOf(chart) }
     var activeTab by remember { mutableStateOf(0) }
     val tabs = listOf("Profile", "Vitals", "Rx", "Labs", "Book Visit")
     var isBookingSuccess by remember { mutableStateOf(false) }
     var isBookingLoading by remember { mutableStateOf(false) }
+    var writeError by remember { mutableStateOf<String?>(null) }
+    var bp by remember { mutableStateOf("") }
+    var hr by remember { mutableStateOf("") }
+    var spo2 by remember { mutableStateOf("") }
+    var diagnosis by remember { mutableStateOf("") }
+    var medicines by remember { mutableStateOf("") }
+    var testName by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+
+    fun refreshChart() {
+        val six = localChart.sixDigitId ?: return
+        scope.launch {
+            val res = apiCall { ServiceLocator.api.getPatientBySixDigitId(six) }
+            if (res is Resource.Success) localChart = res.data
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text(chart.name, fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 18.sp)
-                Text("HSC-${chart.sixDigitId ?: "N/A"} · ${chart.gender ?: "MALE"}", fontSize = 12.sp, color = t.primary, fontWeight = FontWeight.Bold)
+                Text(localChart.name, fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 18.sp)
+                Text("HSC-${localChart.sixDigitId ?: "N/A"} Â· ${localChart.gender ?: "MALE"}", fontSize = 12.sp, color = t.primary, fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -263,24 +284,100 @@ private fun PatientChartDialog(chart: PatientRecordChart, onDismiss: () -> Unit)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
+                if (writeError != null) {
+                    Text(writeError!!, fontSize = 11.sp, color = t.clinical, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                }
 
-                Box(Modifier.height(220.dp).fillMaxWidth()) {
+                Box(Modifier.height(320.dp).fillMaxWidth()) {
                     when (activeTab) {
                         0 -> Column {
-                            Text("Contact: ${chart.contact ?: "N/A"}", fontSize = 12.sp, color = t.textSecondary)
-                            Text("DOB: ${chart.dateOfBirth?.take(10) ?: "N/A"}", fontSize = 12.sp, color = t.textSecondary)
-                            Text("Blood Group: ${chart.bloodGroup ?: "O+"}", fontSize = 12.sp, color = t.textSecondary)
-                            Text("Medical History: ${chart.medicalHistory ?: "None recorded"}", fontSize = 12.sp, color = t.textMuted)
+                            Text("Contact: ${localChart.contact ?: "N/A"}", fontSize = 12.sp, color = t.textSecondary)
+                            Text("DOB: ${localChart.dateOfBirth?.take(10) ?: "N/A"}", fontSize = 12.sp, color = t.textSecondary)
+                            Text("Blood Group: ${localChart.bloodGroup ?: "O+"}", fontSize = 12.sp, color = t.textSecondary)
+                            Text("Medical History: ${localChart.medicalHistory ?: "None recorded"}", fontSize = 12.sp, color = t.textMuted)
                         }
                         1 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (chart.vitals.isEmpty()) item { Text("No vitals recorded.", color = t.textMuted, fontSize = 12.sp) }
-                            else items(chart.vitals) { v ->
+                            item {
+                                FormField(bp, { bp = it }, "Blood pressure")
+                                Spacer(Modifier.height(6.dp))
+                                FormField(hr, { hr = it.filter { c -> c.isDigit() }.take(3) }, "Heart rate")
+                                Spacer(Modifier.height(6.dp))
+                                FormField(spo2, { spo2 = it.filter { c -> c.isDigit() }.take(3) }, "SpO2 %")
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        saving = true
+                                        writeError = null
+                                        scope.launch {
+                                            val res = apiCall {
+                                                ServiceLocator.api.recordVitals(
+                                                    RecordVitalsRequest(
+                                                        patientId = localChart.id,
+                                                        patientName = localChart.name,
+                                                        bloodPressure = bp.ifBlank { null },
+                                                        heartRate = hr.toIntOrNull(),
+                                                        oxygenSaturation = spo2.toIntOrNull(),
+                                                    )
+                                                )
+                                            }
+                                            saving = false
+                                            if (res is Resource.Error) writeError = res.message
+                                            else {
+                                                bp = ""; hr = ""; spo2 = ""
+                                                refreshChart()
+                                            }
+                                        }
+                                    },
+                                    enabled = !saving && (bp.isNotBlank() || hr.isNotBlank() || spo2.isNotBlank()),
+                                    colors = ButtonDefaults.buttonColors(containerColor = t.primary),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                                    contentPadding = PaddingValues(0.dp),
+                                ) { Text(if (saving) "Savingâ€¦" else "Record vitals", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                            }
+                            if (localChart.vitals.isEmpty()) item { Text("No vitals recorded.", color = t.textMuted, fontSize = 12.sp) }
+                            else items(localChart.vitals) { v ->
                                 Text("BP: ${v.bloodPressure ?: "--"} | HR: ${v.heartRate ?: "--"} bpm | SpO2: ${v.oxygenSaturation ?: "--"}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = t.textPrimary)
                             }
                         }
                         2 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (chart.prescriptions.isEmpty()) item { Text("No prescriptions recorded.", color = t.textMuted, fontSize = 12.sp) }
-                            else items(chart.prescriptions) { rx ->
+                            item {
+                                FormField(diagnosis, { diagnosis = it }, "Diagnosis")
+                                Spacer(Modifier.height(6.dp))
+                                FormField(medicines, { medicines = it }, "Medicines", singleLine = false)
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        saving = true
+                                        writeError = null
+                                        scope.launch {
+                                            val res = apiCall {
+                                                ServiceLocator.api.createPrescription(
+                                                    CreatePrescriptionRequest(
+                                                        patientId = localChart.id,
+                                                        patientName = localChart.name,
+                                                        diagnosis = diagnosis.ifBlank { null },
+                                                        medicines = medicines,
+                                                        status = "ISSUED",
+                                                    )
+                                                )
+                                            }
+                                            saving = false
+                                            if (res is Resource.Error) writeError = res.message
+                                            else {
+                                                diagnosis = ""; medicines = ""
+                                                refreshChart()
+                                            }
+                                        }
+                                    },
+                                    enabled = !saving && medicines.isNotBlank(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = t.primary),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                                    contentPadding = PaddingValues(0.dp),
+                                ) { Text(if (saving) "Savingâ€¦" else "Issue prescription", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                            }
+                            if (localChart.prescriptions.isEmpty()) item { Text("No prescriptions recorded.", color = t.textMuted, fontSize = 12.sp) }
+                            else items(localChart.prescriptions) { rx ->
                                 var rxStatus by remember { mutableStateOf((rx.status ?: "UNCLAIMED").uppercase()) }
                                 Column(
                                     Modifier
@@ -316,14 +413,45 @@ private fun PatientChartDialog(chart: PatientRecordChart, onDismiss: () -> Unit)
                                         }
                                     } else if (rxStatus == "CURRENT") {
                                         Spacer(Modifier.height(4.dp))
-                                        Text("✓ Active Prescription (CURRENT)", fontSize = 11.sp, color = t.emerald, fontWeight = FontWeight.Bold)
+                                        Text("âœ“ Active Prescription (CURRENT)", fontSize = 11.sp, color = t.emerald, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
                         3 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (chart.labOrders.isEmpty()) item { Text("No lab orders recorded.", color = t.textMuted, fontSize = 12.sp) }
-                            else items(chart.labOrders) { lab ->
+                            item {
+                                FormField(testName, { testName = it }, "Test name")
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        saving = true
+                                        writeError = null
+                                        scope.launch {
+                                            val res = apiCall {
+                                                ServiceLocator.api.createLabOrder(
+                                                    CreateLabOrderRequest(
+                                                        patientId = localChart.id,
+                                                        patientName = localChart.name,
+                                                        testName = testName,
+                                                    )
+                                                )
+                                            }
+                                            saving = false
+                                            if (res is Resource.Error) writeError = res.message
+                                            else {
+                                                testName = ""
+                                                refreshChart()
+                                            }
+                                        }
+                                    },
+                                    enabled = !saving && testName.isNotBlank(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = t.primary),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                                    contentPadding = PaddingValues(0.dp),
+                                ) { Text(if (saving) "Savingâ€¦" else "Order lab", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                            }
+                            if (localChart.labOrders.isEmpty()) item { Text("No lab orders recorded.", color = t.textMuted, fontSize = 12.sp) }
+                            else items(localChart.labOrders) { lab ->
                                 var labStatus by remember { mutableStateOf((lab.status ?: "PENDING").uppercase()) }
                                 Column(
                                     Modifier
@@ -378,16 +506,16 @@ private fun PatientChartDialog(chart: PatientRecordChart, onDismiss: () -> Unit)
                                         }
                                     } else if (labStatus == "COMPLETED") {
                                         Spacer(Modifier.height(4.dp))
-                                        Text("✓ Test Completed", fontSize = 11.sp, color = t.emerald, fontWeight = FontWeight.Bold)
+                                        Text("âœ“ Test Completed", fontSize = 11.sp, color = t.emerald, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
                         4 -> Column {
                             if (isBookingSuccess) {
-                                Text("✓ Appointment booked successfully!", color = t.emerald, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("âœ“ Appointment booked successfully!", color = t.emerald, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             } else {
-                                Text("Book visit for ${chart.name} using Hoscore ID #${chart.sixDigitId}", fontSize = 12.sp, color = t.textSecondary)
+                                Text("Book visit for ${localChart.name} using Hoscore ID #${localChart.sixDigitId}", fontSize = 12.sp, color = t.textSecondary)
                                 Spacer(Modifier.height(10.dp))
                                 Button(
                                     onClick = {
@@ -396,8 +524,8 @@ private fun PatientChartDialog(chart: PatientRecordChart, onDismiss: () -> Unit)
                                             apiCall {
                                                 ServiceLocator.api.createHospitalAppointment(
                                                     CreateHospitalAppointmentRequest(
-                                                        patientName = chart.name,
-                                                        sixDigitId = chart.sixDigitId,
+                                                        patientName = localChart.name,
+                                                        sixDigitId = localChart.sixDigitId,
                                                         time = "10:00 AM",
                                                         date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
                                                     )

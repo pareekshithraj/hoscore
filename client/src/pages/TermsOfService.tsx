@@ -114,7 +114,7 @@ export const TermsOfService: React.FC = () => {
           <ul className="list-disc pl-6 space-y-1.5 text-slate-600 font-medium">
             <li><strong>Subscription Plans:</strong> Pricing and billing cycles are billed monthly or annually as per the selected institutional package.</li>
             <li><strong>Payments & Payment Gateways:</strong> Transactions are securely processed through RBI-authorized payment gateways (e.g. Razorpay). All fees are exclusive of applicable GST unless stated otherwise.</li>
-            <li><strong>SLA Guarantee:</strong> Hoscore maintains a 99.99% system uptime SLA for core hospital registration, queue console, and prescription generation endpoints.</li>
+            <li><strong>Availability:</strong> We aim for continuous availability of queue, records, and billing. This is not a contractual 99.99% SLA unless agreed in a hospital contract.</li>
           </ul>
         </section>
 

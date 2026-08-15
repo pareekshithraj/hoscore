@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Search, Stethoscope, User, Edit2, Trash2, Star, X, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Stethoscope, User, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 interface Doctor {
@@ -21,6 +22,7 @@ export const Doctors = () => {
   const [specialtyFilter, setSpecialtyFilter] = useState('All');
   const [deleteTarget, setDeleteTarget] = useState<Doctor | null>(null);
   const [formData, setFormData] = useState({ name: '', specialty: 'Cardiology', contact: '', email: '' });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const specialties = ['Cardiology', 'Neurosurgery', 'Pulmonology', 'Orthopedics', 'Pediatrics', 'Dermatology', 'General Medicine'];
 
@@ -45,8 +47,13 @@ export const Doctors = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/doctors', formData);
+      if (editingId) {
+        await api.patch(`/doctors/${editingId}`, formData);
+      } else {
+        await api.post('/doctors', formData);
+      }
       setIsModalOpen(false);
+      setEditingId(null);
       setFormData({ name: '', specialty: 'Cardiology', contact: '', email: '' });
       fetchDoctors();
     } catch (err) { console.error(err); }
@@ -116,27 +123,35 @@ export const Doctors = () => {
                   <p className="text-sm text-blue-600 font-medium">{doc.specialty}</p>
                 </div>
               </div>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${doc.status === 'On Duty' ? 'bg-emerald-100 text-emerald-700' : doc.status === 'On Leave' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                {doc.status}
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${['On Duty', 'ON_DUTY', 'AVAILABLE'].includes(doc.status) ? 'bg-emerald-100 text-emerald-700' : doc.status === 'On Leave' || doc.status === 'ON_LEAVE' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                {doc.status === 'ON_DUTY' ? 'On Duty' : doc.status}
               </span>
             </div>
 
             <div className="space-y-2 text-sm text-slate-600 mb-5">
               <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-400" />{doc.email}</div>
               <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                <span className="font-semibold text-slate-900">{doc.rating}</span>
-                <span className="text-slate-400">· {doc.patientsCount} active patients</span>
+                <span className="text-slate-400">{doc.patientsCount || 0} linked records</span>
               </div>
             </div>
 
             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => {
+                  setEditingId(doc.id);
+                  setFormData({ name: doc.name, specialty: doc.specialty, contact: (doc as any).contact || '', email: doc.email });
+                  setIsModalOpen(true);
+                }}
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5"
+              >
                 <Edit2 className="w-3.5 h-3.5" /> Edit
               </button>
-              <button className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100">
+              <Link
+                to={`/dashboard/patients?q=${encodeURIComponent(doc.name)}`}
+                className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 text-center"
+              >
                 View Patients
-              </button>
+              </Link>
               <button onClick={() => setDeleteTarget(doc)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                 <Trash2 className="w-4 h-4" />
               </button>

@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
-import { Building2, CheckCircle2, XCircle, MapPin } from 'lucide-react';
+import { Building2, CheckCircle2, XCircle, MapPin, Headset, Pause, Play } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const ManageHospitals = () => {
+  const { impersonateHospital } = useAuth();
   const [hospitals, setHospitals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openingId, setOpeningId] = useState('');
+  const [error, setError] = useState('');
 
   const load = () => { api.get('/super-admin/hospitals').then(setHospitals).catch(console.error).finally(() => setLoading(false)); };
   useEffect(load, []);
@@ -12,6 +16,17 @@ export const ManageHospitals = () => {
   const toggle = async (id: string) => {
     await api.patch(`/super-admin/hospitals/${id}/toggle`, {});
     load();
+  };
+
+  const openAsSupport = async (id: string) => {
+    setError('');
+    setOpeningId(id);
+    try {
+      await impersonateHospital(id);
+    } catch (e: any) {
+      setError(e?.message || 'Could not open hospital as support');
+      setOpeningId('');
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -25,6 +40,7 @@ export const ManageHospitals = () => {
         </div>
         <span className="text-xs text-slate-500 dark:text-zinc-450 font-bold bg-slate-100 dark:bg-zinc-900 border border-slate-200/50 dark:border-zinc-800/60 px-2.5 py-1 rounded-lg">{hospitals.length} total</span>
       </div>
+      {error && <p className="text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/50 px-3 py-2 rounded-xl">{error}</p>}
       <div className="space-y-4">
         {hospitals.map((h: any) => (
           <div key={h.id} className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200/60 dark:border-zinc-800/80 p-6 shadow-sm transition-all duration-300">
@@ -50,16 +66,32 @@ export const ManageHospitals = () => {
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => toggle(h.id)} 
-                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
-                  h.isActive 
-                    ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 hover:bg-rose-100 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-400 border border-emerald-200/50 dark:border-emerald-500/20' 
-                    : 'bg-rose-100 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 border border-rose-200/50 dark:border-rose-500/20'
-                }`}
-              >
-                {h.isActive ? <><CheckCircle2 className="w-4 h-4" /> Active</> : <><XCircle className="w-4 h-4" /> Inactive</>}
-              </button>
+              <div className="flex flex-col sm:items-end gap-2">
+                <button
+                  onClick={() => openAsSupport(h.id)}
+                  disabled={openingId === h.id}
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-90 disabled:opacity-50 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <Headset className="w-4 h-4" />
+                  {openingId === h.id ? 'Opening…' : 'Open as support'}
+                </button>
+                <button 
+                  onClick={() => toggle(h.id)} 
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
+                    h.isActive 
+                      ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 hover:bg-rose-100 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-400 border border-emerald-200/50 dark:border-emerald-500/20' 
+                      : 'bg-rose-100 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 border border-rose-200/50 dark:border-rose-500/20'
+                  }`}
+                >
+                  {h.isActive
+                    ? <><Pause className="w-4 h-4" /> Pause tenant</>
+                    : <><Play className="w-4 h-4" /> Resume tenant</>}
+                </button>
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${h.isActive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {h.isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                  {h.isActive ? 'Live' : 'Paused'}
+                </span>
+              </div>
             </div>
           </div>
         ))}

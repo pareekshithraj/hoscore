@@ -1,23 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, ShieldCheck, CheckCircle2, Clock, Server, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
+import { BASE_URL } from '../utils/apiConfig';
+
+type ServiceRow = { name: string; status: string };
 
 export const SystemStatus: React.FC = () => {
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [lastUpdated, setLastUpdated] = useState('');
+  const [overall, setOverall] = useState('checking');
+  const [services, setServices] = useState<ServiceRow[]>([]);
 
   useEffect(() => {
-    setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    fetch(`${BASE_URL}/status`)
+      .then((r) => r.json())
+      .then((data) => {
+        setOverall(data.status || 'unknown');
+        setServices(Array.isArray(data.services) ? data.services : []);
+        setLastUpdated(new Date(data.generatedAt || Date.now()).toLocaleTimeString('en-IN'));
+      })
+      .catch(() => {
+        setOverall('unreachable');
+        setServices([{ name: 'API', status: 'down' }]);
+        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+      });
   }, []);
 
-  const services = [
-    { name: 'Patient Portal & Web App', status: 'Operational', uptime: '99.999%', latency: '24ms' },
-    { name: 'Hospital ERP Console', status: 'Operational', uptime: '99.998%', latency: '18ms' },
-    { name: 'OPD Queue Token Engine', status: 'Operational', uptime: '100.00%', latency: '12ms' },
-    { name: 'Digital Prescription Generator', status: 'Operational', uptime: '99.995%', latency: '31ms' },
-    { name: 'ABDM ABHA Gateway (M1/M2/M3)', status: 'Operational', uptime: '99.990%', latency: '45ms' },
-    { name: 'Razorpay Payment & Invoicing', status: 'Operational', uptime: '99.999%', latency: '28ms' },
-    { name: 'WebSocket Real-time Sync', status: 'Operational', uptime: '99.999%', latency: '9ms' }
-  ];
+  const healthy = overall === 'operational';
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-rose-100 selection:text-rose-900">
@@ -45,8 +53,11 @@ export const SystemStatus: React.FC = () => {
       {/* Hero */}
       <section className="relative pt-28 pb-12 bg-gradient-to-b from-emerald-50/40 via-white to-slate-50/50 border-b border-slate-100 overflow-hidden">
         <div className="max-w-4xl mx-auto px-6 space-y-4 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold uppercase tracking-wider mx-auto">
-            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" /> All Systems Operational
+          <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider mx-auto ${
+            healthy ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-amber-100 border-amber-200 text-amber-800'
+          }`}>
+            <span className={`w-2.5 h-2.5 rounded-full ${healthy ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            {healthy ? 'Core systems reachable' : overall === 'checking' ? 'Checking…' : 'Degraded or unreachable'}
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
@@ -57,7 +68,7 @@ export const SystemStatus: React.FC = () => {
           </h1>
 
           <p className="text-slate-600 text-sm font-medium">
-            Real-time status updates across Hoscore clinical API microservices, ABDM gateways, and hospital queue nodes.
+            Live checks against the Hoscore API, database, and payment configuration. ABDM is listed only when connected.
           </p>
 
           <div className="inline-flex items-center gap-2 text-xs font-mono text-slate-500 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
@@ -75,36 +86,31 @@ export const SystemStatus: React.FC = () => {
           <h2 className="text-lg font-extrabold text-slate-900">Platform Core Services</h2>
           
           <div className="space-y-3">
-            {services.map((s, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-200/60 hover:bg-slate-50 transition-all">
+            {services.map((s, idx) => {
+              const ok = s.status === 'operational';
+              return (
+              <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-200/60">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-extrabold text-slate-900 text-sm">{s.name}</p>
-                    <p className="text-[11px] text-slate-500 font-medium">Latency: {s.latency} · Response SLA OK</p>
-                  </div>
+                  {ok ? <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />}
+                  <p className="font-extrabold text-slate-900 text-sm">{s.name}</p>
                 </div>
-                <div className="text-right">
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
-                    {s.status}
-                  </span>
-                  <p className="text-[11px] font-mono text-slate-500 font-bold mt-1">Uptime: {s.uptime}</p>
-                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border ${
+                  ok ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'
+                }`}>
+                  {s.status.replace(/_/g, ' ')}
+                </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         {/* Recent Past Incidents */}
         <div className="space-y-4">
-          <h2 className="text-lg font-extrabold text-slate-900">Recent System Maintenance Logs</h2>
-          <div className="bg-white border border-slate-200/80 rounded-[24px] p-5 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold">
-              <span className="text-slate-900">Scheduled Database Upgrade (Clean completion)</span>
-              <span className="text-slate-400">July 20, 2026</span>
-            </div>
+          <h2 className="text-lg font-extrabold text-slate-900">Notes</h2>
+          <div className="bg-white border border-slate-200/80 rounded-[24px] p-5">
             <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              Planned maintenance completed in 4 minutes during low-traffic window (03:00 AM IST). Zero data loss or service disruption reported.
+              This page reports live reachability, not a contractual SLA. ABDM / ABHA certification is not connected yet.
             </p>
           </div>
         </div>

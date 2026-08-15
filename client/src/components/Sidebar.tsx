@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, Bed, Users, Stethoscope, ClipboardList, Package, Receipt,
+  LayoutDashboard, Bed, Users, Stethoscope, Package, Receipt,
   Settings, LogOut, BarChart2, UserCircle, Calendar, Megaphone, CalendarOff,
-  UsersRound, Activity, ChevronLeft, ChevronRight, ShieldCheck, X, CreditCard, Search, Map as MapIcon
+  UsersRound, ChevronLeft, ChevronRight, ShieldCheck, X, CreditCard, Search, Map as MapIcon,
+  Pill, HeartPulse, FlaskConical, ClipboardPlus, FileOutput, CalendarClock, Wallet, BadgeDollarSign, ScrollText
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import clsx from "clsx";
@@ -11,42 +12,50 @@ import { hasFeature } from "../utils/features";
 
 type Role = "ADMIN" | "DOCTOR" | "NURSE" | "RECEPTIONIST" | "STAFF" | "PHARMACIST" | "LAB_TECH";
 
-const mainMenuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", feature: "dashboard" },
-  { icon: MapIcon, label: "Map Builder", path: "/dashboard/map", feature: "map" },
-  { icon: Users, label: "OPD Queue", path: "/dashboard/queue", feature: "queue" },
-  { icon: ClipboardList, label: "Prescriptions", path: "/dashboard/prescriptions", feature: "prescriptions" },
-  { icon: Bed, label: "Rooms & Beds", path: "/dashboard/rooms", feature: "rooms" },
-  { icon: Users, label: "Patients", path: "/dashboard/patients", feature: "patients" },
-  { icon: ClipboardList, label: "Admissions", path: "/dashboard/admissions", feature: "admissions" },
-  { icon: ClipboardList, label: "Discharges", path: "/dashboard/discharges", feature: "discharges" },
-  { icon: ClipboardList, label: "Vitals", path: "/dashboard/vitals", feature: "vitals" },
-  { icon: ClipboardList, label: "Lab Orders", path: "/dashboard/labs", feature: "labs" },
-  { icon: Stethoscope, label: "Doctors", path: "/dashboard/doctors", feature: "doctors" },
-  { icon: UserCircle, label: "Staff", path: "/dashboard/staff", feature: "staff" },
-  { icon: ShieldCheck, label: "Staff Privileges", path: "/dashboard/staff-types", feature: "staff_types" },
-  { icon: Calendar, label: "Shift Roster", path: "/dashboard/shifts", feature: "shifts" },
-  { icon: Package, label: "Inventory", path: "/dashboard/inventory", feature: "inventory" },
-  { icon: Receipt, label: "Billing", path: "/dashboard/billing", feature: "billing" },
-  { icon: Receipt, label: "Claims", path: "/dashboard/claims", feature: "claims" },
-  { icon: Receipt, label: "Expenses", path: "/dashboard/expenses", feature: "expenses" },
-  { icon: BarChart2, label: "Analytics", path: "/dashboard/analytics", feature: "analytics" },
-];
+type MenuItem = {
+  icon: any;
+  label: string;
+  path: string;
+  feature: string;
+  adminOnly?: boolean;
+  hideFor?: Role[];
+  group: "clinical" | "census" | "admin" | "management";
+};
 
-const managementMenuItems = [
-  { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription", feature: "settings", adminOnly: true },
-  { icon: Calendar, label: "Calendar", path: "/dashboard/calendar", feature: "calendar" },
-  { icon: Megaphone, label: "Notice Board", path: "/dashboard/notices", feature: "notices" },
-  { icon: CalendarOff, label: "Leave Requests", path: "/dashboard/leaves", feature: "leaves" },
-  { icon: UsersRound, label: "Groups", path: "/dashboard/groups", feature: "groups" },
-  { icon: Megaphone, label: "Feedback", path: "/dashboard/feedback", feature: "feedback" },
-  { icon: Settings, label: "Audit Logs", path: "/dashboard/audit-logs", feature: "audit_logs" },
+const allMenuItems: MenuItem[] = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", feature: "dashboard", group: "clinical" },
+  { icon: Users, label: "OPD Queue", path: "/dashboard/queue", feature: "queue", group: "clinical" },
+  { icon: Pill, label: "Prescriptions", path: "/dashboard/prescriptions", feature: "prescriptions", group: "clinical" },
+  { icon: HeartPulse, label: "Vitals", path: "/dashboard/vitals", feature: "vitals", group: "clinical" },
+  { icon: FlaskConical, label: "Lab Orders", path: "/dashboard/labs", feature: "labs", group: "clinical" },
+  { icon: UserCircle, label: "Patients", path: "/dashboard/patients", feature: "patients", group: "clinical" },
+  { icon: ClipboardPlus, label: "Admissions", path: "/dashboard/admissions", feature: "admissions", group: "census" },
+  { icon: FileOutput, label: "Discharges", path: "/dashboard/discharges", feature: "discharges", group: "census" },
+  { icon: Bed, label: "Rooms & Beds", path: "/dashboard/rooms", feature: "rooms", group: "census" },
+  { icon: MapIcon, label: "Map Builder", path: "/dashboard/map", feature: "map", group: "census" },
+  { icon: Stethoscope, label: "Doctors", path: "/dashboard/doctors", feature: "doctors", group: "admin", hideFor: ["DOCTOR"] },
+  { icon: UsersRound, label: "Staff", path: "/dashboard/staff", feature: "staff", group: "admin" },
+  { icon: ShieldCheck, label: "Staff Privileges", path: "/dashboard/staff-types", feature: "staff_types", group: "admin" },
+  { icon: CalendarClock, label: "Shift Roster", path: "/dashboard/shifts", feature: "shifts", group: "admin" },
+  { icon: Package, label: "Inventory", path: "/dashboard/inventory", feature: "inventory", group: "admin" },
+  { icon: Receipt, label: "Billing", path: "/dashboard/billing", feature: "billing", group: "admin" },
+  { icon: BadgeDollarSign, label: "Claims", path: "/dashboard/claims", feature: "claims", group: "admin" },
+  { icon: Wallet, label: "Expenses", path: "/dashboard/expenses", feature: "expenses", group: "admin" },
+  { icon: BarChart2, label: "Analytics", path: "/dashboard/analytics", feature: "analytics", group: "admin" },
+  { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription", feature: "settings", group: "management", adminOnly: true },
+  { icon: Calendar, label: "Calendar", path: "/dashboard/calendar", feature: "calendar", group: "management" },
+  { icon: Megaphone, label: "Notice Board", path: "/dashboard/notices", feature: "notices", group: "management" },
+  { icon: CalendarOff, label: "Leave Requests", path: "/dashboard/leaves", feature: "leaves", group: "management" },
+  { icon: UsersRound, label: "Groups", path: "/dashboard/groups", feature: "groups", group: "management", hideFor: ["DOCTOR"] },
+  { icon: ScrollText, label: "Feedback", path: "/dashboard/feedback", feature: "feedback", group: "management" },
+  { icon: Settings, label: "Audit Logs", path: "/dashboard/audit-logs", feature: "audit_logs", group: "management" },
 ];
 
 export const Sidebar = ({ isMobileOpen = false, onCloseMobile }: { isMobileOpen?: boolean; onCloseMobile?: () => void }) => {
   const location = useLocation();
   const { activeContext, user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [navQuery, setNavQuery] = useState("");
 
   const userRole = (activeContext?.role || "STAFF") as Role;
 
@@ -55,11 +64,20 @@ export const Sidebar = ({ isMobileOpen = false, onCloseMobile }: { isMobileOpen?
     return location.pathname.startsWith(path);
   };
 
-  const filteredMain = mainMenuItems.filter((i) => hasFeature(activeContext?.permissions, i.feature, userRole));
-  const filteredManagement = managementMenuItems.filter((i) => {
-    if ('adminOnly' in i && i.adminOnly && userRole !== 'ADMIN') return false;
-    return hasFeature(activeContext?.permissions, i.feature, userRole);
+  const visibleItems = allMenuItems.filter((i) => {
+    if (i.adminOnly && userRole !== "ADMIN") return false;
+    if (i.hideFor?.includes(userRole)) return false;
+    if (!hasFeature(activeContext?.permissions, i.feature, userRole)) return false;
+    if (navQuery.trim() && !i.label.toLowerCase().includes(navQuery.trim().toLowerCase())) return false;
+    return true;
   });
+
+  const groups: { id: MenuItem["group"]; label: string }[] = [
+    { id: "clinical", label: "Clinical" },
+    { id: "census", label: "Census" },
+    { id: "admin", label: "Admin" },
+    { id: "management", label: "Management" },
+  ];
 
   useEffect(() => {
     onCloseMobile?.();
@@ -141,6 +159,8 @@ export const Sidebar = ({ isMobileOpen = false, onCloseMobile }: { isMobileOpen?
                 <input
                   id="sidebar-search"
                   type="text"
+                  value={navQuery}
+                  onChange={(e) => setNavQuery(e.target.value)}
                   placeholder="Find page..."
                   className="bg-transparent border-0 outline-none text-xs w-full text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-600 font-semibold"
                 />
@@ -152,77 +172,47 @@ export const Sidebar = ({ isMobileOpen = false, onCloseMobile }: { isMobileOpen?
 
         {/* Main Navigation */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5 scrollbar-thin">
-          <div>
-            {!isCollapsed ? (
-              <p className="px-3 mb-2 text-[9px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Operations</p>
-            ) : (
-              <div className="h-px bg-slate-200 dark:bg-zinc-800/60 my-2 mx-1" />
-            )}
-            <div className="space-y-0.5">
-              {filteredMain.map((item) => {
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={clsx(
-                      "group flex items-center rounded-lg transition-all duration-200 text-xs relative",
-                      isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
-                      active
-                        ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-white font-extrabold border border-slate-200/50 dark:border-zinc-800/60"
-                        : "hover:bg-slate-50 dark:hover:bg-zinc-900/30 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 border border-transparent",
-                    )}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    {active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 dark:bg-white rounded-r-full" />
-                    )}
-                    <item.icon className={clsx(
-                      "w-[18px] h-[18px] flex-shrink-0 transition-transform duration-200", 
-                      active ? "text-blue-600 dark:text-white" : "group-hover:scale-105 text-slate-400 dark:text-zinc-500 group-hover:text-slate-700 dark:group-hover:text-zinc-200"
-                    )} />
-                    {!isCollapsed && <span className="font-semibold">{item.label}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            {!isCollapsed ? (
-              <p className="px-3 mb-2 text-[9px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Management</p>
-            ) : (
-              <div className="h-px bg-slate-200 dark:bg-zinc-800/60 my-2 mx-1" />
-            )}
-            <div className="space-y-0.5">
-              {filteredManagement.map((item) => {
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={clsx(
-                      "group flex items-center rounded-lg transition-all duration-200 text-xs relative",
-                      isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
-                      active
-                        ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-white font-extrabold border border-slate-200/50 dark:border-zinc-800/60"
-                        : "hover:bg-slate-50 dark:hover:bg-zinc-900/30 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 border border-transparent",
-                    )}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    {active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 dark:bg-white rounded-r-full" />
-                    )}
-                    <item.icon className={clsx(
-                      "w-[18px] h-[18px] flex-shrink-0 transition-transform duration-200", 
-                      active ? "text-blue-600 dark:text-white" : "group-hover:scale-105 text-slate-400 dark:text-zinc-500 group-hover:text-slate-700 dark:group-hover:text-zinc-200"
-                    )} />
-                    {!isCollapsed && <span className="font-semibold">{item.label}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
+          {groups.map((group) => {
+            const items = visibleItems.filter((i) => i.group === group.id);
+            if (!items.length) return null;
+            return (
+              <div key={group.id}>
+                {!isCollapsed ? (
+                  <p className="px-3 mb-2 text-[9px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">{group.label}</p>
+                ) : (
+                  <div className="h-px bg-slate-200 dark:bg-zinc-800/60 my-2 mx-1" />
+                )}
+                <div className="space-y-0.5">
+                  {items.map((item) => {
+                    const active = isActive(item.path);
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        className={clsx(
+                          "group flex items-center rounded-lg transition-all duration-200 text-xs relative",
+                          isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
+                          active
+                            ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-white font-extrabold border border-slate-200/50 dark:border-zinc-800/60"
+                            : "hover:bg-slate-50 dark:hover:bg-zinc-900/30 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 border border-transparent",
+                        )}
+                        title={isCollapsed ? item.label : undefined}
+                      >
+                        {active && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 dark:bg-white rounded-r-full" />
+                        )}
+                        <item.icon className={clsx(
+                          "w-[18px] h-[18px] flex-shrink-0 transition-transform duration-200",
+                          active ? "text-blue-600 dark:text-white" : "group-hover:scale-105 text-slate-400 dark:text-zinc-500 group-hover:text-slate-700 dark:group-hover:text-zinc-200"
+                        )} />
+                        {!isCollapsed && <span className="font-semibold">{item.label}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         {/* Sidebar Footer Section (Vercel Avatar + settings menu) */}

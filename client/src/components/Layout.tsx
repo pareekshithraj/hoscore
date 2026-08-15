@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { BASE_URL } from '../utils/apiConfig';
+import { useAuth } from '../context/AuthContext';
 
 // ── New-booking live toast ───────────────────────────────────────────────────
 interface BookingToast {
@@ -39,7 +40,7 @@ function NewBookingToast({ toast, onDismiss }: { toast: BookingToast; onDismiss:
         animation: 'slideInRight 0.3s ease',
         cursor: 'pointer',
       }}
-      onClick={() => { navigate('/calendar'); onDismiss(toast.id); }}
+      onClick={() => { navigate('/dashboard/calendar'); onDismiss(toast.id); }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -69,8 +70,7 @@ function NewBookingToast({ toast, onDismiss }: { toast: BookingToast; onDismiss:
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const location = useLocation();
-  const isSimulator = location.pathname === '/dashboard/simulator';
+  const { activeContext, exitImpersonation } = useAuth();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
   const [toasts, setToasts] = useState<BookingToast[]>([]);
@@ -184,10 +184,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  if (isSimulator) {
-    return <>{children}</>;
-  }
-
   return (
     <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden dashboard-theme">
       {/* Fixed Sidebar */}
@@ -195,6 +191,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
+        {activeContext?.impersonating && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-500 text-slate-900 text-xs font-bold z-20">
+            <span>Viewing as {activeContext.hospitalName || 'hospital'} — support session</span>
+            <button
+              type="button"
+              onClick={exitImpersonation}
+              className="px-3 py-1 rounded-lg bg-slate-900 text-white font-extrabold cursor-pointer"
+            >
+              Exit support
+            </button>
+          </div>
+        )}
         <Header onOpenMenu={() => setIsMobileNavOpen(true)} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-8 animate-fade-in-up relative z-10">
           {children}

@@ -158,6 +158,7 @@ export const MyVaccinations = () => {
       <div className="space-y-4">
         {filteredVaccines.map((v) => {
           const isCompleted = v.status === 'COMPLETED';
+          const selfReported = Boolean(v.givenBy && String(v.givenBy).toLowerCase().includes('self-reported'));
           return (
             <div 
               key={v.id} 
@@ -203,16 +204,15 @@ export const MyVaccinations = () => {
                 </div>
 
                 <div className="flex items-center gap-3 self-end md:self-auto">
-                  <button
-                    onClick={() => openReportModal(v)}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                      isCompleted
-                        ? 'border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-600/10'
-                    }`}
-                  >
-                    {isCompleted ? 'Edit Details' : 'Record Vaccination'} <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                  {isCompleted ? (
+                    <span className="px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 text-slate-600">
+                      {selfReported ? 'Self-reported' : 'Recorded at hospital'}
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => openReportModal(v)} className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700">
+                      I received this (self-report)
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -247,7 +247,7 @@ export const MyVaccinations = () => {
                   {selectedVaccine.scheduledAge} Target
                 </span>
                 <h3 className="text-lg font-extrabold pr-8">{selectedVaccine.name}</h3>
-                <p className="text-xs text-indigo-200">Submit official immunization delivery records for your lifetime clinical record.</p>
+                <p className="text-xs text-indigo-200">This is a self-report. Hospital staff can confirm the same dose on your chart.</p>
               </div>
             </div>
 

@@ -75,12 +75,15 @@ fun PatientDashboardScreen(
     val billsState by billsVm.state.collectAsState()
     val recordsVm: PatientRecordsVM = viewModel()
     val recordsState by recordsVm.state.collectAsState()
+    val visitVm: VisitVM = viewModel()
+    val visit by visitVm.visit.collectAsState()
 
     LaunchedEffect(Unit) {
         apptVm.loadOnce()
         rxVm.loadOnce()
         billsVm.loadOnce()
         recordsVm.loadOnce()
+        visitVm.load()
     }
 
     var isManualRefreshing by remember { mutableStateOf(false) }
@@ -152,6 +155,35 @@ fun PatientDashboardScreen(
             }
             Spacer(Modifier.width(8.dp))
             SmallIconBtn(Icons.Rounded.CalendarMonth, { onOpenTab(1) }, PBlue)
+        }
+
+        if (visit.inQueue) {
+            val called = visit.status.equals("IN_CONSULTATION", true)
+            Box(
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (called) PRedSoft else PBlueSoft)
+                    .clickable { onOpenTab(3) }
+                    .padding(14.dp),
+            ) {
+                Column {
+                    Text(
+                        if (called) "You are being called" else "You are ${visit.position ?: "—"} in line",
+                        fontWeight = FontWeight.Black,
+                        color = TextDark,
+                        fontSize = 14.sp,
+                    )
+                    Text(
+                        "Token #${visit.tokenNumber ?: "—"} · ${visit.roomName ?: "OPD"}",
+                        color = TextMid,
+                        fontSize = 12.sp,
+                    )
+                    Text("Tap for indoor map", color = PBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
         }
 
         // ─── Search ───────────────────────────────────────────────────────

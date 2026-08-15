@@ -1,15 +1,20 @@
 import { useState, useEffect } from "react";
 import { api } from "../services/api";
 import { Plus, TestTube, X } from "lucide-react";
+import { PatientPicker } from "../components/clinical/PatientPicker";
+import { useAuth } from "../context/AuthContext";
 import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusPill } from "../components/ui/StatusPill";
 
 export const LabOrders = () => {
+  const { activeContext } = useAuth();
+  const isLabTech = activeContext?.role === "LAB_TECH" || activeContext?.role === "ADMIN";
   const [orders, setOrders] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     patientName: "",
+    patientId: "",
     doctorName: "",
     testName: "",
     testType: "Blood Test",
@@ -101,7 +106,7 @@ export const LabOrders = () => {
               </div>
               <div className="flex items-center justify-between sm:justify-end gap-3">
                 <StatusPill status={o.priority} />
-                {o.status !== "COMPLETED" && (
+                {o.status !== "COMPLETED" && isLabTech && (
                   <button
                     onClick={() => openResultModal(o)}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all"
@@ -179,19 +184,22 @@ export const LabOrders = () => {
               </button>
             </div>
             <div className="space-y-3">
-              {[
-                { ph: "Patient Name", k: "patientName", type: "text" },
-                { ph: "Doctor Name", k: "doctorName", type: "text" },
-                { ph: "Test Name (e.g. CBC, Lipid Profile)", k: "testName", type: "text" },
-              ].map((f) => (
-                <input
-                  key={f.k}
-                  placeholder={f.ph}
-                  value={(form as any)[f.k]}
-                  onChange={(e) => setForm({ ...form, [f.k]: e.target.value })}
-                  className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] p-2.5 rounded-xl text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              ))}
+              <PatientPicker
+                value={form.patientId}
+                onChange={(p) => setForm({ ...form, patientId: p?.id || "", patientName: p?.name || "" })}
+              />
+              <input
+                placeholder="Doctor Name"
+                value={form.doctorName}
+                onChange={(e) => setForm({ ...form, doctorName: e.target.value })}
+                className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] p-2.5 rounded-xl text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+              <input
+                placeholder="Test Name (e.g. CBC, Lipid Profile)"
+                value={form.testName}
+                onChange={(e) => setForm({ ...form, testName: e.target.value })}
+                className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] p-2.5 rounded-xl text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
               <select
                 value={form.testType}
                 onChange={(e) => setForm({ ...form, testType: e.target.value })}

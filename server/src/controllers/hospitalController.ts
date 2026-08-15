@@ -14,6 +14,7 @@ import { signUrl, signHospitalPhotos } from '../services/r2.js';
 import { createChallenge, buildSession, buildChallengeSummary } from './authController.js';
 import { pick } from '../utils/pick.js';
 import { parseDateSafe } from '../utils/dateUtils.js';
+import { ensureDoctorRoster } from '../utils/doctorRoster.js';
 
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'hoscore-development-secret-key-32chars';
@@ -487,6 +488,13 @@ export const inviteStaff = async (req: AuthRequest, res: Response) => {
     });
 
     await logAudit(req, 'CREATE', 'Membership', membership.id, `Created ${assignedRole} portal login for ${user.email}`);
+    if (String(assignedRole).toUpperCase() === 'DOCTOR') {
+      await ensureDoctorRoster(hospitalId, {
+        name: user.name || name,
+        email: user.email,
+        specialty: department,
+      });
+    }
     res.status(201).json({ message: 'Staff invited', membership });
   } catch (error: any) {
     console.error('Invite staff error:', error);
@@ -531,6 +539,13 @@ export const updateStaffMembership = async (req: AuthRequest, res: Response) => 
     });
 
     await logAudit(req, 'UPDATE', 'Membership', membership.id, `Updated portal access for ${existing.user.email}`);
+    if (String(nextRole).toUpperCase() === 'DOCTOR') {
+      await ensureDoctorRoster(hospitalId, {
+        name: membership.user?.name || existing.user.email,
+        email: existing.user.email,
+        specialty: membership.department,
+      });
+    }
     if (membership.user && membership.user.avatar) {
       const signedAvatar = await signUrl(membership.user.avatar);
       return res.json({

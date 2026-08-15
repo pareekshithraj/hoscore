@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, Calendar, FileText, Activity, Receipt, Search, LogOut, ChevronLeft, ChevronRight, X, Shield, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
+import { LiveVisitBanner } from './LiveVisitBanner';
 
 const patientMenuItems = [
   { icon: LayoutDashboard, label: 'Overview', path: '/patient' },
@@ -180,6 +181,7 @@ export const PatientLayout: React.FC<{ children: React.ReactNode }> = ({ childre
       <div className="flex-1 flex flex-col min-w-0 relative">
         <Header onOpenMenu={() => setIsMobileNavOpen(true)} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-8 animate-fade-in-up relative z-10">
+          <LiveVisitBanner />
           {children}
         </main>
       </div>

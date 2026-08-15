@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Save, Undo2, Plus, Trash2, Layers, Globe, Lock, DoorOpen,
-  MapPin, Loader2, Grid3x3, Building2, Copy, Download,
+  Save, Undo2, Redo2, Plus, Trash2, Layers, Globe, Lock, DoorOpen,
+  MapPin, Loader2, Grid3x3, Building2, Copy, Download, Upload,
   MousePointer, Eraser, ZoomIn, ZoomOut, RotateCcw,
   Navigation, CheckCircle2, Sliders, ArrowUp, ArrowDown,
   ArrowLeft, ArrowRight, LayoutGrid, Sparkles, Maximize2, Minimize2,
-  PenTool, ShieldCheck, Check, AlertCircle, Bed, BoxSelect
+  PenTool, ShieldCheck, Bed, BoxSelect, Eye, HelpCircle
 } from 'lucide-react';
 import { api } from '../services/api';
 import { MapCanvas } from '../components/map/MapCanvas';
 import {
   AREA_CONFIG, emptyFloor, emptyMap, normaliseFloor, findPath,
-  syncRoomBlocksToGrid, type AreaType, type Anchor, type Floor,
+  syncRoomBlocksToGrid, bakeMapForSave, findEmptyPlacement, mapRoomTypeToArea,
+  isFloorEmpty, roomsOverlap, type AreaType, type Anchor, type Floor,
   type HospitalMapDoc, type Cell, type RoomBlock
 } from '../utils/mapModel';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -39,8 +40,17 @@ const ROOM_PRESETS: { name: string; type: AreaType; w: number; h: number; doorSi
 interface RoomLite {
   id: string;
   name: string;
+  type?: string;
   roomType?: string;
-  beds?: { id: string; bedNumber: string }[];
+  beds?: { id: string; bedNumber: string; status?: string }[];
+}
+
+interface BedLite {
+  id: string;
+  bedNumber: string;
+  status: string;
+  roomId?: string;
+  room?: { id: string; name: string };
 }
 
 export const MapBuilder = () => {
@@ -51,7 +61,13 @@ export const MapBuilder = () => {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [anchorKind, setAnchorKind] = useState<Anchor['kind']>('room');
   const [history, setHistory] = useState<HospitalMapDoc[]>([]);
+  const [future, setFuture] = useState<HospitalMapDoc[]>([]);
   const [rooms, setRooms] = useState<RoomLite[]>([]);
+  const [beds, setBeds] = useState<BedLite[]>([]);
+  const [positions, setPositions] = useState<any[]>([]);
+  const [previewOccupancy, setPreviewOccupancy] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -87,7 +103,9 @@ export const MapBuilder = () => {
     Promise.all([
       api.get('/map').catch(() => null),
       api.get('/rooms').catch(() => []),
-    ]).then(([map, rms]) => {
+      api.get('/beds').catch(() => []),
+      api.get('/map/positions').catch(() => []),
+    ]).then(([map, rms, bds, pos]) => {
       if (!mounted) return;
       if (map && Array.isArray(map.floors) && map.floors.length) {
         const normalised: HospitalMapDoc = {
@@ -97,8 +115,14 @@ export const MapBuilder = () => {
         setDoc(normalised);
         setNewCols(map.cols || 20);
         setNewRows(map.rows || 20);
+        const first = normalised.floors[0];
+        setShowGuide(isFloorEmpty(first));
+      } else {
+        setShowGuide(true);
       }
       setRooms(Array.isArray(rms) ? rms : []);
+      setBeds(Array.isArray(bds) ? bds : []);
+      setPositions(Array.isArray(pos) ? pos : []);
       setLoading(false);
     }).catch(() => {
       if (mounted) setLoading(false);
@@ -108,6 +132,7 @@ export const MapBuilder = () => {
 
   const pushHistory = useCallback(() => {
     setHistory((h) => [...h.slice(-29), JSON.parse(JSON.stringify(doc))]);
+    setFuture([]);
     setDirty(true);
   }, [doc]);
 
@@ -129,12 +154,14 @@ export const MapBuilder = () => {
 
   const addPresetRoom = useCallback((preset: typeof ROOM_PRESETS[0]) => {
     pushHistory();
+    const existing = floor.rooms || [];
+    const spot = findEmptyPlacement(existing, preset.w, preset.h, doc.cols, doc.rows);
     const newBlock: RoomBlock = {
       id: `rb-${Math.random().toString(36).slice(2, 8)}`,
       name: preset.name,
       type: preset.type,
-      x: 2,
-      y: 2,
+      x: spot.x,
+      y: spot.y,
       w: preset.w,
       h: preset.h,
       doorSide: preset.doorSide,
@@ -146,8 +173,9 @@ export const MapBuilder = () => {
     setSelectedRoomId(newBlock.id);
     setActiveTool('select_room');
     setDirty(true);
+    setShowGuide(false);
     setStatus(`Added architectural room: ${preset.name}`);
-  }, [pushHistory, mutateFloor]);
+  }, [pushHistory, mutateFloor, floor.rooms, doc.cols, doc.rows]);
 
   const updateSelectedRoom = useCallback((updates: Partial<RoomBlock>) => {
     if (!selectedRoomId) return;
@@ -186,7 +214,57 @@ export const MapBuilder = () => {
     setDirty(true);
   }, [selectedRoomId, doc.cols, doc.rows, pushHistory, mutateFloor]);
 
+  const liveMoveRoom = useCallback((id: string, x: number, y: number) => {
+    mutateFloor((f) => ({
+      ...f,
+      rooms: (f.rooms || []).map((r) => {
+        if (r.id !== id) return r;
+        const newX = Math.max(0, Math.min(doc.cols - r.w, x));
+        const newY = Math.max(0, Math.min(doc.rows - r.h, y));
+        return { ...r, x: newX, y: newY };
+      }),
+    }));
+    setDirty(true);
+  }, [mutateFloor, doc.cols, doc.rows]);
+
+  const liveResizeRoom = useCallback((id: string, w: number, h: number) => {
+    mutateFloor((f) => ({
+      ...f,
+      rooms: (f.rooms || []).map((r) => {
+        if (r.id !== id) return r;
+        return {
+          ...r,
+          w: Math.max(2, Math.min(doc.cols - r.x, w)),
+          h: Math.max(2, Math.min(doc.rows - r.y, h)),
+        };
+      }),
+    }));
+    setDirty(true);
+  }, [mutateFloor, doc.cols, doc.rows]);
+
+  const overlappingIds = useMemo(() => {
+    const list = floor.rooms || [];
+    const ids = new Set<string>();
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if (roomsOverlap(list[i], list[j])) {
+          ids.add(list[i].id);
+          ids.add(list[j].id);
+        }
+      }
+    }
+    return ids;
+  }, [floor.rooms]);
+
   const getOrthoSnappedCell = useCallback((start: Cell, curr: Cell): Cell => {
+    const dr = Math.abs(curr.r - start.r);
+    const dc = Math.abs(curr.c - start.c);
+    if (dr >= dc) {
+      return { r: curr.r, c: start.c };
+    } else {
+      return { r: start.r, c: curr.c };
+    }
+  }, []);
     const dr = Math.abs(curr.r - start.r);
     const dc = Math.abs(curr.c - start.c);
     if (dr >= dc) {
@@ -221,25 +299,16 @@ export const MapBuilder = () => {
       return;
     }
 
-    const typeMapping: Record<string, AreaType> = {
-      icu: 'icu',
-      emergency: 'emergency',
-      ot: 'ot',
-      surgery: 'ot',
-      radiology: 'radiology',
-      lab: 'lab',
-      pharmacy: 'pharmacy',
-      reception: 'reception',
-      cafeteria: 'cafeteria',
-    };
-    const mappedType: AreaType = (dbRoom.roomType && typeMapping[dbRoom.roomType.toLowerCase()]) || 'ward-a';
+    const mappedType: AreaType = mapRoomTypeToArea(dbRoom.type || dbRoom.roomType);
 
+    const existingRooms = floor.rooms || [];
+    const spot = findEmptyPlacement(existingRooms, 6, 5, doc.cols, doc.rows);
     const newBlock: RoomBlock = {
       id: `rb-${Math.random().toString(36).slice(2, 8)}`,
       name: dbRoom.name,
       type: mappedType,
-      x: 3,
-      y: 3,
+      x: spot.x,
+      y: spot.y,
       w: 6,
       h: 5,
       doorSide: 'south',
@@ -253,8 +322,9 @@ export const MapBuilder = () => {
     setSelectedRoomId(newBlock.id);
     setActiveTool('select_room');
     setDirty(true);
+    setShowGuide(false);
     setStatus(`Placed registered hospital room: "${dbRoom.name}"`);
-  }, [floor.rooms, pushHistory, mutateFloor]);
+  }, [floor.rooms, pushHistory, mutateFloor, doc.cols, doc.rows]);
 
   // Handle cell click / drag actions
   const handleCellClick = useCallback((r: number, c: number) => {
@@ -381,10 +451,23 @@ export const MapBuilder = () => {
     setHistory((h) => {
       if (!h.length) return h;
       const prev = h[h.length - 1];
+      setFuture((f) => [JSON.parse(JSON.stringify(doc)), ...f].slice(0, 30));
       setDoc(prev);
+      setDirty(true);
       return h.slice(0, -1);
     });
-  }, []);
+  }, [doc]);
+
+  const redo = useCallback(() => {
+    setFuture((f) => {
+      if (!f.length) return f;
+      const next = f[0];
+      setHistory((h) => [...h.slice(-29), JSON.parse(JSON.stringify(doc))]);
+      setDoc(next);
+      setDirty(true);
+      return f.slice(1);
+    });
+  }, [doc]);
 
   const addFloor = () => {
     pushHistory();
@@ -393,6 +476,11 @@ export const MapBuilder = () => {
       return { ...prev, floors };
     });
     setFloorIdx(doc.floors.length);
+  };
+
+  const renameFloor = (label: string) => {
+    mutateFloor((f) => ({ ...f, label }));
+    setDirty(true);
   };
 
   const duplicateFloor = () => {
@@ -405,6 +493,7 @@ export const MapBuilder = () => {
         index: prev.floors.length,
         cells: JSON.parse(JSON.stringify(current.cells)),
         anchors: JSON.parse(JSON.stringify(current.anchors)),
+        rooms: JSON.parse(JSON.stringify(current.rooms || [])),
       };
       return { ...prev, floors: [...prev.floors, newFloor] };
     });
@@ -435,6 +524,7 @@ export const MapBuilder = () => {
     setFreehandStrokes([]);
     setActiveStroke(null);
     setDirty(true);
+    setShowGuide(true);
     setStatus('Floor plan completely wiped & reset.');
   };
 
@@ -455,16 +545,17 @@ export const MapBuilder = () => {
     setSaving(true);
     setStatus(null);
     try {
+      const baked = bakeMapForSave(doc);
       const saved = await api.put('/map', {
-        name: doc.name,
-        cols: doc.cols,
-        rows: doc.rows,
-        floors: doc.floors,
-        isPublished: doc.isPublished,
+        name: baked.name,
+        cols: baked.cols,
+        rows: baked.rows,
+        floors: baked.floors,
+        isPublished: baked.isPublished,
       });
-      setDoc((d) => ({ ...d, id: saved.id, version: saved.version }));
+      setDoc((d) => ({ ...baked, id: saved.id, version: saved.version }));
       setDirty(false);
-      setStatus('Map changes saved & synced across Web and Mobile App');
+      setStatus('Map saved. Patients and the mobile app now see this floor plan.');
     } catch (e: any) {
       setStatus(e?.message || 'Save failed');
     } finally {
@@ -474,7 +565,7 @@ export const MapBuilder = () => {
   };
 
   const exportMapJson = () => {
-    const jsonStr = JSON.stringify(doc, null, 2);
+    const jsonStr = JSON.stringify(bakeMapForSave(doc), null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -483,6 +574,112 @@ export const MapBuilder = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const importMapJson = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (!Array.isArray(parsed?.floors)) throw new Error('Invalid map file');
+        pushHistory();
+        const cols = Number(parsed.cols) || doc.cols;
+        const rows = Number(parsed.rows) || doc.rows;
+        setDoc({
+          name: parsed.name || 'Imported Building',
+          cols,
+          rows,
+          isPublished: Boolean(parsed.isPublished),
+          floors: parsed.floors.map((f: Floor) => normaliseFloor(f, rows, cols)),
+        });
+        setNewCols(cols);
+        setNewRows(rows);
+        setFloorIdx(0);
+        setDirty(true);
+        setShowGuide(false);
+        setStatus('Imported floor plan JSON');
+      } catch {
+        setStatus('Could not import that file. Use a Hoscore map JSON export.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (dirty && !saving) save();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      } else if (e.key === 'Escape') {
+        setWallStart(null);
+        setDragBoxStart(null);
+        setPendingAnchor(null);
+        setActiveTool('select_room');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dirty, saving, undo, redo]);
+
+  const occupancyMarkers = useMemo(() => {
+    if (!previewOccupancy) return [];
+    const markers: { cell: Cell; label?: string; kind: 'patient' | 'staff'; pulse?: boolean }[] = [];
+    positions
+      .filter((p) => p.floorId === floor.id)
+      .forEach((p) => {
+        markers.push({
+          cell: { r: p.cellR, c: p.cellC },
+          label: p.label || 'Live',
+          kind: p.subjectType === 'STAFF' ? 'staff' : 'patient',
+          pulse: true,
+        });
+      });
+    const occupied = beds.filter((b) => String(b.status).toUpperCase().includes('OCCUPIED'));
+    occupied.forEach((b) => {
+      const anchor = floor.anchors.find((a) => a.bedId === b.id);
+      if (anchor) {
+        markers.push({ cell: anchor.cell, label: `Bed ${b.bedNumber}`, kind: 'patient' });
+        return;
+      }
+      const roomBlock = (floor.rooms || []).find((r) => r.roomId === b.roomId || r.roomId === b.room?.id);
+      if (roomBlock) {
+        markers.push({
+          cell: { r: roomBlock.y + Math.floor(roomBlock.h / 2), c: roomBlock.x + Math.floor(roomBlock.w / 2) },
+          label: `Bed ${b.bedNumber}`,
+          kind: 'patient',
+        });
+      }
+    });
+    return markers;
+  }, [previewOccupancy, positions, beds, floor]);
+
+  const occupancyHeat = useMemo(() => {
+    if (!previewOccupancy) return undefined;
+    const heat: Record<string, number> = {};
+    occupancyMarkers.forEach((m) => {
+      const k = `${m.cell.r},${m.cell.c}`;
+      heat[k] = Math.min(1, (heat[k] || 0) + 0.45);
+    });
+    return heat;
+  }, [previewOccupancy, occupancyMarkers]);
 
   // Test Wayfinding Route Calculation
   const testWayfindingPath = useMemo(() => {
@@ -499,8 +696,8 @@ export const MapBuilder = () => {
   return (
     <div className={isFullscreen ? 'fixed inset-0 z-50 bg-[var(--main-bg)] p-4 h-screen w-screen overflow-hidden flex flex-col justify-between space-y-4' : 'space-y-6'}>
       <PageHeader
-        title="Hospital Map Builder Studio"
-        subtitle="CAD-grade floor planner, registered room locator, 90° Ortho wall drawing engine"
+        title="Hospital Map Builder"
+        subtitle="Place rooms, draw corridors, test a route, then publish for patients and staff."
         icon={<Grid3x3 className="w-5 h-5 text-blue-500" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -516,7 +713,7 @@ export const MapBuilder = () => {
               {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Studio'}
             </button>
             <button
-              onClick={() => setDoc((d) => ({ ...d, isPublished: !d.isPublished }))}
+              onClick={() => { setDoc((d) => ({ ...d, isPublished: !d.isPublished })); setDirty(true); }}
               className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
                 doc.isPublished
                   ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
@@ -525,6 +722,16 @@ export const MapBuilder = () => {
             >
               {doc.isPublished ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               {doc.isPublished ? 'Published' : 'Private'}
+            </button>
+            <button
+              onClick={() => setPreviewOccupancy((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+                previewOccupancy
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-600'
+                  : 'border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-primary)] hover:bg-[var(--inner-bg)]'
+              }`}
+            >
+              <Eye className="h-4 w-4" /> {previewOccupancy ? 'Occupancy on' : 'Preview occupancy'}
             </button>
             <button
               onClick={() => setIsGridModalOpen(true)}
@@ -540,11 +747,25 @@ export const MapBuilder = () => {
               <Download className="h-4 w-4 text-[var(--text-muted)]" /> Export
             </button>
             <button
+              onClick={() => importRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-all cursor-pointer"
+            >
+              <Upload className="h-4 w-4 text-[var(--text-muted)]" /> Import
+            </button>
+            <input ref={importRef} type="file" accept="application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importMapJson(f); e.target.value = ''; }} />
+            <button
               onClick={undo}
               disabled={!history.length}
               className="flex items-center gap-1.5 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3.5 py-2 text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-all cursor-pointer disabled:opacity-40"
             >
               <Undo2 className="h-4 w-4 text-[var(--text-muted)]" /> Undo
+            </button>
+            <button
+              onClick={redo}
+              disabled={!future.length}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3.5 py-2 text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-all cursor-pointer disabled:opacity-40"
+            >
+              <Redo2 className="h-4 w-4 text-[var(--text-muted)]" /> Redo
             </button>
             <button
               onClick={save}
@@ -569,6 +790,14 @@ export const MapBuilder = () => {
       <div className={`grid grid-cols-1 gap-6 ${isFullscreen ? 'flex-1 lg:grid-cols-[320px_1fr_300px] overflow-hidden' : 'lg:grid-cols-[300px_1fr_280px]'}`}>
         {/* Left: Architectural Tool Palette & Registered Rooms */}
         <div className="space-y-4 overflow-y-auto pr-1">
+          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm space-y-2">
+            <label className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">Building name</label>
+            <input
+              value={doc.name}
+              onChange={(e) => { setDoc((d) => ({ ...d, name: e.target.value })); setDirty(true); }}
+              className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-xs font-bold text-[var(--text-primary)]"
+            />
+          </div>
           {/* Drawing Tools Selector */}
           <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">CAD Editor Mode</h3>
@@ -650,6 +879,39 @@ export const MapBuilder = () => {
               <Navigation className="w-4 h-4 text-emerald-500" /> Test Wayfinding Route
             </button>
           </div>
+
+          {(activeTool === 'paint' || activeTool === 'draw_box' || activeTool === 'erase') && (
+            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Zone palette</h3>
+              {[
+                { label: 'Clinical', zones: CLINICAL_ZONES },
+                { label: 'Circulation', zones: CIRCULATION_ZONES },
+                { label: 'Structure', zones: STRUCTURAL_ZONES },
+              ].map((group) => (
+                <div key={group.label}>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{group.label}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.zones.map((z) => {
+                      const cfg = AREA_CONFIG[z];
+                      const active = selectedArea === z;
+                      return (
+                        <button
+                          key={z}
+                          onClick={() => { setSelectedArea(z); if (activeTool === 'erase') setActiveTool('paint'); }}
+                          className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold cursor-pointer ${
+                            active ? 'border-blue-500 bg-blue-500/10 text-[var(--text-primary)]' : 'border-[var(--card-border)] text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cfg.color === 'transparent' ? '#94a3b8' : cfg.color }} />
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Registered Hospital Rooms & Wards Tray */}
           <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm space-y-3">
@@ -755,19 +1017,24 @@ export const MapBuilder = () => {
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm space-y-4">
           {/* Viewport Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--inner-bg)] p-2 rounded-xl border border-[var(--card-border)]">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {doc.floors.map((f, i) => (
-                <button
-                  key={f.id}
-                  onClick={() => setFloorIdx(i)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    i === floorIdx
-                      ? 'bg-[var(--card-bg)] text-[var(--text-primary)] shadow-sm'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {f.label}
-                </button>
+                i === floorIdx ? (
+                  <input
+                    key={f.id}
+                    value={f.label}
+                    onChange={(e) => renameFloor(e.target.value)}
+                    className="rounded-lg bg-[var(--card-bg)] px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] w-32 border border-blue-500/40"
+                  />
+                ) : (
+                  <button
+                    key={f.id}
+                    onClick={() => setFloorIdx(i)}
+                    className="rounded-lg px-3 py-1.5 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                  >
+                    {f.label}
+                  </button>
+                )
               ))}
               <button
                 onClick={addFloor}
@@ -827,18 +1094,23 @@ export const MapBuilder = () => {
           </div>
 
           {/* Active Canvas Surface (Full Length & Width) */}
-          <div className="w-full flex-1 overflow-auto rounded-2xl border border-[var(--card-border)] bg-slate-950/80 dark:bg-black/80 p-3 shadow-inner transition-all flex items-center justify-center min-h-[500px]" style={{ transform: `scale(${zoomScale / 100})`, transformOrigin: 'top center' }}>
+          <div className="relative w-full flex-1 overflow-auto rounded-2xl border border-[var(--card-border)] bg-slate-950/80 dark:bg-black/80 p-3 shadow-inner min-h-[500px]">
+            <div style={{ width: `${zoomScale}%`, minWidth: '100%' }}>
             <MapCanvas
               cells={floor.cells}
               anchors={floor.anchors}
               roomBlocks={floor.rooms}
               selectedRoomId={selectedRoomId}
-              onSelectRoom={(id) => setSelectedRoomId(id)}
+              onSelectRoom={(id) => { setSelectedRoomId(id); setActiveTool('select_room'); }}
               wallPreview={wallPreview}
               selectionRect={selectionRect}
               freehandStrokes={freehandStrokes}
               activeStroke={activeStroke}
-              editing={activeTool !== 'wayfinding_test'}
+              editing={activeTool !== 'wayfinding_test' && !previewOccupancy}
+              allowRoomDrag={activeTool === 'select_room'}
+              onRoomMove={liveMoveRoom}
+              onRoomResize={liveResizeRoom}
+              heat={occupancyHeat}
               path={activeTool === 'wayfinding_test' ? testWayfindingPath : []}
               markers={
                 activeTool === 'wayfinding_test'
@@ -846,12 +1118,27 @@ export const MapBuilder = () => {
                       ...(testStart ? [{ cell: testStart, label: 'Start (Patient)', kind: 'you' as const }] : []),
                       ...(testEnd ? [{ cell: testEnd, label: 'Destination', kind: 'destination' as const }] : []),
                     ]
-                  : []
+                  : occupancyMarkers
               }
               onCellClick={handleCellClick}
               onCellPaint={paintCell}
               onCellHover={(r, c) => setHoverCell({ r, c })}
             />
+            </div>
+            {showGuide && (
+              <div className="absolute inset-4 z-40 flex items-center justify-center pointer-events-none">
+                <div className="pointer-events-auto max-w-md rounded-2xl border border-blue-500/30 bg-slate-950/95 p-5 text-white shadow-2xl space-y-3">
+                  <h4 className="flex items-center gap-2 text-sm font-black"><HelpCircle className="h-4 w-4 text-sky-400" /> First floor plan</h4>
+                  <ol className="list-decimal pl-4 space-y-1.5 text-xs text-slate-300 font-semibold">
+                    <li>Place registered rooms from the left tray, or spawn a preset block.</li>
+                    <li>Drag rooms into place. Draw corridors with the tile brush (pick Corridor in the zone palette).</li>
+                    <li>Drop an Entrance anchor, then Test Wayfinding.</li>
+                    <li>Turn on Preview occupancy, then Save and Publish so patients can navigate.</li>
+                  </ol>
+                  <button onClick={() => setShowGuide(false)} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold">Got it</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Floating CAD Telemetry & Cursor Bar */}
@@ -1015,7 +1302,7 @@ export const MapBuilder = () => {
             <dl className="space-y-2 text-xs font-semibold">
               <div className="flex justify-between"><dt className="text-[var(--text-muted)]">Floors</dt><dd className="font-bold text-[var(--text-primary)]">{doc.floors.length}</dd></div>
               <div className="flex justify-between"><dt className="text-[var(--text-muted)]">Room Blocks</dt><dd className="font-bold text-[var(--text-primary)]">{floor.rooms?.length ?? 0}</dd></div>
-              <div className="flex justify-between"><dt className="text-[var(--text-muted)]">Total Anchors</dt><dd className="font-bold text-[var(--text-primary)]">{anchorCount}</dd></div>
+              <div className="flex justify-between"><dt className="text-[var(--text-muted)]">Overlapping rooms</dt><dd className={`font-bold ${overlappingIds.size ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>{overlappingIds.size}</dd></div>
               <div className="flex justify-between"><dt className="text-[var(--text-muted)]">Map Version</dt><dd className="font-bold text-[var(--text-primary)]">v{doc.version ?? '1'}</dd></div>
             </dl>
 
@@ -1076,7 +1363,7 @@ export const MapBuilder = () => {
                 <input
                   type="number"
                   min={10}
-                  max={50}
+                  max={80}
                   value={newCols}
                   onChange={(e) => setNewCols(parseInt(e.target.value) || 20)}
                   className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-primary)] font-bold"
@@ -1087,7 +1374,7 @@ export const MapBuilder = () => {
                 <input
                   type="number"
                   min={10}
-                  max={50}
+                  max={80}
                   value={newRows}
                   onChange={(e) => setNewRows(parseInt(e.target.value) || 20)}
                   className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-primary)] font-bold"

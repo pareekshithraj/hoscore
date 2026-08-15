@@ -117,6 +117,7 @@ fun MyVaccinationsScreen(onBack: (() -> Unit)? = null, vm: VaccinationsVM = view
                                     val req = RecordVaccinationRequest(
                                         id = v.id,
                                         status = "COMPLETED",
+                                        givenBy = "Self-reported",
                                     )
                                     recordVaccination(req)
                                 } }
@@ -202,7 +203,7 @@ private fun VaccineCard(v: Vaccination, onMarkDone: () -> Unit) {
             ) {
                 Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Mark as Given", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("I received this (self-report)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

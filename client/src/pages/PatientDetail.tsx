@@ -8,6 +8,8 @@ import {
 import { EmptyState, LoadingState, StatusPill } from '../components/ui';
 import { calcAge, formatINR, formatShortDate, initials, patientIdLabel, vitalsFlags } from '../utils/clinical';
 import { cn } from '../lib/cn';
+import { printPrescription } from '../utils/medicines';
+import { useAuth } from '../context/AuthContext';
 
 type Tab = 'overview' | 'appointments' | 'vitals' | 'rx' | 'labs' | 'admissions' | 'bills';
 
@@ -27,7 +29,12 @@ export const PatientDetail = () => {
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
-  const [today] = useState(() => new Date());
+  const { user } = useAuth();
+  const [chartAction, setChartAction] = useState<'rx' | 'lab' | 'vitals' | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [rxForm, setRxForm] = useState({ diagnosis: '', medicines: '', instructions: '' });
+  const [labForm, setLabForm] = useState({ testName: '', testType: 'Blood Test', priority: 'ROUTINE' });
+  const [vitalsForm, setVitalsForm] = useState({ bloodPressure: '', heartRate: '', temperature: '', oxygenSaturation: '' });
 
   useEffect(() => {
     if (!id) return;
@@ -46,6 +53,48 @@ export const PatientDetail = () => {
       .filter((a: any) => a.billing)
       .map((a: any) => ({ ...a.billing, admission: a }));
   }, [patient]);
+
+  const reload = () => {
+    if (!id) return;
+    api.get(`/patients/${id}`).then(setPatient).catch(console.error);
+  };
+
+  const submitChartAction = async () => {
+    if (!patient) return;
+    setActionBusy(true);
+    try {
+      if (chartAction === 'rx') {
+        await api.post('/prescriptions', {
+          patientId: patient.id,
+          diagnosis: rxForm.diagnosis,
+          medicines: rxForm.medicines.split('\n').filter(Boolean).map((name) => ({ name, dosage: '', duration: '', instructions: '', quantity: 1 })),
+          instructions: rxForm.instructions,
+        });
+      } else if (chartAction === 'lab') {
+        await api.post('/lab-orders', {
+          patientId: patient.id,
+          patientName: patient.name,
+          doctorName: user?.name,
+          testName: labForm.testName,
+          testType: labForm.testType,
+          priority: labForm.priority,
+        });
+      } else if (chartAction === 'vitals') {
+        await api.post('/vitals', {
+          patientId: patient.id,
+          patientName: patient.name,
+          ...vitalsForm,
+          heartRate: Number(vitalsForm.heartRate),
+          temperature: Number(vitalsForm.temperature),
+          oxygenSaturation: Number(vitalsForm.oxygenSaturation),
+        });
+      }
+      setChartAction(null);
+      reload();
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   const convertToHoscore = async () => {
     if (!id) return;
@@ -144,6 +193,15 @@ export const PatientDetail = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => setChartAction('rx')} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white">Write Rx</button>
+        <button onClick={() => setChartAction('lab')} className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-bold">Order lab</button>
+        <button onClick={() => setChartAction('vitals')} className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-bold">Record vitals</button>
+        <Link to="/dashboard/admissions" className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-bold">Admit</Link>
+        <Link to="/dashboard/discharges" className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-bold">Discharge</Link>
+        <Link to="/dashboard/queue" className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-bold">Open in OPD</Link>
       </div>
 
       {/* Tabs */}
@@ -329,6 +387,19 @@ export const PatientDetail = () => {
                   </div>
                   <pre className="whitespace-pre-wrap rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3 font-mono text-xs text-[var(--text-secondary)]">{rx.medicines}</pre>
                   {rx.instructions && <p className="mt-2 text-xs italic text-[var(--text-muted)]">{rx.instructions}</p>}
+                  <button
+                    onClick={() => printPrescription({
+                      patientName: patient.name,
+                      doctorName: rx.doctor?.name,
+                      diagnosis: rx.diagnosis,
+                      medicines: rx.medicines,
+                      instructions: rx.instructions,
+                      date: rx.date,
+                    })}
+                    className="mt-2 text-[10px] font-bold uppercase text-blue-600"
+                  >
+                    Print Rx
+                  </button>
                 </div>
               ))}
             </div>
@@ -421,6 +492,41 @@ export const PatientDetail = () => {
           )
         )}
       </div>
+
+      {chartAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setChartAction(null)}>
+          <div className="w-full max-w-md space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-black">{chartAction === 'rx' ? 'Write prescription' : chartAction === 'lab' ? 'Order lab' : 'Record vitals'}</h3>
+            {chartAction === 'rx' && (
+              <>
+                <input value={rxForm.diagnosis} onChange={(e) => setRxForm({ ...rxForm, diagnosis: e.target.value })} placeholder="Diagnosis" className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm" />
+                <textarea value={rxForm.medicines} onChange={(e) => setRxForm({ ...rxForm, medicines: e.target.value })} placeholder="One medicine per line" rows={4} className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm" />
+                <input value={rxForm.instructions} onChange={(e) => setRxForm({ ...rxForm, instructions: e.target.value })} placeholder="Instructions" className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm" />
+              </>
+            )}
+            {chartAction === 'lab' && (
+              <>
+                <input value={labForm.testName} onChange={(e) => setLabForm({ ...labForm, testName: e.target.value })} placeholder="Test name" className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm" />
+                <select value={labForm.priority} onChange={(e) => setLabForm({ ...labForm, priority: e.target.value })} className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm">
+                  <option value="ROUTINE">Routine</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </>
+            )}
+            {chartAction === 'vitals' && (
+              <div className="grid grid-cols-2 gap-2">
+                {(['bloodPressure', 'heartRate', 'temperature', 'oxygenSaturation'] as const).map((k) => (
+                  <input key={k} value={(vitalsForm as any)[k]} onChange={(e) => setVitalsForm({ ...vitalsForm, [k]: e.target.value })} placeholder={k} className="rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm" />
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setChartAction(null)} className="px-3 py-2 text-xs font-bold">Cancel</button>
+              <button onClick={submitChartAction} disabled={actionBusy} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white">{actionBusy ? 'Saving…' : 'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

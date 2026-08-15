@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { CalendarOff, Plus, Check, X as XIcon, User } from 'lucide-react';
 import { api } from '../services/api';
+import { StaffPicker } from '../components/clinical/StaffPicker';
+import { useAuth } from '../context/AuthContext';
 
 const TYPE_COLORS: Record<string, string> = { CASUAL: 'bg-blue-50 text-blue-600 border-blue-100', SICK: 'bg-amber-50 text-amber-600 border-amber-100', EARNED: 'bg-violet-50 text-violet-600 border-violet-100' };
 const STATUS_COLORS: Record<string, string> = { PENDING: 'bg-amber-50 text-amber-600', APPROVED: 'bg-emerald-50 text-emerald-600', REJECTED: 'bg-rose-50 text-rose-600' };
 
 export const LeaveManagement = () => {
+  const { user } = useAuth();
   const [leaves, setLeaves] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
-  const [form, setForm] = useState({ staffName: '', role: 'Doctor', startDate: '', endDate: '', type: 'CASUAL', reason: '' });
+  const [form, setForm] = useState({ staffId: '', staffName: '', role: 'Doctor', startDate: '', endDate: '', type: 'CASUAL', reason: '' });
 
   useEffect(() => { loadLeaves(); }, []);
   const loadLeaves = () => api.get('/leaves').then(setLeaves).catch(() => {});
@@ -17,7 +20,7 @@ export const LeaveManagement = () => {
   const handleCreate = async () => {
     try {
       await api.post('/leaves', form);
-      setForm({ staffName: '', role: 'Doctor', startDate: '', endDate: '', type: 'CASUAL', reason: '' });
+      setForm({ staffId: '', staffName: '', role: 'Doctor', startDate: '', endDate: '', type: 'CASUAL', reason: '' });
       setShowForm(false);
       loadLeaves();
     } catch (e) { console.error(e); }
@@ -25,7 +28,7 @@ export const LeaveManagement = () => {
 
   const handleAction = async (id: string, status: string) => {
     try {
-      await api.patch(`/leaves/${id}/status`, { status, reviewedBy: 'Admin' });
+      await api.patch(`/leaves/${id}/status`, { status, reviewedBy: user?.name });
       loadLeaves();
     } catch (e) { console.error(e); }
   };
@@ -106,13 +109,18 @@ export const LeaveManagement = () => {
                   <p className="text-xs font-bold text-slate-700">{new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${STATUS_COLORS[leave.status] || ''}`}>{leave.status}</span>
-                {leave.status === 'PENDING' && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => handleAction(leave.id, 'APPROVED')} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all"><Check className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => handleAction(leave.id, 'REJECTED')} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"><XIcon className="w-3.5 h-3.5" /></button>
-                  </div>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${STATUS_COLORS[leave.status] || ''}`}>{leave.status}</span>
+                  {leave.status === 'PENDING' && (
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleAction(leave.id, 'APPROVED')} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all"><Check className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleAction(leave.id, 'REJECTED')} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"><XIcon className="w-3.5 h-3.5" /></button>
+                    </div>
+                  )}
+                </div>
+                {leave.reviewedBy && leave.status !== 'PENDING' && (
+                  <p className="text-[9px] text-slate-400 font-semibold">by {leave.reviewedBy}</p>
                 )}
               </div>
             </div>
@@ -129,8 +137,11 @@ export const LeaveManagement = () => {
               <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-slate-100 rounded-lg"><XIcon className="w-4 h-4 text-slate-400" /></button>
             </div>
             <div className="space-y-4">
-              <div><label className="text-sm font-semibold text-slate-700 block mb-1">Name</label><input value={form.staffName} onChange={e => setForm(f => ({ ...f, staffName: e.target.value }))} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" /></div>
-              <div><label className="text-sm font-semibold text-slate-700 block mb-1">Role</label><select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"><option>Doctor</option><option>Nurse</option><option>Technician</option><option>Admin</option></select></div>
+              <StaffPicker
+                value={form.staffId}
+                onChange={(s) => setForm((f) => ({ ...f, staffId: s?.id || '', staffName: s?.name || '', role: s?.role || f.role }))}
+                label="Staff member"
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="text-sm font-semibold text-slate-700 block mb-1">From</label><input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" /></div>
                 <div><label className="text-sm font-semibold text-slate-700 block mb-1">To</label><input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" /></div>

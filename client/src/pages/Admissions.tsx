@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Search, Calendar, User, Bed, Clock, Edit2, Trash2, LogOut, Activity, MapPin } from 'lucide-react';
+import { Plus, Search, Calendar, User, Bed, Clock, Edit2, LogOut, Activity, MapPin } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusPill } from '../components/ui/StatusPill';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
-import { initials } from '../utils/clinical';
+import { PatientPicker } from '../components/clinical/PatientPicker';
 
 export const Admissions = () => {
   const [admissions, setAdmissions] = useState<any[]>([]);
@@ -16,7 +17,7 @@ export const Admissions = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Active' | 'Discharged'>('All');
-  const [formData, setFormData] = useState({ patientName: '', doctorId: '', bedId: '', reason: '' });
+  const [formData, setFormData] = useState({ patientName: '', patientId: '', doctorId: '', bedId: '', reason: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [dischargeId, setDischargeId] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
@@ -77,7 +78,7 @@ export const Admissions = () => {
         floorId: match.floorId, cellR: match.r, cellC: match.c,
         note: `Admitted to ${a.bed?.room?.name || 'ward'}${a.bed?.bedNumber ? `, Bed ${a.bed.bedNumber}` : ''}.`,
       });
-      setAlertMessage('Patient located on map — visible in Simulator, patient app & family share.');
+      setAlertMessage('Patient located on map — visible to staff occupancy preview, the patient app, and family share.');
     } catch (err: any) {
       setAlertMessage(err?.message || 'Could not set map location.');
     }
@@ -86,10 +87,11 @@ export const Admissions = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formData.patientId) return setAlertMessage('Select a registered patient.');
       if (!formData.bedId) return setAlertMessage('No beds available!');
       await api.post('/admissions', formData);
       setIsModalOpen(false);
-      setFormData(p => ({ ...p, patientName: '', reason: '' }));
+      setFormData(p => ({ ...p, patientName: '', patientId: '', reason: '' }));
       fetchData();
     } catch (err) { console.error(err); }
   };
@@ -235,8 +237,14 @@ export const Admissions = () => {
                         <button onClick={() => handleDischarge(a.id)} className="px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300 rounded-lg hover:bg-emerald-100 cursor-pointer transition-all">Discharge</button>
                       </>
                     )}
-                    <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors"><Edit2 className="w-4 h-4" /></button>
-                    <button className="p-1.5 text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => setDischargeId(a.id)} className="p-1.5 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Discharge">
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                    {a.patient?.id && (
+                      <Link to={`/dashboard/patients/${a.patient.id}`} className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Edit chart">
+                        <Edit2 className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -257,8 +265,10 @@ export const Admissions = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Patient Name</label>
-              <input required value={formData.patientName} onChange={e => setFormData({...formData, patientName: e.target.value})} type="text" placeholder="Full name" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              <PatientPicker
+                value={formData.patientId}
+                onChange={(p) => setFormData({ ...formData, patientId: p?.id || '', patientName: p?.name || '' })}
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Assign Doctor</label>

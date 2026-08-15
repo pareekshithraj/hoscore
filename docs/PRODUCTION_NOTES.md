@@ -1,13 +1,24 @@
 # Production Notes
 
+Production is **Vercel only**. Public site: `https://hoscore.in`. API: `https://api.hoscore.in`.
+
+## Vercel projects
+
+| Project | Root directory | Production domain |
+|---|---|---|
+| Web app | `client` | `hoscore.in` / `www.hoscore.in` |
+| API | `server` | `api.hoscore.in` |
+
+The client rewrites `/api/*` to `https://api.hoscore.in/api/*`. Queue updates on Vercel use HTTP polling (serverless cannot keep a WebSocket open).
+
 ## Environment
 
-- `server/.env` must define `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, and any Cloudflare R2 variables used by the deployment.
 - Do not commit local `.env`, SQLite dev databases, screenshots, or generated workbooks.
-- The frontend expects `VITE_API_URL` when the API is not served at `http://localhost:5000/api`.
-- **Vercel client deploys:** set `VITE_API_URL` in Vercel → Project Settings → Environment Variables (e.g. `https://your-api.onrender.com/api`), then redeploy.
-- **Render API deploys:** use `render.yaml` at repo root; set `DATABASE_URL`, `RAZORPAY_*`, and `CLIENT_URL`.
+- **API project** (Production + Preview): `NODE_ENV=production`, `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` (32+ chars), `CLIENT_URL=https://hoscore.in`, `PUBLIC_APP_URL=https://hoscore.in`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, R2 keys, MSG91/Resend. Optional: `FCM_SERVER_KEY`.
+- **Web project:** `VITE_API_URL` is optional. Unset, the client already uses `https://api.hoscore.in/api`.
+- After changing env vars, redeploy both projects. Run `npx prisma migrate deploy` via the API project's `vercel-build` (already in `server/package.json`).
 - **Billing workflow:** hospitals register → 30-day trial → add staff → pay per user/year on `/dashboard/subscription` → optional Razorpay autopay. See `docs/RAZORPAY_SETUP.md`.
+- Razorpay webhook URL: `https://api.hoscore.in/api/payments/webhook`.
 
 ## Database
 

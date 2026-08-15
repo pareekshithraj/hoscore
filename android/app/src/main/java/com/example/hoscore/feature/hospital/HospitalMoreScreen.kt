@@ -77,7 +77,13 @@ fun HospitalMoreScreen(onOpen: (HospitalDest) -> Unit, onLogout: () -> Unit) {
         MoreItem("Patient Vitals", Icons.Rounded.MonitorHeart, HospitalDest.VITALS, "vitals"),
         MoreItem("Doctors Roster", Icons.Rounded.Badge, HospitalDest.DOCTORS, "doctors"),
         MoreItem("Indoor Hospital Map", Icons.Rounded.Map, HospitalDest.MAP, "map"),
-    ).filter { hasFeature(permissions, it.feature, role) }
+    ).filter {
+        if (it.dest == HospitalDest.MAP) {
+            hasFeature(permissions, "map", role) || hasFeature(permissions, "admissions", role)
+        } else {
+            hasFeature(permissions, it.feature, role)
+        }
+    }
 
     val adminItems = listOf(
         MoreItem("Billing & Invoices", Icons.Rounded.ReceiptLong, HospitalDest.BILLING, "billing"),

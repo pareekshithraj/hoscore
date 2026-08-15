@@ -28,7 +28,7 @@ export const getAll = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
-    const safeData = pick(req.body, ['patientId', 'patientName', 'policyNumber', 'insuranceCompany', 'claimAmount', 'approvedAmount', 'status', 'documents', 'remarks', 'admissionId', 'diagnosis']);
+    const safeData = pick(req.body, ['patientId', 'patientName', 'policyNumber', 'insuranceCompany', 'claimAmount', 'approvedAmount', 'status', 'documents', 'remarks', 'admissionId', 'billId', 'diagnosis']);
     const claim = await prisma.insuranceClaim.create({ data: { ...safeData, hospitalId: hid(req) } });
     const signedDocuments = await signDocumentsField(claim.documents);
     res.status(201).json({ ...claim, documents: signedDocuments });
@@ -39,7 +39,7 @@ export const updateStatus = async (req: Request, res: Response) => {
   try {
     const existing = await prisma.insuranceClaim.findFirst({ where: { id: req.params.id!, hospitalId: hid(req) } });
     if (!existing) return res.status(404).json({ error: 'Insurance claim not found' });
-    const safeData = pick(req.body, ['patientId', 'patientName', 'policyNumber', 'insuranceCompany', 'claimAmount', 'approvedAmount', 'status', 'documents', 'remarks', 'admissionId', 'diagnosis']);
+    const safeData = pick(req.body, ['patientId', 'patientName', 'policyNumber', 'insuranceCompany', 'claimAmount', 'approvedAmount', 'status', 'documents', 'remarks', 'admissionId', 'billId', 'diagnosis']);
     const data: any = { ...safeData };
     if (['APPROVED', 'REJECTED'].includes(data.status)) data.reviewedAt = new Date();
     const claim = await prisma.insuranceClaim.update({ where: { id: req.params.id! }, data });

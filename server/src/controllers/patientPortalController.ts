@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import { prisma } from '../index.js';
 import type { AuthRequest } from '../middleware/authMiddleware.js';
 import { parseDateSafe } from '../utils/dateUtils.js';
+import { registerDeviceToken } from '../services/push.js';
 
 async function validatePatientAccess(userId: string, targetPatientId?: string): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { patientProfile: true } });
@@ -102,12 +103,13 @@ export const getMyRecords = async (req: AuthRequest, res: Response) => {
     const pid = await validatePatientAccess(req.user!.userId, targetPatientId);
     if (!pid) return res.json({ vitals: [], labs: [], admissions: [] });
 
-    const [vitals, labs, admissions] = await Promise.all([
-      prisma.vitalRecord.findMany({ where: { patientId: pid }, orderBy: { recordedAt: 'desc' }, take: 20 }),
-      prisma.labOrder.findMany({ where: { patientId: pid }, orderBy: { orderedAt: 'desc' }, take: 20 }),
+    const [vitals, labs, admissions, prescriptions] = await Promise.all([
+      prisma.vitalRecord.findMany({ where: { patientId: pid }, orderBy: { recordedAt: 'desc' }, take: 40 }),
+      prisma.labOrder.findMany({ where: { patientId: pid }, orderBy: { orderedAt: 'desc' }, take: 40 }),
       prisma.admission.findMany({ where: { patientId: pid }, include: { bed: { include: { room: true } } }, orderBy: { admissionDate: 'desc' } }),
+      prisma.prescription.findMany({ where: { patientId: pid }, include: { doctor: { select: { name: true } } }, orderBy: { date: 'desc' }, take: 20 }),
     ]);
-    res.json({ vitals, labs, admissions });
+    res.json({ vitals, labs, admissions, prescriptions });
   } catch (error) { res.status(500).json({ error: 'Failed' }); }
 };
 
@@ -150,6 +152,72 @@ export const getPatientDashboard = async (req: AuthRequest, res: Response) => {
     ]);
     res.json({ upcoming, recentRx, profile: patientProfile });
   } catch (error) { res.status(500).json({ error: 'Failed' }); }
+};
+
+function visitRoomName(department?: string | null) {
+  const dept = (department || '').toLowerCase();
+  if (dept.includes('cardio')) return 'Cardiology OPD';
+  if (dept.includes('pediat')) return 'Pediatrics OPD';
+  if (dept.includes('ortho')) return 'Orthopedics OPD';
+  if (dept.includes('lab') || dept.includes('diagnos')) return 'Lab Room';
+  if (dept.includes('bill') || dept.includes('financ')) return 'Billing Desk';
+  if (dept.includes('pharm')) return 'Pharmacy';
+  return 'OPD Consultation Room';
+}
+
+export const getMyVisit = async (req: AuthRequest, res: Response) => {
+  try {
+    const targetPatientId = req.query.patientId as string;
+    const pid = await validatePatientAccess(req.user!.userId, targetPatientId);
+    if (!pid) return res.json({ inQueue: false });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const entry = await prisma.oPDQueue.findFirst({
+      where: {
+        patientId: pid,
+        date: { gte: today, lt: tomorrow },
+        status: { in: ['WAITING', 'IN_CONSULTATION'] },
+      },
+      orderBy: { tokenNumber: 'asc' },
+    });
+    if (!entry) return res.json({ inQueue: false });
+
+    let position: number | null = null;
+    if (entry.status === 'WAITING' && entry.doctorId) {
+      const waiting = await prisma.oPDQueue.count({
+        where: {
+          hospitalId: entry.hospitalId,
+          doctorId: entry.doctorId,
+          status: 'WAITING',
+          date: { gte: today, lt: tomorrow },
+          tokenNumber: { lte: entry.tokenNumber },
+        },
+      });
+      position = waiting;
+    }
+
+    const hospital = entry.hospitalId
+      ? await prisma.hospital.findUnique({ where: { id: entry.hospitalId }, select: { id: true, name: true } })
+      : null;
+
+    res.json({
+      inQueue: true,
+      status: entry.status,
+      position,
+      tokenNumber: entry.tokenNumber,
+      doctorName: entry.doctorName,
+      department: entry.department,
+      roomName: visitRoomName(entry.department),
+      hospitalId: hospital?.id || entry.hospitalId,
+      hospitalName: hospital?.name,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load visit status' });
+  }
 };
 
 export const skipAlert = async (req: AuthRequest, res: Response) => {
@@ -340,7 +408,7 @@ export const getVaccinations = async (req: AuthRequest, res: Response) => {
 
 export const recordVaccination = async (req: AuthRequest, res: Response) => {
   try {
-    const { id, status, givenAt, givenBy, notes } = req.body;
+    const { id, givenAt, givenBy, notes } = req.body;
     if (!id) return res.status(400).json({ error: 'Vaccination record ID is required' });
 
     const vaccine = await prisma.vaccination.findUnique({ where: { id } });
@@ -352,9 +420,9 @@ export const recordVaccination = async (req: AuthRequest, res: Response) => {
     const updated = await prisma.vaccination.update({
       where: { id },
       data: {
-        status: status || 'COMPLETED',
+        status: 'COMPLETED',
         givenAt: givenAt ? new Date(givenAt) : new Date(),
-        givenBy: givenBy || 'Self-reported (Patient Portal)',
+        givenBy: `Self-reported${givenBy && !String(givenBy).toLowerCase().includes('self-reported') ? ` — ${givenBy}` : ''}`,
         notes: notes || null
       }
     });
@@ -470,5 +538,19 @@ export const getAccessLogs = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch access logs' });
+  }
+};
+
+export const registerDevice = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const token = String(req.body?.token || '');
+    const platform = String(req.body?.platform || 'android');
+    const row = await registerDeviceToken(userId, token, platform);
+    if (!row) return res.status(400).json({ error: 'Invalid device token' });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'Failed to register device' });
   }
 };

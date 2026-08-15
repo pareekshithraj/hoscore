@@ -108,13 +108,13 @@ fun HospitalDashboardScreen(
         when (val s = state) {
             is Resource.Loading -> HospitalLoadingContent()
             is Resource.Error   -> HospitalErrorContent(s.message) { vm.refresh() }
-            is Resource.Success -> HospitalContent(s.data, onOpenTab)
+            is Resource.Success -> HospitalContent(s.data, onOpenTab, role)
         }
     }
 }
 
 @Composable
-private fun HospitalContent(stats: Stats, onOpenTab: (Int) -> Unit = {}) {
+private fun HospitalContent(stats: Stats, onOpenTab: (Int) -> Unit = {}, role: String = "Staff") {
     var selectedDateIdx by remember { mutableStateOf(2) }
     val today = java.util.Calendar.getInstance()
     val dayOfMonth = today.get(java.util.Calendar.DAY_OF_MONTH)
@@ -146,6 +146,33 @@ private fun HospitalContent(stats: Stats, onOpenTab: (Int) -> Unit = {}) {
                     Spacer(Modifier.height(2.dp))
                     Text(day, fontSize = 15.sp, fontWeight = FontWeight.Black, color = if (selected) Color.White else TextDark)
                 }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        val dayTitle = when (role) {
+            "DOCTOR" -> "My clinic day"
+            "RECEPTIONIST" -> "Front desk"
+            "NURSE" -> "Ward round"
+            "LAB_TECH" -> "Lab inbox"
+            "PHARMACIST" -> "Dispense desk"
+            else -> "Hospital activity"
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .clickable { onOpenTab(1) }
+                .padding(16.dp),
+        ) {
+            Column {
+                Text(dayTitle, fontWeight = FontWeight.Black, color = TextDark, fontSize = 15.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("${stats.telemetry.activeQueue} in OPD queue · occupancy ${stats.occupancyRate}%", color = TextMid, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                Text("Open queue", color = HTeal, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 

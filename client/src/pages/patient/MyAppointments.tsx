@@ -4,15 +4,15 @@ import { Calendar } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-const TIMES = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'];
-
 export const MyAppointments = () => {
   const { selectedPatientId } = useAuth();
   const [appts, setAppts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [rescheduleId, setRescheduleId] = useState('');
-  const [reschedule, setReschedule] = useState({ date: '', time: '09:00 AM' });
+  const [reschedule, setReschedule] = useState({ date: '', time: '' });
   const [confirmCancelId, setConfirmCancelId] = useState('');
+  const [slotOptions, setSlotOptions] = useState<string[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   const loadAppointments = () => {
     setLoading(true);
@@ -27,6 +27,26 @@ export const MyAppointments = () => {
     loadAppointments();
   }, [selectedPatientId]);
 
+  const rescheduleAppt = appts.find((a) => a.id === rescheduleId);
+  useEffect(() => {
+    const hospitalId = rescheduleAppt?.hospitalId || rescheduleAppt?.hospital?.id;
+    if (!hospitalId || !reschedule.date) {
+      setSlotOptions([]);
+      return;
+    }
+    setSlotsLoading(true);
+    api.get(`/hospitals/${hospitalId}/available-slots?date=${reschedule.date}${rescheduleAppt?.doctorId ? `&doctorId=${rescheduleAppt.doctorId}` : ''}`)
+      .then((res: any) => {
+        const open = (res?.slots || []).filter((s: any) => s.isBooked !== true).map((s: any) => s.time);
+        setSlotOptions(open);
+        if (open.length && !open.includes(reschedule.time)) {
+          setReschedule((prev) => ({ ...prev, time: open[0] }));
+        }
+      })
+      .catch(() => setSlotOptions([]))
+      .finally(() => setSlotsLoading(false));
+  }, [rescheduleId, reschedule.date, rescheduleAppt?.hospitalId, rescheduleAppt?.hospital?.id, rescheduleAppt?.doctorId]);
+
   const cancelAppointment = async (id: string) => {
     await api.patch(`/patient/appointments/${id}/cancel`, {});
     setConfirmCancelId('');
@@ -36,7 +56,7 @@ export const MyAppointments = () => {
   const submitReschedule = async (id: string) => {
     await api.patch(`/patient/appointments/${id}/reschedule`, reschedule);
     setRescheduleId('');
-    setReschedule({ date: '', time: '09:00 AM' });
+    setReschedule({ date: '', time: '' });
     loadAppointments();
   };
 
@@ -104,11 +124,19 @@ export const MyAppointments = () => {
                 </div>
                 {rescheduleId === a.id && (
                   <div className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 border-t border-slate-100 pt-4">
-                    <input type="date" min={new Date().toISOString().split('T')[0]} value={reschedule.date} onChange={(e) => setReschedule({ ...reschedule, date: e.target.value })} className="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
-                    <select value={reschedule.time} onChange={(e) => setReschedule({ ...reschedule, time: e.target.value })} className="px-3 py-2 rounded-xl border border-slate-200 text-sm">
-                      {TIMES.map((time) => <option key={time}>{time}</option>)}
-                    </select>
-                    <button disabled={!reschedule.date} onClick={() => submitReschedule(a.id)} className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold disabled:opacity-50">Save</button>
+                    <input type="date" min={new Date().toISOString().split('T')[0]} value={reschedule.date} onChange={(e) => setReschedule({ ...reschedule, date: e.target.value, time: '' })} className="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+                    {slotsLoading ? (
+                      <p className="text-xs text-slate-500 self-center">Loading open slots…</p>
+                    ) : slotOptions.length === 0 ? (
+                      <p className="text-xs text-amber-700 self-center font-semibold">
+                        {reschedule.date ? 'No open slots — hospital may be closed or fully booked.' : 'Pick a date to load real slots.'}
+                      </p>
+                    ) : (
+                      <select value={reschedule.time} onChange={(e) => setReschedule({ ...reschedule, time: e.target.value })} className="px-3 py-2 rounded-xl border border-slate-200 text-sm">
+                        {slotOptions.map((time) => <option key={time}>{time}</option>)}
+                      </select>
+                    )}
+                    <button disabled={!reschedule.date || !reschedule.time || slotOptions.length === 0} onClick={() => submitReschedule(a.id)} className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold disabled:opacity-50">Save</button>
                   </div>
                 )}
               </div>

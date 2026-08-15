@@ -22,11 +22,16 @@ interface SuperAdminStats {
   totalPatients: number;
   activeSubscriptions: number;
   totalRevenue: number;
+  failedPayments?: number;
+  growth?: { name: string; registrations: number; cumulative?: number }[];
+  planShare?: { name: string; value: number; count?: number }[];
   usage?: {
     neon: { storageBytes: number; estimatedStorageCostUsd: number };
     r2: { storageBytes: number; objectCount: number; estimatedStorageCostUsd: number; isConfigured: boolean };
   };
 }
+
+const PLAN_COLORS = ['#06b6d4', '#6366f1', '#8b5cf6', '#f59e0b', '#10b981'];
 
 const formatBytes = (bytes = 0) => {
   if (!bytes) return '0 B';
@@ -74,20 +79,18 @@ export const SuperAdminDashboard = () => {
     { icon: IndianRupee, label: 'Est. Revenue', value: `₹${revenueCount.toLocaleString()}`, color: 'text-rose-400', badgeBg: 'bg-rose-500/10 border-rose-500/20' },
   ];
 
-  // Registry registrations over time
-  const growthData = [
-    { name: "Jan", registrations: 4 },
-    { name: "Feb", registrations: 8 },
-    { name: "Mar", registrations: 12 },
-    { name: "Apr", registrations: 18 },
-    { name: "May", registrations: stats?.totalHospitals || 22 },
-  ];
+  const growthData = stats?.growth?.length
+    ? stats.growth
+    : [{ name: 'Now', registrations: stats?.totalHospitals || 0 }];
 
-  const subscriptionData = [
-    { name: "Starter Plan", value: 45, color: "#06b6d4" },
-    { name: "Professional Plan", value: 35, color: "#6366f1" },
-    { name: "Enterprise Plan", value: 20, color: "#8b5cf6" },
-  ];
+  const subscriptionData = (stats?.planShare?.length ? stats.planShare : [{ name: 'No plans yet', value: 100 }]).map((p, i) => ({
+    ...p,
+    color: PLAN_COLORS[i % PLAN_COLORS.length],
+  }));
+
+  const prev = growthData.length >= 2 ? growthData[growthData.length - 2].registrations : 0;
+  const last = growthData[growthData.length - 1]?.registrations || 0;
+  const momPct = prev > 0 ? (((last - prev) / prev) * 100).toFixed(1) : null;
 
   const systemHealth = [
     { label: "Neon Storage Used", value: formatBytes(stats?.usage?.neon?.storageBytes || 0), icon: HardDrive, color: "text-sky-400" },
@@ -157,7 +160,7 @@ export const SuperAdminDashboard = () => {
               Direct Subscription Billings Active
             </span>
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-              +14.8% MoM
+              {momPct ? `${Number(momPct) >= 0 ? '+' : ''}${momPct}% MoM` : `${stats?.failedPayments || 0} failed payments`}
             </span>
           </div>
         </div>
@@ -249,7 +252,7 @@ export const SuperAdminDashboard = () => {
             {/* Center Label */}
             <div className="absolute flex flex-col items-center justify-center">
               <span className="text-[8px] text-[var(--text-muted)] font-black tracking-widest uppercase">SHARES</span>
-              <span className="text-lg font-black mt-0.5 text-[var(--text-primary)]">3 Tiers</span>
+              <span className="text-lg font-black mt-0.5 text-[var(--text-primary)]">{subscriptionData.length} Tiers</span>
             </div>
 
             <div className="w-36 h-36">

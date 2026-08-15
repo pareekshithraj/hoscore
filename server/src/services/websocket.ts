@@ -39,17 +39,20 @@ export function initWebSocket(server: Server) {
       }
 
       if (decoded.contextType === 'hospital' && decoded.hospitalId) {
-        const membership = await prisma.membership.findFirst({
-          where: {
-            userId: decoded.userId,
-            hospitalId: decoded.hospitalId,
-            status: 'ACTIVE',
-            hospital: { isActive: true },
-          },
-        });
-        if (!membership) {
-          ws.close(4004, 'No hospital access');
-          return;
+        const supportSession = Boolean(decoded.isSuperAdmin && decoded.impersonating);
+        if (!supportSession) {
+          const membership = await prisma.membership.findFirst({
+            where: {
+              userId: decoded.userId,
+              hospitalId: decoded.hospitalId,
+              status: 'ACTIVE',
+              hospital: { isActive: true },
+            },
+          });
+          if (!membership) {
+            ws.close(4004, 'No hospital access');
+            return;
+          }
         }
       }
 

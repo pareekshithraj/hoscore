@@ -1,32 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Calendar, FileText, Heart, Clock, Activity, ChevronRight, User, AlertCircle, Users, Plus, Navigation, ShieldCheck } from 'lucide-react';
+import { Calendar, FileText, Heart, Clock, Activity, ChevronRight, User, AlertCircle, Users, Plus, ShieldCheck } from 'lucide-react';
 import { api } from '../../services/api';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAnimatedCounter } from '../../hooks/useAnimatedCounter';
-import { WayfindingModal } from '../../components/WayfindingModal';
 import { Modal } from '../../components/Modal';
 import { QrCode } from 'lucide-react';
 import { DigitalQRPassModal } from '../../components/DigitalQRPassModal';
-
-import { BASE_URL } from '../../utils/apiConfig';
-const getWsUrl = (token: string) => {
-  const apiBase = BASE_URL;
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  let host = window.location.host;
-  if (apiBase.startsWith('http')) {
-    const url = new URL(apiBase);
-    host = url.host;
-  }
-  return `${wsProtocol}//${host}/ws?token=${token}`;
-};
-
-const getPositionString = (pos: number) => {
-  if (pos === 1) return '1st';
-  if (pos === 2) return '2nd';
-  if (pos === 3) return '3rd';
-  return `${pos}th`;
-};
 
 export const PatientDashboard = () => {
   const { user, selectedPatientId, setSelectedPatientId, theme } = useAuth();
@@ -35,11 +15,6 @@ export const PatientDashboard = () => {
   const [dependents, setDependents] = useState<any[]>([]);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
   const [showQRPass, setShowQRPass] = useState(false);
-
-  // Live Queue state
-  const [liveQueueAlert, setLiveQueueAlert] = useState<any>(null);
-  const [wayfindingDest, setWayfindingDest] = useState<string>('');
-  const [isWayfindingOpen, setIsWayfindingOpen] = useState(false);
 
   // Form state for creating dependents
   const [newDependent, setNewDependent] = useState({
@@ -72,56 +47,6 @@ export const PatientDashboard = () => {
 
   useEffect(() => {
     loadDependents();
-  }, []);
-
-  // WebSocket for Live Queue Position & Calling Alerts
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const wsUrl = getWsUrl(token);
-    let ws: WebSocket;
-
-    try {
-      ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        console.log('🔌 Dashboard WebSocket connected');
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'queue_position_update') {
-            setLiveQueueAlert({
-              type: 'position',
-              message: `You are ${getPositionString(payload.data.position)} in line for ${payload.data.doctorName}. Please prepare to head to ${payload.data.roomName}.`,
-              roomName: payload.data.roomName,
-            });
-          } else if (payload.type === 'queue_called') {
-            setLiveQueueAlert({
-              type: 'called',
-              message: `Your turn has arrived! You are called for ${payload.data.doctorName} (${payload.data.department}). Please head to ${payload.data.roomName} immediately.`,
-              roomName: payload.data.roomName,
-            });
-          }
-        } catch (err) {
-          console.error('Error handling WebSocket message', err);
-        }
-      };
-
-      ws.onclose = () => {
-        console.log('🔌 Dashboard WebSocket closed');
-      };
-    } catch (error) {
-      // Silently ignore WebSocket errors on unsupported environments
-    }
-
-    return () => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-    };
   }, []);
 
   const upcomingCount = useAnimatedCounter(data.upcoming?.length || 0);
@@ -191,50 +116,7 @@ export const PatientDashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Live Queue Alerts */}
-      {liveQueueAlert && (
-        <div className={`p-6 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden animate-fade-in-up ${liveQueueAlert.type === 'called'
-          ? 'bg-rose-50/50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-500/20'
-          : 'bg-sky-50/50 dark:bg-sky-500/5 border-sky-200 dark:border-sky-500/20'
-          }`}>
-          <div className="relative z-10 flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${liveQueueAlert.type === 'called'
-              ? 'bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-500/20'
-              : 'bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200/50 dark:border-sky-500/20'
-              }`}>
-              <Navigation className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
-                {liveQueueAlert.type === 'called' ? 'Consultation Room Call' : 'Live Queue Position'}
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-300 font-semibold mt-1">
-                {liveQueueAlert.message}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 relative z-10">
-            <button
-              onClick={() => {
-                setWayfindingDest(liveQueueAlert.roomName);
-                setIsWayfindingOpen(true);
-              }}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer text-white ${liveQueueAlert.type === 'called'
-                ? 'bg-rose-600 hover:bg-rose-700'
-                : 'bg-sky-600 hover:bg-sky-700'
-                }`}
-            >
-              Open Indoor Walkway Map
-            </button>
-            <button
-              onClick={() => setLiveQueueAlert(null)}
-              className="px-3 py-2 border border-[var(--card-border)] bg-[var(--inner-bg)] hover:bg-[var(--card-bg)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Live queue is shown globally by LiveVisitBanner in PatientLayout */}
 
       {/* Follow-up Appointment Recommendation Alert */}
       {showAppointmentAlert && (
@@ -549,13 +431,6 @@ export const PatientDashboard = () => {
           )}
         </div>
       </div>
-
-      {/* Wayfinding Modal Overlay */}
-      <WayfindingModal
-        isOpen={isWayfindingOpen}
-        onClose={() => setIsWayfindingOpen(false)}
-        destination={wayfindingDest}
-      />
 
       {/* Family dependents management modal */}
       <Modal isOpen={showFamilyModal} onClose={() => setShowFamilyModal(false)} title="Manage Family Members">

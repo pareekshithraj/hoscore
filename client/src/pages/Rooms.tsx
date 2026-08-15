@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
-import { AlertTriangle, Bed, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Bed, Plus, Trash2, X, Pencil } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { EmptyState, LoadingState, PageHeader, StatCard, StatusPill } from '../components/ui';
 import { formatINR } from '../utils/clinical';
@@ -19,6 +19,7 @@ export const Rooms = () => {
   const [beds, setBeds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<any | null>(null);
   const [isBedModalOpen, setIsBedModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'room' | 'bed'; name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -55,8 +56,14 @@ export const Rooms = () => {
   const handleRoomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/rooms', { ...roomData, capacity: Number(roomData.capacity), basePrice: Number(roomData.basePrice) });
+      const payload = { ...roomData, capacity: Number(roomData.capacity), basePrice: Number(roomData.basePrice) };
+      if (editingRoom) {
+        await api.patch(`/rooms/${editingRoom.id}`, payload);
+      } else {
+        await api.post('/rooms', payload);
+      }
       setIsRoomModalOpen(false);
+      setEditingRoom(null);
       setRoomData({ name: '', type: 'Ward', capacity: 1, basePrice: 50 });
       fetchData();
     } catch (err) {
@@ -125,7 +132,7 @@ export const Rooms = () => {
         }
         actions={
           <>
-            <button onClick={() => setIsRoomModalOpen(true)} className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2.5 text-sm font-bold text-[var(--text-primary)]">
+            <button onClick={() => { setEditingRoom(null); setRoomData({ name: '', type: 'Ward', capacity: 1, basePrice: 50 }); setIsRoomModalOpen(true); }} className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2.5 text-sm font-bold text-[var(--text-primary)]">
               <span className="inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Room</span>
             </button>
             <button onClick={() => setIsBedModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">
@@ -212,6 +219,17 @@ export const Rooms = () => {
                       {cap ? Math.round((occ / cap) * 100) : 0}% full
                     </StatusPill>
                     <button
+                      onClick={() => {
+                        setEditingRoom(room);
+                        setRoomData({ name: room.name, type: room.type, capacity: room.capacity || 1, basePrice: room.basePrice || 50 });
+                        setIsRoomModalOpen(true);
+                      }}
+                      className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-blue-500/10 hover:text-blue-600"
+                      title="Edit room"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => setDeleteTarget({ id: room.id, type: 'room', name: room.name })}
                       className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-rose-500/10 hover:text-rose-600"
                     >
@@ -276,7 +294,7 @@ export const Rooms = () => {
         </div>
       )}
 
-      <Modal isOpen={isRoomModalOpen} onClose={() => setIsRoomModalOpen(false)} title="Add room">
+      <Modal isOpen={isRoomModalOpen} onClose={() => { setIsRoomModalOpen(false); setEditingRoom(null); }} title={editingRoom ? 'Edit room' : 'Add room'}>
         <form onSubmit={handleRoomSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium">Room name</label>
@@ -299,8 +317,8 @@ export const Rooms = () => {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setIsRoomModalOpen(false)} className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium">Cancel</button>
-            <button type="submit" className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">Save room</button>
+            <button type="button" onClick={() => { setIsRoomModalOpen(false); setEditingRoom(null); }} className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium">Cancel</button>
+            <button type="submit" className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">{editingRoom ? 'Save changes' : 'Save room'}</button>
           </div>
         </form>
       </Modal>

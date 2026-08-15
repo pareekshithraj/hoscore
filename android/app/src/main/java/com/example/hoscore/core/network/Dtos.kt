@@ -286,10 +286,43 @@ data class Bill(
     val status: String? = null,
     val hospitalName: String? = null,
     val createdAt: String? = null,
+    val roomCharges: Double? = null,
+    val doctorFees: Double? = null,
+    val pharmacyFees: Double? = null,
+    val labFees: Double? = null,
+    val paymentMethod: String? = null,
 ) {
     val amount: Double? get() = totalAmount
-    val description: String? get() = null
+    val description: String? get() = hospitalName ?: "Hospital invoice"
 }
+
+@Serializable
+data class PatientBillOrder(
+    val orderId: String = "",
+    val amount: Double = 0.0,
+    val currency: String = "INR",
+    val keyId: String? = null,
+    val mockMode: Boolean = false,
+)
+
+@Serializable
+data class VerifyPaymentRequest(
+    val razorpay_order_id: String,
+    val razorpay_payment_id: String,
+    val razorpay_signature: String,
+)
+
+@Serializable
+data class PatientVisit(
+    val inQueue: Boolean = false,
+    val status: String? = null,
+    val position: Int? = null,
+    val tokenNumber: Int? = null,
+    val doctorName: String? = null,
+    val department: String? = null,
+    val roomName: String? = null,
+    val hospitalName: String? = null,
+)
 
 @Serializable
 data class Vaccination(
@@ -888,12 +921,26 @@ data class MapAnchor(
 )
 
 @Serializable
+data class MapRoomBlock(
+    val id: String = "",
+    val name: String = "",
+    val type: String = "ward-a",
+    val x: Int = 0,
+    val y: Int = 0,
+    val w: Int = 1,
+    val h: Int = 1,
+    val doorSide: String? = null,
+    val roomId: String? = null,
+)
+
+@Serializable
 data class MapFloor(
     val id: String = "",
     val label: String = "",
     val index: Int = 0,
     val cells: List<List<String>> = emptyList(), // AreaType per cell (rows x cols)
     val anchors: List<MapAnchor> = emptyList(),
+    val rooms: List<MapRoomBlock> = emptyList(),
 )
 
 @Serializable

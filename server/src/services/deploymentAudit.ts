@@ -29,6 +29,7 @@ const recommendedChecks: Array<{ key: string; label: string; note: string }> = [
   { key: 'FROM_EMAIL', label: 'Outbound email sender', note: 'Recommended for trusted email delivery.' },
   { key: 'RAZORPAY_KEY_ID', label: 'Razorpay key ID', note: 'Recommended before enabling live billing.' },
   { key: 'RAZORPAY_KEY_SECRET', label: 'Razorpay key secret', note: 'Recommended before enabling live billing.' },
+  { key: 'FCM_SERVER_KEY', label: 'Firebase Cloud Messaging key', note: 'Optional. Enables Android queue-call push when the app is in the background.' },
 ];
 
 export const getDeploymentAudit = () => {

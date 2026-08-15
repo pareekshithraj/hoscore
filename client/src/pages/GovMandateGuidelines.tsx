@@ -736,7 +736,7 @@ export const GovMandateGuidelines: React.FC = () => {
                 <img src="/hoscore-logo.png" alt="HOSCORE" className="h-12 w-auto object-contain" />
               </div>
               <p className="text-sm text-slate-400 leading-relaxed max-w-sm font-medium">
-                HOSCORE is the premier digital hospital network. Fully compliant with GIGW 3.0, ABDM Milestone 1-3, EHR Standards 2016, and DPDP Act 2023 data privacy regulations.
+                HOSCORE is a hospital operations and patient visit platform. Pages here summarize government guidelines we are building toward. ABDM M1–M3 is not certified yet.
               </p>
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />

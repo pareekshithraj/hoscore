@@ -37,4 +37,14 @@ export const api = {
   patch: (endpoint: string, data?: any) => request('PATCH', endpoint, data),
   put: (endpoint: string, data?: any) => request('PUT', endpoint, data),
   delete: (endpoint: string) => request('DELETE', endpoint),
+  upload: async (endpoint: string, formData: FormData) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) throw new Error(await parseError(response));
+    return response.json();
+  },
 };

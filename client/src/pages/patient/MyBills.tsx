@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { Receipt, IndianRupee, CreditCard, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { printInvoice } from '../../utils/medicines';
 
 export const MyBills = () => {
   const { selectedPatientId } = useAuth();
@@ -34,9 +35,21 @@ export const MyBills = () => {
       // Patient-context endpoints — the staff /billing/* routes are feature-gated
       // to hospital context and always reject a patient session.
       const orderData = await api.post(`/patient/bills/${billId}/pay-order`, {});
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (orderData.mockMode || String(orderData.orderId || '').startsWith('order_mock_')) {
+        await api.post('/patient/bills/pay-verify', {
+          razorpay_order_id: orderData.orderId,
+          razorpay_payment_id: `pay_mock_${Date.now()}`,
+          razorpay_signature: 'mock',
+        });
+        setNotice({ tone: 'success', text: 'Payment recorded (test mode). Your receipt is ready to download.' });
+        fetchBills();
+        setPayingId(null);
+        return;
+      }
+      const razorpayKey = orderData.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
       if (!razorpayKey) {
         setNotice({ tone: 'error', text: 'Online payments are not configured. Please contact the hospital.' });
+        setPayingId(null);
         return;
       }
       const options = {
@@ -117,9 +130,15 @@ export const MyBills = () => {
                     <CreditCard className="w-3.5 h-3.5" /> {payingId === b.id ? 'Opening…' : 'Pay Now'}
                   </button>
                 )}
+                <button
+                  onClick={() => printInvoice({ ...b, patientName: b.admission?.patient?.name })}
+                  className="mt-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> {b.status === 'PAID' ? 'Tax invoice' : 'Preview invoice'}
+                </button>
                 {b.status === 'PAID' && b.receiptUrl && (
                   <a href={b.receiptUrl} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-colors">
-                    <Download className="w-3.5 h-3.5" /> Receipt
+                    <Download className="w-3.5 h-3.5" /> PDF receipt
                   </a>
                 )}
               </div>

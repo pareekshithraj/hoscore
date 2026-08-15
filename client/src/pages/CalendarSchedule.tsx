@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { 
   Calendar as CalIcon, ChevronLeft, ChevronRight, Clock, X, 
   Megaphone, AlertTriangle, Info, Bell, Users, Zap, 
-  CalendarCheck, FileText, Activity, Plus, Pin
+  CalendarCheck, FileText, Activity, Plus, Pin, Stethoscope
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { PatientPicker } from '../components/clinical/PatientPicker';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -28,17 +29,17 @@ const ACTION_COLORS: Record<string, string> = {
   REGISTER:     'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20',
 };
 
-type TabType = 'calendar' | 'updates' | 'shifts';
+type TabType = 'book' | 'calendar' | 'updates' | 'shifts';
 
 export const CalendarSchedule = () => {
-  const { addNotification } = useAuth();
+  const { addNotification, activeContext } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [defaults, setDefaults] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [form, setForm] = useState({ isOpen: true, openTime: '08:00', closeTime: '20:00', note: '' });
-  const [activeTab, setActiveTab] = useState<TabType>('calendar');
+  const [activeTab, setActiveTab] = useState<TabType>('book');
 
   // Notices
   const [notices, setNotices] = useState<any[]>([]);
@@ -49,6 +50,14 @@ export const CalendarSchedule = () => {
   // Shifts
   const [shifts, setShifts] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
+
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [bookDate, setBookDate] = useState<Date>(new Date());
+  const [showBook, setShowBook] = useState(false);
+  const [bookForm, setBookForm] = useState({ patientId: '', patientName: '', doctorId: '', time: '10:00 AM' });
+  const [slots, setSlots] = useState<string[]>([]);
+  const [bookError, setBookError] = useState('');
 
   // Live feed for updates tab
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
@@ -70,9 +79,13 @@ export const CalendarSchedule = () => {
     Promise.all([
       api.get('/shifts').catch(() => []),
       api.get('/staff').catch(() => []),
-    ]).then(([shiftsRes, staffRes]) => {
+      api.get('/appointments').catch(() => []),
+      api.get('/doctors').catch(() => []),
+    ]).then(([shiftsRes, staffRes, apptRes, docRes]) => {
       setShifts(Array.isArray(shiftsRes) ? shiftsRes : []);
       setStaff(Array.isArray(staffRes) ? staffRes : []);
+      setAppointments(Array.isArray(apptRes) ? apptRes : []);
+      setDoctors(Array.isArray(docRes) ? docRes : []);
     });
   }, []);
 
@@ -142,6 +155,43 @@ export const CalendarSchedule = () => {
     } catch (e) { console.error(e); }
   };
 
+  const sameDay = (a: string | Date, b: Date) => new Date(a).toDateString() === b.toDateString();
+  const apptsOn = (day: Date) => appointments.filter((a: any) => sameDay(a.date, day) && a.status !== 'CANCELLED');
+  const dayAppts = apptsOn(bookDate);
+
+  useEffect(() => {
+    const hid = activeContext?.hospitalId;
+    if (!hid || !bookForm.doctorId) { setSlots([]); return; }
+    const dateStr = bookDate.toISOString().split('T')[0];
+    api.get(`/hospitals/${hid}/available-slots?date=${dateStr}&doctorId=${bookForm.doctorId}`)
+      .then((res: any) => {
+        const list = Array.isArray(res) ? res : (res?.slots || res?.times || []);
+        setSlots(list.map((s: any) => typeof s === 'string' ? s : s.time || s.slot).filter(Boolean));
+      })
+      .catch(() => setSlots([]));
+  }, [activeContext?.hospitalId, bookDate, bookForm.doctorId]);
+
+  const handleBookVisit = async () => {
+    if (!bookForm.patientId || !bookForm.time) return;
+    setBookError('');
+    try {
+      await api.post('/appointments', {
+        patientId: bookForm.patientId,
+        patientName: bookForm.patientName,
+        doctorId: bookForm.doctorId || undefined,
+        date: bookDate.toISOString(),
+        time: bookForm.time,
+      });
+      const res = await api.get('/appointments');
+      setAppointments(Array.isArray(res) ? res : []);
+      setShowBook(false);
+      setBookForm({ patientId: '', patientName: '', doctorId: bookForm.doctorId, time: '10:00 AM' });
+      addNotification('Visit booked', `${bookForm.patientName} · ${bookDate.toLocaleDateString()} ${bookForm.time}`, 'SUCCESS');
+    } catch (e: any) {
+      setBookError(e?.message || 'Could not book visit.');
+    }
+  };
+
   const navigate = (dir: number) => setCurrentDate(new Date(year, month + dir, 1));
   const isToday = (day: number) => today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
 
@@ -166,7 +216,8 @@ export const CalendarSchedule = () => {
   };
 
   const tabs: { key: TabType; label: string; icon: any; badge?: number }[] = [
-    { key: 'calendar', label: 'Hospital Schedule', icon: CalIcon },
+    { key: 'book', label: 'Doctor book', icon: Stethoscope, badge: apptsOn(today).length || undefined },
+    { key: 'calendar', label: 'Hospital hours', icon: CalIcon },
     { key: 'updates', label: 'Staff Updates', icon: Megaphone, badge: notices.filter((n: any) => !n.isRead).length || undefined },
     { key: 'shifts', label: 'Shift Roster', icon: Users },
   ];
@@ -178,7 +229,7 @@ export const CalendarSchedule = () => {
         <div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Calendar & Updates</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-            Hospital schedule, staff announcements and shift roster
+            Doctor visits, hospital hours, and staff updates
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/[0.03] px-3.5 py-2 rounded-xl border border-slate-200/60 dark:border-white/[0.05]">
@@ -229,6 +280,72 @@ export const CalendarSchedule = () => {
           </button>
         ))}
       </div>
+
+      {/* ===== TAB: DOCTOR BOOK ===== */}
+      {activeTab === 'book' && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 bg-white dark:bg-white/[0.02] rounded-2xl border border-slate-200/60 dark:border-white/[0.06] overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">{MONTHS[month]} {year}</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Visits by day</p>
+              </div>
+              <div className="flex gap-1">
+                <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/[0.05] rounded-lg"><ChevronLeft className="w-4 h-4 text-slate-500" /></button>
+                <button onClick={() => { setCurrentDate(new Date()); setBookDate(new Date()); }} className="px-3 py-1.5 text-xs font-bold text-blue-600">Today</button>
+                <button onClick={() => navigate(1)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/[0.05] rounded-lg"><ChevronRight className="w-4 h-4 text-slate-500" /></button>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {DAYS.map(d => <div key={d} className="text-center text-[10px] font-black text-slate-400 uppercase py-2">{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: firstDay }).map((_, i) => <div key={`be${i}`} />)}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const date = new Date(year, month, day);
+                  const count = apptsOn(date).length;
+                  const selected = bookDate.toDateString() === date.toDateString();
+                  return (
+                    <button
+                      key={day}
+                      onClick={() => setBookDate(date)}
+                      className={`relative p-2 rounded-xl text-left min-h-[64px] border ${
+                        isToday(day) ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-500/10 border-blue-200' :
+                        selected ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200' :
+                        'border-transparent hover:bg-slate-50 dark:hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{day}</span>
+                      {count > 0 && (
+                        <span className="mt-1 block text-[10px] font-black text-indigo-600">{count} visit{count > 1 ? 's' : ''}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-black">{bookDate.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}</h3>
+              <button onClick={() => { setShowBook(true); setBookError(''); }} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white">
+                <Plus className="h-3.5 w-3.5" /> Book
+              </button>
+            </div>
+            <div className="space-y-2 max-h-[420px] overflow-y-auto">
+              {dayAppts.length === 0 && <p className="text-xs text-slate-400">No visits booked this day.</p>}
+              {dayAppts.map((a: any) => (
+                <div key={a.id} className="rounded-xl border border-slate-100 dark:border-white/[0.06] px-3 py-2">
+                  <p className="text-xs font-bold">{a.patient?.name || a.patientName || 'Patient'}</p>
+                  <p className="text-[10px] text-slate-500">{a.time} · {a.doctor?.name || 'Unassigned'} · {a.status}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== TAB: CALENDAR ===== */}
       {activeTab === 'calendar' && (
@@ -730,6 +847,46 @@ export const CalendarSchedule = () => {
                 Save Schedule Override
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Book visit modal */}
+      {showBook && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowBook(false)}>
+          <div className="bg-white dark:bg-[#0c1120] rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/60 dark:border-white/[0.08] p-5 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black">Book visit · {bookDate.toLocaleDateString()}</h3>
+              <button onClick={() => setShowBook(false)}><X className="w-4 h-4 text-slate-400" /></button>
+            </div>
+            <PatientPicker
+              value={bookForm.patientId}
+              onChange={(p) => setBookForm((f) => ({ ...f, patientId: p?.id || '', patientName: p?.name || '' }))}
+            />
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Doctor</span>
+              <select
+                value={bookForm.doctorId}
+                onChange={(e) => setBookForm((f) => ({ ...f, doctorId: e.target.value }))}
+                className="w-full rounded-xl border px-3 py-2 text-sm font-semibold"
+              >
+                <option value="">Any / unassigned</option>
+                {doctors.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Time</span>
+              <select
+                value={bookForm.time}
+                onChange={(e) => setBookForm((f) => ({ ...f, time: e.target.value }))}
+                className="w-full rounded-xl border px-3 py-2 text-sm font-semibold"
+              >
+                {(slots.length ? slots : ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM']).map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </label>
+            {bookError && <p className="text-xs text-rose-600">{bookError}</p>}
+            <button onClick={handleBookVisit} disabled={!bookForm.patientId} className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50">Save visit</button>
           </div>
         </div>
       )}

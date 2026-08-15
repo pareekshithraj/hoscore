@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { Plus, Search, Filter, Edit2, Trash2, Calendar, Phone, Activity, Eye, Users, QrCode } from 'lucide-react';
 import { Modal } from '../components/Modal';
@@ -26,6 +26,12 @@ export const Patients = () => {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [showDateRange, setShowDateRange] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -83,14 +89,27 @@ export const Patients = () => {
     fetchPatients();
   }, []);
 
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchQuery(q);
+  }, [searchParams]);
+
   const submitPatient = async (force: boolean) => {
     setSubmitting(true);
     try {
-      await api.post(`/patients${force ? '?force=true' : ''}`, {
-        ...formData,
-        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined
-      });
+      if (editingPatientId) {
+        await api.put(`/patients/${editingPatientId}`, {
+          ...formData,
+          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined
+        });
+      } else {
+        await api.post(`/patients${force ? '?force=true' : ''}`, {
+          ...formData,
+          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined
+        });
+      }
       setIsModalOpen(false);
+      setEditingPatientId(null);
       setDuplicateMatch(null);
       setFormData({ name: '', contact: '', email: '', dateOfBirth: '', gender: 'Male', bloodGroup: 'O+', isHoscoreUser: true, manualCareNote: '' });
       fetchPatients();
@@ -153,7 +172,11 @@ export const Patients = () => {
               Scan / Search Hoscore ID
             </button>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                setEditingPatientId(null);
+                setFormData({ name: '', contact: '', email: '', dateOfBirth: '', gender: 'Male', bloodGroup: 'O+', isHoscoreUser: true, manualCareNote: '' });
+                setIsModalOpen(true);
+              }}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -181,14 +204,26 @@ export const Patients = () => {
           />
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3.5 py-2 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer">
+          <button
+            onClick={() => setStatusFilter((s) => s === 'ALL' ? 'In-Patient' : s === 'In-Patient' ? 'Out-Patient' : 'ALL')}
+            className="flex items-center gap-2 px-3.5 py-2 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer"
+          >
             <Filter className="w-4 h-4" />
-            Filter
+            {statusFilter === 'ALL' ? 'Filter' : statusFilter}
           </button>
-          <button className="flex items-center gap-2 px-3.5 py-2 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer">
+          <button
+            onClick={() => setShowDateRange((v) => !v)}
+            className="flex items-center gap-2 px-3.5 py-2 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer"
+          >
             <Calendar className="w-4 h-4" />
             Date Range
           </button>
+          {showDateRange && (
+            <>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-2 py-1.5 text-xs" />
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-2 py-1.5 text-xs" />
+            </>
+          )}
         </div>
       </div>
 
@@ -206,12 +241,18 @@ export const Patients = () => {
           </thead>
           <tbody className="divide-y divide-[var(--card-border)]">
             {(() => {
-              const filteredPatients = patients.filter(patient => 
-                patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                patient.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (patient.sixDigitId || patient.id).toLowerCase().includes(searchQuery.toLowerCase())
-              );
+              const filteredPatients = patients.filter(patient => {
+                const matchesSearch =
+                  patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  patient.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (patient.sixDigitId || patient.id).toLowerCase().includes(searchQuery.toLowerCase());
+                const matchesStatus = statusFilter === 'ALL' || patient.status === statusFilter;
+                const created = patient.createdAt ? new Date(patient.createdAt).getTime() : 0;
+                const matchesFrom = !dateFrom || created >= new Date(dateFrom).getTime();
+                const matchesTo = !dateTo || created <= new Date(dateTo).getTime() + 86400000;
+                return matchesSearch && matchesStatus && matchesFrom && matchesTo;
+              });
               return filteredPatients.map((patient) => (
               <tr key={patient.id} className="hover:bg-[var(--inner-bg)] transition-colors group">
                 <td className="px-6 py-4">
@@ -257,7 +298,23 @@ export const Patients = () => {
                     >
                       <Calendar className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-md cursor-pointer transition-colors">
+                    <button
+                      onClick={() => {
+                        setEditingPatientId(patient.id);
+                        setFormData({
+                          name: patient.name || '',
+                          contact: patient.contact || '',
+                          email: patient.email || '',
+                          dateOfBirth: patient.dateOfBirth ? String(patient.dateOfBirth).slice(0, 10) : '',
+                          gender: patient.gender || 'Male',
+                          bloodGroup: patient.bloodGroup || 'O+',
+                          isHoscoreUser: patient.isHoscoreUser !== false,
+                          manualCareNote: patient.manualCareNote || '',
+                        });
+                        setIsModalOpen(true);
+                      }}
+                      className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-md cursor-pointer transition-colors"
+                    >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button onClick={() => handleDelete(patient.id)} className="p-1.5 text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md cursor-pointer transition-colors">
@@ -275,7 +332,7 @@ export const Patients = () => {
         </table>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Register New Patient">
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingPatientId(null); }} title={editingPatientId ? 'Edit Patient' : 'Register New Patient'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
@@ -333,7 +390,7 @@ export const Patients = () => {
           </div>
           <div className="pt-4 flex gap-3">
             <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{submitting ? 'Registering…' : 'Register'}</button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{submitting ? (editingPatientId ? 'Saving…' : 'Registering…') : (editingPatientId ? 'Save changes' : 'Register')}</button>
           </div>
         </form>
       </Modal>

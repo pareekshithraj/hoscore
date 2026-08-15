@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AREA_CONFIG, type AreaType, type Anchor, type Cell, type RoomBlock } from '../../utils/mapModel';
-import { MapPin, DoorOpen, Bed, HeartPulse, Stethoscope, Pill, Activity, Syringe, Building2 } from 'lucide-react';
+import { MapPin, DoorOpen, Bed, HeartPulse, Stethoscope, Activity, Syringe, Building2 } from 'lucide-react';
 
 export interface Marker {
   cell: Cell;
@@ -36,6 +36,9 @@ interface MapCanvasProps {
   wallPreview?: { r1: number; c1: number; r2: number; c2: number } | null;
   showAnchorLabels?: boolean;
   className?: string;
+  allowRoomDrag?: boolean;
+  onRoomMove?: (id: string, x: number, y: number) => void;
+  onRoomResize?: (id: string, w: number, h: number) => void;
 }
 
 const markerColor: Record<NonNullable<Marker['kind']>, string> = {
@@ -76,9 +79,55 @@ export const MapCanvas = ({
   wallPreview,
   showAnchorLabels = true,
   className = '',
+  allowRoomDrag = false,
+  onRoomMove,
+  onRoomResize,
 }: MapCanvasProps) => {
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [dragState, setDragState] = useState<{
+    id: string;
+    mode: 'move' | 'resize';
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+    origW: number;
+    origH: number;
+  } | null>(null);
+
+  const cellFromPointer = (clientX: number, clientY: number) => {
+    const el = rootRef.current;
+    if (!el || !cols || !rows) return { c: 0, r: 0 };
+    const rect = el.getBoundingClientRect();
+    const c = Math.max(0, Math.min(cols - 1, Math.floor(((clientX - rect.left) / rect.width) * cols)));
+    const r = Math.max(0, Math.min(rows - 1, Math.floor(((clientY - rect.top) / rect.height) * rows)));
+    return { c, r };
+  };
+
+  useEffect(() => {
+    if (!dragState) return;
+    const onMove = (e: PointerEvent) => {
+      const { c, r } = cellFromPointer(e.clientX, e.clientY);
+      if (dragState.mode === 'move') {
+        const dx = c - dragState.startX;
+        const dy = r - dragState.startY;
+        onRoomMove?.(dragState.id, dragState.origX + dx, dragState.origY + dy);
+      } else {
+        const w = Math.max(2, c - dragState.origX + 1);
+        const h = Math.max(2, r - dragState.origY + 1);
+        onRoomResize?.(dragState.id, w, h);
+      }
+    };
+    const onUp = () => setDragState(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [dragState, onRoomMove, onRoomResize]);
 
   const pathSet = useMemo(() => new Set(path.map((p) => `${p.r},${p.c}`)), [path]);
   const anchorByCell = useMemo(() => {
@@ -108,7 +157,11 @@ export const MapCanvas = ({
   }, [path, cols, rows]);
 
   return (
-    <div className={`relative aspect-square w-full ${className}`}>
+    <div
+      ref={rootRef}
+      className={`relative w-full ${className}`}
+      style={{ aspectRatio: `${Math.max(cols, 1)} / ${Math.max(rows, 1)}` }}
+    >
       <div
         className="grid h-full w-full overflow-hidden rounded-xl border border-slate-700/50 dark:border-white/10 bg-slate-950 bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] dark:bg-[#020617] dark:bg-[radial-gradient(#475569_1.5px,transparent_1.5px)] [background-size:24px_24px] shadow-2xl"
         style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}
@@ -187,17 +240,29 @@ export const MapCanvas = ({
         return (
           <div
             key={rb.id}
-            onClick={(e) => {
-              if (editing) {
-                e.stopPropagation();
-                onSelectRoom?.(rb.id);
+            onPointerDown={(e) => {
+              if (!editing) return;
+              e.stopPropagation();
+              onSelectRoom?.(rb.id);
+              if (allowRoomDrag && onRoomMove) {
+                const { c, r } = cellFromPointer(e.clientX, e.clientY);
+                setDragState({
+                  id: rb.id,
+                  mode: 'move',
+                  startX: c,
+                  startY: r,
+                  origX: rb.x,
+                  origY: rb.y,
+                  origW: rb.w,
+                  origH: rb.h,
+                });
               }
             }}
-            className={`absolute flex flex-col justify-between p-1.5 rounded-lg border-2 transition-all select-none shadow-md ${
-              editing ? 'cursor-pointer hover:brightness-125' : ''
+            className={`absolute flex flex-col justify-between p-1.5 rounded-lg border-2 select-none shadow-md ${
+              editing ? 'cursor-grab hover:brightness-125' : ''
             } ${
               isSelected
-                ? 'ring-4 ring-blue-500 border-blue-500 z-30 shadow-2xl scale-[1.01]'
+                ? 'ring-4 ring-blue-500 border-blue-500 z-30 shadow-2xl'
                 : 'border-slate-800/80 dark:border-slate-200/80 z-20'
             }`}
             style={{
@@ -242,6 +307,26 @@ export const MapCanvas = ({
               >
                 <DoorOpen className="h-2.5 w-2.5" />
               </div>
+            )}
+            {editing && allowRoomDrag && isSelected && (
+              <div
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  const { c, r } = cellFromPointer(e.clientX, e.clientY);
+                  setDragState({
+                    id: rb.id,
+                    mode: 'resize',
+                    startX: c,
+                    startY: r,
+                    origX: rb.x,
+                    origY: rb.y,
+                    origW: rb.w,
+                    origH: rb.h,
+                  });
+                }}
+                className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-white bg-blue-500 shadow-md"
+                title="Drag to resize"
+              />
             )}
           </div>
         );

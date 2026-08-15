@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.hoscore"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "3.0"
+        versionCode = 4
+        versionName = "3.1"
 
         buildConfigField("String", "PROD_API_BASE", "\"https://api.hoscore.in/api/\"")
         buildConfigField("String", "PROD_WS_URL", "\"wss://api.hoscore.in/ws\"")
@@ -114,4 +114,6 @@ dependencies {
 
   // Biometric authentication
   implementation("androidx.biometric:biometric:1.2.0-alpha05")
+
+  implementation("com.razorpay:checkout:1.6.40")
 }

@@ -25,28 +25,36 @@ import androidx.compose.material.icons.rounded.Vaccines
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Biotech
 import androidx.compose.material.icons.rounded.MedicalServices
-import androidx.compose.material3.Text
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.app.Activity
+import com.example.hoscore.core.common.Resource
+import com.example.hoscore.core.payments.payPatientBill
 import com.example.hoscore.core.ui.DataScreen
+import kotlinx.coroutines.launch
 import com.example.hoscore.core.ui.components.EmptyState
 import com.example.hoscore.core.ui.components.HoscoreCard
 import com.example.hoscore.core.ui.components.HoscoreTopBar
@@ -346,6 +354,11 @@ fun PatientMoreScreen(onLogout: () -> Unit) {
     val t = HoscoreTokens.current
     val billsVm: BillsVM = viewModel()
     var subScreen by remember { mutableStateOf<PatientDest?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var payingId by remember { mutableStateOf<String?>(null) }
+    var payNotice by remember { mutableStateOf<String?>(null) }
+    var payOk by remember { mutableStateOf(true) }
 
     if (subScreen != null) {
         val closeSub = { subScreen = null }
@@ -399,6 +412,10 @@ fun PatientMoreScreen(onLogout: () -> Unit) {
                     Spacer(Modifier.height(16.dp))
                     Text("Outstanding bills", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 15.sp)
                     Spacer(Modifier.height(4.dp))
+                    if (payNotice != null) {
+                        Text(payNotice!!, color = if (payOk) t.emerald else t.clinical, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                    }
                 }
                 if (bills.isEmpty()) {
                     item {
@@ -410,6 +427,7 @@ fun PatientMoreScreen(onLogout: () -> Unit) {
                     }
                 } else {
                     items(bills, key = { it.id }) { b ->
+                        val unpaid = (b.status ?: "").uppercase() != "PAID"
                         HoscoreCard(Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
@@ -419,6 +437,46 @@ fun PatientMoreScreen(onLogout: () -> Unit) {
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text("₹${b.amount?.toInt() ?: 0}", fontWeight = FontWeight.Black, color = t.textPrimary, fontSize = 16.sp)
                                     if (b.status != null) StatusBadge(b.status, statusColor(b.status))
+                                    Text(
+                                        "GST invoice: Room ₹${b.roomCharges?.toInt() ?: 0} · Dr ₹${b.doctorFees?.toInt() ?: 0}",
+                                        color = t.textMuted,
+                                        fontSize = 10.sp,
+                                    )
+                                }
+                            }
+                            if (unpaid) {
+                                Spacer(Modifier.height(10.dp))
+                                Button(
+                                    onClick = {
+                                        val activity = context as? Activity ?: return@Button
+                                        payingId = b.id
+                                        payNotice = null
+                                        scope.launch {
+                                            when (val res = payPatientBill(activity, b.id)) {
+                                                is Resource.Success -> {
+                                                    payOk = true
+                                                    payNotice = "Payment successful"
+                                                    billsVm.refresh()
+                                                }
+                                                is Resource.Error -> {
+                                                    payOk = false
+                                                    payNotice = res.message
+                                                }
+                                                Resource.Loading -> Unit
+                                            }
+                                            payingId = null
+                                        }
+                                    },
+                                    enabled = payingId == null,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = t.primary),
+                                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                                ) {
+                                    Text(
+                                        if (payingId == b.id) "Paying…" else "Pay now",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                    )
                                 }
                             }
                         }

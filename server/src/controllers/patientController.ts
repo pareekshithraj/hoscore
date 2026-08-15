@@ -375,3 +375,28 @@ export const deletePatient = async (req: Request, res: Response) => {
     res.json({ message: 'Deleted successfully' });
   } catch { res.status(500).json({ error: 'Failed to delete patient' }); }
 };
+
+export const completeVaccination = async (req: Request, res: Response) => {
+  try {
+    const hospitalId = hid(req);
+    const vaccine = await prisma.vaccination.findUnique({ where: { id: req.params.id } });
+    if (!vaccine) return res.status(404).json({ error: 'Vaccination record not found' });
+    const allowed = await checkHospitalAccess(vaccine.patientId, hospitalId);
+    if (!allowed) return res.status(403).json({ error: 'Patient is not on your hospital roster' });
+
+    const staffName = (req as any).user?.name || 'Hospital staff';
+    const updated = await prisma.vaccination.update({
+      where: { id: vaccine.id },
+      data: {
+        status: 'COMPLETED',
+        givenAt: req.body.givenAt ? new Date(req.body.givenAt) : new Date(),
+        givenBy: req.body.givenBy || staffName,
+        notes: req.body.notes || null,
+      },
+    });
+    await logAudit(req, 'UPDATE', 'Vaccination', updated.id, `Recorded ${updated.name} for patient`);
+    res.json(updated);
+  } catch {
+    res.status(500).json({ error: 'Failed to record vaccination' });
+  }
+};

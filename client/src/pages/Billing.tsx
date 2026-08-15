@@ -7,12 +7,17 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { formatINR } from '../utils/clinical';
+import { printInvoice } from '../utils/medicines';
+import { Modal } from '../components/Modal';
 
 export const Billing = () => {
   const [billing, setBilling] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [payTarget, setPayTarget] = useState<any | null>(null);
+  const [payMethod, setPayMethod] = useState('CASH');
+  const [viewBill, setViewBill] = useState<any | null>(null);
 
   const fetchBillings = () => {
     setLoading(true);
@@ -25,16 +30,45 @@ export const Billing = () => {
     fetchBillings();
   }, []);
 
-  const handleMarkPaid = async (id: string) => {
-    const method = window.prompt('Enter Payment Method (CASH, UPI, CARD)', 'CASH');
-    if (!method) return;
+  const handleMarkPaid = async () => {
+    if (!payTarget) return;
     try {
-      await api.put(`/billing/${id}/pay-offline`, { paymentMethod: method });
+      await api.put(`/billing/${payTarget.id}/pay-offline`, { paymentMethod: payMethod });
+      setPayTarget(null);
       fetchBillings();
     } catch (err) {
       console.error(err);
       alert('Failed to process offline payment.');
     }
+  };
+
+  const exportReport = () => {
+    const byStatus = statusFilter === 'All' ? billing : billing.filter(b => b.status === statusFilter);
+    const rowsSrc = !searchQuery ? byStatus : byStatus.filter(b =>
+      (b.admission?.patient?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.id.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    const rows = [
+      ['Invoice', 'Patient', 'Room', 'Doctor', 'Pharmacy', 'Lab', 'Total', 'Status'],
+      ...rowsSrc.map((b) => [
+        `INV-${String(b.id).slice(0, 8).toUpperCase()}`,
+        b.admission?.patient?.name || '',
+        b.roomCharges || 0,
+        b.doctorFees || 0,
+        b.pharmacyFees || 0,
+        b.labFees || 0,
+        b.totalAmount || 0,
+        b.status,
+      ]),
+    ];
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hoscore-billing-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -56,7 +90,10 @@ export const Billing = () => {
         subtitle="Track payments, patient invoices, and financial records"
         icon={<Receipt className="w-5 h-5" />}
         actions={
-          <button className="flex items-center gap-2 px-4 py-2.5 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer shadow-sm">
+          <button
+            onClick={exportReport}
+            className="flex items-center gap-2 px-4 py-2.5 border border-[var(--card-border)] bg-[var(--card-bg)] rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--inner-bg)] transition-colors cursor-pointer shadow-sm"
+          >
             <Download className="w-4 h-4 text-[var(--text-muted)]" />
             Export Report
           </button>
@@ -150,11 +187,11 @@ export const Billing = () => {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="View Invoice"><Eye className="w-4 h-4" /></button>
-                    {(!bill.receiptUrl) && <button className="p-1.5 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Download PDF"><Download className="w-4 h-4" /></button>}
+                    <button onClick={() => setViewBill(bill)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="View Invoice"><Eye className="w-4 h-4" /></button>
+                    <button onClick={() => printInvoice({ ...bill, hospitalName: bill.hospital?.name, patientName: bill.admission?.patient?.name })} className="p-1.5 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Print invoice"><Download className="w-4 h-4" /></button>
                     {(bill.status === 'PENDING' || bill.status === 'Pending') && (
                       <button
-                        onClick={() => handleMarkPaid(bill.id)}
+                        onClick={() => { setPayTarget(bill); setPayMethod('CASH'); }}
                         className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer transition-all"
                       >
                         Mark Paid
@@ -185,6 +222,36 @@ export const Billing = () => {
           />
         )}
       </div>
+
+      <Modal isOpen={!!payTarget} onClose={() => setPayTarget(null)} title="Record offline payment">
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--text-secondary)]">
+            {payTarget?.admission?.patient?.name} · {formatINR(payTarget?.totalAmount || 0)}
+          </p>
+          <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm font-semibold">
+            <option value="CASH">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="CARD">Card</option>
+            <option value="BANK">Bank transfer</option>
+          </select>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPayTarget(null)} className="flex-1 rounded-xl border px-4 py-2 text-xs font-bold">Cancel</button>
+            <button type="button" onClick={handleMarkPaid} className="flex-1 rounded-xl bg-emerald-600 text-white px-4 py-2 text-xs font-bold">Mark paid</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!viewBill} onClose={() => setViewBill(null)} title="Invoice">
+        {viewBill && (
+          <div className="space-y-2 text-sm">
+            <p className="font-bold">{viewBill.admission?.patient?.name}</p>
+            <p>Room {formatINR(viewBill.roomCharges || 0)} · Doctor {formatINR(viewBill.doctorFees || 0)}</p>
+            <p>Pharmacy {formatINR(viewBill.pharmacyFees || 0)} · Lab {formatINR(viewBill.labFees || 0)}</p>
+            <p className="text-lg font-black">{formatINR(viewBill.totalAmount || 0)}</p>
+            <button onClick={() => printInvoice({ ...viewBill, patientName: viewBill.admission?.patient?.name })} className="rounded-xl bg-blue-600 text-white px-4 py-2 text-xs font-bold">Print tax invoice</button>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

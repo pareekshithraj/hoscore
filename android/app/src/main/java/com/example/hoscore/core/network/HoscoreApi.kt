@@ -255,6 +255,9 @@ interface HoscoreApi {
     @GET("patient/dashboard")
     suspend fun getPatientDashboard(): PatientDashboard
 
+    @GET("patient/visit")
+    suspend fun getMyVisit(): PatientVisit
+
     @GET("patient/location")
     suspend fun getMyLocation(): MyLocation
 
@@ -292,11 +295,20 @@ interface HoscoreApi {
     @GET("patient/bills")
     suspend fun getMyBills(): List<Bill>
 
+    @POST("patient/bills/{id}/pay-order")
+    suspend fun createPatientBillOrder(@Path("id") id: String): PatientBillOrder
+
+    @POST("patient/bills/pay-verify")
+    suspend fun verifyPatientBillPayment(@Body body: VerifyPaymentRequest): Bill
+
     @GET("patient/vaccinations")
     suspend fun getMyVaccinations(): List<Vaccination>
 
     @POST("patient/vaccinations")
     suspend fun recordVaccination(@Body body: RecordVaccinationRequest): Vaccination
+
+    @PATCH("vaccinations/{id}/complete")
+    suspend fun completeVaccination(@Path("id") id: String, @Body body: Map<String, String> = emptyMap()): Vaccination
 
     @GET("patient/dependents")
     suspend fun getDependents(): List<Patient>

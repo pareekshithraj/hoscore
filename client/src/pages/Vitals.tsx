@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { Heart, HeartPulse, Plus, X } from 'lucide-react';
 import { EmptyState, LoadingState, PageHeader, StatusPill, StatCard } from '../components/ui';
 import { formatShortDate, vitalsFlags } from '../utils/clinical';
-import { cn } from '../lib/cn';
+import { PatientPicker } from '../components/clinical/PatientPicker';
 
 export const Vitals = () => {
   const [vitals, setVitals] = useState<any[]>([]);
@@ -11,6 +11,7 @@ export const Vitals = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     patientName: '',
+    patientId: '',
     bloodPressure: '',
     heartRate: '',
     temperature: '',
@@ -35,7 +36,7 @@ export const Vitals = () => {
       oxygenSaturation: Number(form.oxygenSaturation),
     });
     setShowForm(false);
-    setForm({ patientName: '', bloodPressure: '', heartRate: '', temperature: '', oxygenSaturation: '' });
+    setForm({ patientName: '', patientId: '', bloodPressure: '', heartRate: '', temperature: '', oxygenSaturation: '' });
     load();
   };
 
@@ -158,8 +159,11 @@ export const Vitals = () => {
               <button onClick={() => setShowForm(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--inner-bg)]"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-3">
+              <PatientPicker
+                value={form.patientId}
+                onChange={(p) => setForm({ ...form, patientId: p?.id || '', patientName: p?.name || '' })}
+              />
               {[
-                { ph: 'Patient name', k: 'patientName', type: 'text' },
                 { ph: 'BP (e.g. 120/80)', k: 'bloodPressure', type: 'text' },
                 { ph: 'Heart rate (bpm)', k: 'heartRate', type: 'number' },
                 { ph: 'Temp (°F)', k: 'temperature', type: 'number' },

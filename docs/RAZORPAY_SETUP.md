@@ -17,13 +17,14 @@ Use this guide when submitting your app to Razorpay for live key approval.
 RAZORPAY_KEY_ID=rzp_test_xxxx          # Your test key from Razorpay Dashboard
 RAZORPAY_KEY_SECRET=xxxx
 RAZORPAY_WEBHOOK_SECRET=xxxx           # From Razorpay Dashboard → Webhooks
-CLIENT_URL=https://your-frontend.vercel.app
+CLIENT_URL=https://hoscore.in
+PUBLIC_APP_URL=https://hoscore.in
 ```
 
 ## Webhook URL (configure in Razorpay Dashboard)
 
 ```
-https://your-api.onrender.com/api/payments/webhook
+https://api.hoscore.in/api/payments/webhook
 ```
 
 Enable events:
@@ -38,8 +39,10 @@ Enable events:
 ## Required Client Environment (Vercel)
 
 ```env
-VITE_API_URL=https://your-api.onrender.com/api
+VITE_API_URL=https://api.hoscore.in/api
 ```
+
+Leave unset if the web project already defaults to `api.hoscore.in`.
 
 ## Test Checklist for Razorpay Review
 
@@ -49,7 +52,7 @@ VITE_API_URL=https://your-api.onrender.com/api
 - [ ] Complete test payment with Razorpay test card `4111 1111 1111 1111`
 - [ ] Verify subscription status shows **Active**
 - [ ] Enable autopay — complete Razorpay subscription auth
-- [ ] Confirm webhook received (check Render logs)
+- [ ] Confirm webhook received (Vercel → API project → Logs)
 - [ ] Payment history shows PAID record with correct user count
 
 ## Test Cards (Razorpay Test Mode)

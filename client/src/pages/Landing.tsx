@@ -398,30 +398,27 @@ export const Landing = () => {
           {/* Platform Performance Stat Panel */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 rounded-[28px] bg-slate-900/50 border border-slate-900/80 mb-16 shadow-2xl">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Patient Profiles</p>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <p className="text-2xl font-bold text-white tracking-tight">1,420,892,104</p>
-              </div>
-              <p className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider">Verified Medical Identity Active</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Listed hospitals</p>
+              <p className="text-2xl font-bold text-white tracking-tight">{hospitals.length || '—'}</p>
+              <p className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider">On the public directory</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Platform Uptime SLA</p>
-              <p className="text-2xl font-bold text-white tracking-tight">99.9999%</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">HIPAA & GDPR Compliant Security</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">What ships today</p>
+              <p className="text-sm font-bold text-white tracking-tight pt-1">Queue, records, billing</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Web + Android</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Network Hospitals</p>
-              <p className="text-2xl font-bold text-white tracking-tight">4,892</p>
-              <p className="text-[10px] text-rose-500/80 font-bold uppercase tracking-wider">Verified Clinics & Labs</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Payments</p>
+              <p className="text-sm font-bold text-white tracking-tight pt-1">Razorpay checkout</p>
+              <p className="text-[10px] text-rose-500/80 font-bold uppercase tracking-wider">GST invoice + mock/live</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Security Compliance</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Data protection</p>
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <p className="text-sm font-extrabold text-white tracking-wider">HIPAA / GDPR Ready Architecture</p>
+                <p className="text-sm font-extrabold text-white tracking-wider">DPDP-aligned</p>
               </div>
-              <p className="text-[10px] text-blue-400/80 font-bold uppercase tracking-wider">End-to-End Encryption</p>
+              <p className="text-[10px] text-blue-400/80 font-bold uppercase tracking-wider">ABDM certification not started</p>
             </div>
           </div>
 

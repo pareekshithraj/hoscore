@@ -14,6 +14,8 @@ const REQUIRED: string[] = ['DATABASE_URL', 'JWT_SECRET'];
 const REQUIRED_IN_PROD: string[] = [
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET',
+  'CLIENT_URL',
+  'PUBLIC_APP_URL',
 ];
 
 // Nice-to-have; warn only.
@@ -24,6 +26,8 @@ const OPTIONAL: string[] = [
   'MSG91_TEMPLATE_ID',
   'MSG91_FROM_EMAIL',
   'RAZORPAY_WEBHOOK_SECRET',
+  'RESEND_API_KEY',
+  'FCM_SERVER_KEY',
 ];
 
 export function validateEnv() {

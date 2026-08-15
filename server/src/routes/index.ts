@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, requireFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
+import { authenticate, requireFeature, requireAnyFeature, requireHospitalContext, requirePatientContext, requireSuperAdmin } from '../middleware/authMiddleware.js';
 import * as authController from '../controllers/authController.js';
 import * as hospitalController from '../controllers/hospitalController.js';
 import * as superAdminController from '../controllers/superAdminController.js';
@@ -82,8 +82,8 @@ router.post('/hospitals/register', authenticate, validate(hospitalRegisterSchema
 router.use(authenticate);
 
 // File uploads
-router.post('/upload/image', requireFeature(FEATURES.SETTINGS), upload.single('file'), uploadController.uploadImage);
-router.post('/upload/documents', requireFeature(FEATURES.PATIENTS), upload.array('files', 5), uploadController.uploadDocuments);
+router.post('/upload/image', requireAnyFeature(FEATURES.SETTINGS, FEATURES.CLAIMS, FEATURES.EXPENSES), upload.single('file'), uploadController.uploadImage);
+router.post('/upload/documents', requireAnyFeature(FEATURES.PATIENTS, FEATURES.CLAIMS, FEATURES.EXPENSES), upload.array('files', 5), uploadController.uploadDocuments);
 router.delete('/upload/file', requireFeature(FEATURES.PATIENTS), uploadController.deleteFile);
 
 // Auth context
@@ -91,6 +91,7 @@ router.get('/auth/me', authController.getMe);
 router.get('/auth/contexts', authController.getMyContexts);
 router.post('/auth/switch-context', validate(switchContextSchema), authController.switchContext);
 router.post('/auth/verify-switch-password', authController.verifySwitchPassword);
+router.post('/device-token', patientPortalController.registerDevice);
 
 
 
@@ -113,6 +114,7 @@ router.patch('/hospitals/staff/:id', requireFeature(FEATURES.STAFF), hospitalCon
 
 // ================= PATIENT PORTAL =================
 router.get('/patient/dashboard', requirePatientContext, patientPortalController.getPatientDashboard);
+router.get('/patient/visit', requirePatientContext, patientPortalController.getMyVisit);
 router.post('/patient/skip-alert', requirePatientContext, patientPortalController.skipAlert);
 router.get('/patient/dependents', requirePatientContext, patientPortalController.getDependents);
 router.post('/patient/dependents', requirePatientContext, patientPortalController.createDependent);
@@ -152,6 +154,8 @@ router.post('/super-admin/staff-types', requireSuperAdmin, staffTypeController.c
 router.put('/super-admin/staff-types/:id', requireSuperAdmin, staffTypeController.updateGlobalStaffType);
 router.delete('/super-admin/staff-types/:id', requireSuperAdmin, staffTypeController.deactivateGlobalStaffType);
 router.patch('/super-admin/hospitals/:id/toggle', requireSuperAdmin, superAdminController.toggleHospitalStatus);
+router.post('/super-admin/hospitals/:id/impersonate', requireSuperAdmin, superAdminController.impersonateHospital);
+router.get('/super-admin/payments', requireSuperAdmin, superAdminController.getPayments);
 router.patch('/super-admin/users/:id/toggle', requireSuperAdmin, superAdminController.toggleUserStatus);
 
 // ================= HOSPITAL-SCOPED ROUTES =================
@@ -173,10 +177,10 @@ router.get('/hospital/usage', requireFeature(FEATURES.SETTINGS), hospitalControl
 router.get('/stats', requireFeature(FEATURES.DASHBOARD), statsController.getStats);
 
 // ================= HOSPITAL MAP / WAYFINDING =================
-router.get('/map', requireFeature(FEATURES.MAP), mapController.getMap);
+router.get('/map', requireAnyFeature(FEATURES.MAP, FEATURES.ADMISSIONS), mapController.getMap);
 router.put('/map', requireFeature(FEATURES.MAP), mapController.saveMap);
-router.get('/map/positions', requireFeature(FEATURES.MAP), mapController.getLivePositions);
-router.post('/map/positions', requireFeature(FEATURES.MAP), mapController.upsertLivePosition);
+router.get('/map/positions', requireAnyFeature(FEATURES.MAP, FEATURES.ADMISSIONS), mapController.getLivePositions);
+router.post('/map/positions', requireAnyFeature(FEATURES.MAP, FEATURES.ADMISSIONS), mapController.upsertLivePosition);
 router.delete('/map/positions/:id', requireFeature(FEATURES.MAP), mapController.endLivePosition);
 router.get('/analytics', requireFeature(FEATURES.ANALYTICS), statsController.getAnalytics);
 
@@ -188,13 +192,14 @@ router.patch('/appointments/:id/check-in', requireFeature(FEATURES.QUEUE), appoi
 router.delete('/appointments/:id', requireFeature(FEATURES.CALENDAR), appointmentController.deleteAppointment);
 
 // Rooms
-router.get('/rooms', requireFeature(FEATURES.ROOMS), roomController.getAllRooms);
+router.get('/rooms', requireAnyFeature(FEATURES.ROOMS, FEATURES.ADMISSIONS), roomController.getAllRooms);
 router.post('/rooms', requireFeature(FEATURES.ROOMS), roomController.createRoom);
+router.patch('/rooms/:id', requireFeature(FEATURES.ROOMS), roomController.updateRoom);
 router.get('/rooms/:id', requireFeature(FEATURES.ROOMS), roomController.getRoomById);
 router.delete('/rooms/:id', requireFeature(FEATURES.ROOMS), roomController.deleteRoom);
 
 // Beds
-router.get('/beds', requireFeature(FEATURES.ROOMS), bedController.getAllBeds);
+router.get('/beds', requireAnyFeature(FEATURES.ROOMS, FEATURES.ADMISSIONS), bedController.getAllBeds);
 router.post('/beds', requireFeature(FEATURES.ROOMS), bedController.createBed);
 router.patch('/beds/:id/status', requireFeature(FEATURES.ROOMS), bedController.updateBedStatus);
 router.delete('/beds/:id', requireFeature(FEATURES.ROOMS), bedController.deleteBed);
@@ -207,6 +212,7 @@ router.get('/patients/:id', requireFeature(FEATURES.PATIENTS), patientController
 router.put('/patients/:id', requireFeature(FEATURES.PATIENTS), patientController.updatePatient);
 router.patch('/patients/:id/convert-hoscore', requireFeature(FEATURES.PATIENTS), patientController.convertManualPatientToHoscore);
 router.delete('/patients/:id', requireFeature(FEATURES.PATIENTS), patientController.deletePatient);
+router.patch('/vaccinations/:id/complete', requireFeature(FEATURES.PATIENTS), patientController.completeVaccination);
 
 // Admissions
 router.get('/admissions', requireFeature(FEATURES.ADMISSIONS), admissionController.getAllAdmissions);
@@ -214,7 +220,7 @@ router.post('/admissions', requireFeature(FEATURES.ADMISSIONS), admissionControl
 router.patch('/admissions/:id/discharge', requireFeature(FEATURES.ADMISSIONS), admissionController.dischargePatient);
 
 // Billing
-router.get('/billing', requireFeature(FEATURES.BILLING), billingController.getAllBillings);
+router.get('/billing', requireAnyFeature(FEATURES.BILLING, FEATURES.CLAIMS), billingController.getAllBillings);
 router.post('/billing', requireFeature(FEATURES.BILLING), billingController.createBilling);
 router.patch('/billing/:id/status', requireFeature(FEATURES.BILLING), billingController.updateBillingStatus);
 router.put('/billing/:id/pay-offline', requireFeature(FEATURES.BILLING), billingController.payOffline);
@@ -223,7 +229,7 @@ router.post('/billing/razorpay-verify', requireFeature(FEATURES.BILLING), billin
 router.delete('/billing/:id', requireFeature(FEATURES.BILLING), billingController.deleteBilling);
 
 // Doctors
-router.get('/doctors', requireFeature(FEATURES.DOCTORS), miscController.getAllDoctors);
+router.get('/doctors', requireAnyFeature(FEATURES.DOCTORS, FEATURES.CALENDAR), miscController.getAllDoctors);
 router.post('/doctors', requireFeature(FEATURES.DOCTORS), miscController.createDoctor);
 router.patch('/doctors/:id', requireFeature(FEATURES.DOCTORS), miscController.updateDoctor);
 router.delete('/doctors/:id', requireFeature(FEATURES.DOCTORS), miscController.deleteDoctor);
@@ -235,7 +241,8 @@ router.patch('/inventory/:id/stock', requireFeature(FEATURES.INVENTORY), miscCon
 router.delete('/inventory/:id', requireFeature(FEATURES.INVENTORY), miscController.deleteInventory);
 
 // Staff
-router.get('/staff', requireFeature(FEATURES.STAFF), miscController.getAllStaff);
+router.get('/staff', requireAnyFeature(FEATURES.STAFF, FEATURES.LEAVES, FEATURES.GROUPS, FEATURES.SHIFTS, FEATURES.CALENDAR, FEATURES.EXPENSES), miscController.getAllStaff);
+router.get('/roster', requireAnyFeature(FEATURES.STAFF, FEATURES.LEAVES, FEATURES.GROUPS, FEATURES.SHIFTS, FEATURES.CALENDAR, FEATURES.EXPENSES, FEATURES.FEEDBACK), miscController.getRoster);
 router.post('/staff', requireFeature(FEATURES.STAFF), miscController.createStaff);
 router.delete('/staff/:id', requireFeature(FEATURES.STAFF), miscController.deleteStaff);
 
@@ -309,6 +316,7 @@ router.delete('/shifts/:id', requireFeature(FEATURES.SHIFTS), shiftController.de
 // Feedback
 router.get('/feedback', requireFeature(FEATURES.FEEDBACK), feedbackController.getAll);
 router.post('/feedback', requireFeature(FEATURES.FEEDBACK), feedbackController.create);
+router.patch('/feedback/:id/reply', requireFeature(FEATURES.FEEDBACK), feedbackController.reply);
 router.delete('/feedback/:id', requireFeature(FEATURES.FEEDBACK), feedbackController.remove);
 
 // Insurance Claims

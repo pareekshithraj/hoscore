@@ -66,7 +66,7 @@ fun HospitalShell(
                 HospitalDest.GROUPS -> GroupsScreen(onBack = closeSub)
                 HospitalDest.FEEDBACK -> FeedbackScreen(onBack = closeSub)
                 HospitalDest.AUDIT_LOGS -> AuditLogsScreen(onBack = closeSub)
-                HospitalDest.MAP -> com.example.hoscore.feature.patient.MyLocationScreen()
+                HospitalDest.MAP -> StaffMapScreen()
                 null -> Unit
             }
         }

@@ -48,7 +48,8 @@ const COLUMNS = [
 ];
 
 export const OPDQueue = () => {
-  const { user } = useAuth();
+  const { user, activeContext } = useAuth();
+  const isDoctor = activeContext?.role === 'DOCTOR';
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -180,6 +181,7 @@ export const OPDQueue = () => {
     setSubmitSuccess(false);
 
     if (item.status === 'WAITING') {
+      if (!window.confirm(`Start consult with ${item.patientName || 'this patient'}?`)) return;
       try {
         await api.patch(`/queue/${item.id}/status`, { status: 'IN_CONSULTATION' });
         item = { ...item, status: 'IN_CONSULTATION' };
@@ -266,12 +268,11 @@ export const OPDQueue = () => {
         setSubmitting(false);
         return;
       }
-      const serializedMedicines = medicines.map((m) => `${m.name} (${m.dosage} | ${m.duration} | ${m.instructions})`).join('\n');
       await api.post('/prescriptions', {
         doctorId: docId,
         patientId: activePatient.id,
         diagnosis: diagnosis || 'General Consultation',
-        medicines: serializedMedicines || 'No medicines prescribed',
+        medicines: medicines.length ? medicines : [{ name: 'No medicines prescribed', dosage: '', duration: '', instructions: '' }],
         instructions: 'Consultation notes: ' + (diagnosis || 'Routine checkup'),
       });
       if (selectedLabs.length > 0) {
@@ -304,8 +305,8 @@ export const OPDQueue = () => {
       loadQueue(true);
       loadPatientDetails(activePatient.id);
       setTimeout(() => setSubmitSuccess(false), 5000);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      alert(err?.message || 'Could not complete consult. Check prescription and lab orders, then try again.');
     } finally {
       setSubmitting(false);
     }
@@ -343,8 +344,8 @@ export const OPDQueue = () => {
   return (
     <div className="space-y-5 pb-10 animate-fade-in-up">
       <PageHeader
-        title="OPD Live Board"
-        subtitle="Call the next patient, run consult, prescribe, and clear the queue — one flow."
+        title={isDoctor ? 'My consult board' : 'OPD Live Board'}
+        subtitle={isDoctor ? 'Call the next patient, write Rx and labs, then complete the visit.' : 'Front desk: add tokens, check in bookings, and keep the live board moving.'}
         icon={<Stethoscope className="h-5 w-5" />}
         meta={
           <>
@@ -375,7 +376,7 @@ export const OPDQueue = () => {
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] transition-all hover:bg-[var(--inner-bg)]"
             >
-              <Plus className="h-4 w-4" /> Add token
+              <Plus className="h-4 w-4" /> {isDoctor ? 'Walk-in token' : 'Add token'}
             </button>
           </>
         }

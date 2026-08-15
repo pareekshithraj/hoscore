@@ -91,7 +91,7 @@ feature/screen if its key is in `permissions`** (ADMIN typically has all).
 The keys map 1:1 to the API groups below. Feature keys observed:
 `dashboard, queue, prescriptions, labs, vitals, discharges, shifts, claims,
 expenses, rooms, patients, admissions, billing, doctors, inventory, staff,
-staff_types, calendar, notices, leaves, groups, analytics, simulator,
+staff_types, calendar, notices, leaves, groups, analytics, map,
 audit_logs, feedback, settings`.
 
 ### API surface by context

@@ -103,49 +103,103 @@ export function blankGrid(rows: number, cols: number): AreaType[][] {
   return Array.from({ length: rows }, () => Array.from({ length: cols }, () => 'corridor' as AreaType));
 }
 
-export function syncRoomBlocksToGrid(floor: Floor, rows: number, cols: number): Floor {
-  if (!floor.rooms || floor.rooms.length === 0) return floor;
+export const ROOM_TYPE_TO_AREA: Record<string, AreaType> = {
+  icu: 'icu',
+  emergency: 'emergency',
+  er: 'emergency',
+  ot: 'ot',
+  surgery: 'ot',
+  theatre: 'ot',
+  radiology: 'radiology',
+  lab: 'lab',
+  laboratory: 'lab',
+  pharmacy: 'pharmacy',
+  reception: 'reception',
+  cafeteria: 'cafeteria',
+  ward: 'ward-a',
+  'ward a': 'ward-a',
+  'ward-a': 'ward-a',
+  'ward b': 'ward-b',
+  'ward-b': 'ward-b',
+  general: 'ward-a',
+  private: 'ward-b',
+};
 
-  // Start with corridor base
-  const cells: AreaType[][] = Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => 'corridor' as AreaType)
-  );
+export function mapRoomTypeToArea(raw?: string | null): AreaType {
+  if (!raw) return 'ward-a';
+  return ROOM_TYPE_TO_AREA[raw.trim().toLowerCase()] || 'ward-a';
+}
 
-  floor.rooms.forEach((r) => {
-    const minY = Math.max(0, Math.min(rows - 1, r.y));
-    const maxY = Math.max(0, Math.min(rows - 1, r.y + r.h - 1));
-    const minX = Math.max(0, Math.min(cols - 1, r.x));
-    const maxX = Math.max(0, Math.min(cols - 1, r.x + r.w - 1));
+function stampRoom(cells: AreaType[][], r: RoomBlock, rows: number, cols: number) {
+  const minY = Math.max(0, Math.min(rows - 1, r.y));
+  const maxY = Math.max(0, Math.min(rows - 1, r.y + r.h - 1));
+  const minX = Math.max(0, Math.min(cols - 1, r.x));
+  const maxX = Math.max(0, Math.min(cols - 1, r.x + r.w - 1));
+  const midX = Math.floor((minX + maxX) / 2);
+  const midY = Math.floor((minY + maxY) / 2);
 
-    // Fill room interior
-    for (let py = minY; py <= maxY; py++) {
-      for (let px = minX; px <= maxX; px++) {
-        // Perimeter wall vs interior zone
-        const isEdgeY = py === minY || py === maxY;
-        const isEdgeX = px === minX || px === maxX;
+  for (let py = minY; py <= maxY; py++) {
+    for (let px = minX; px <= maxX; px++) {
+      const isEdgeY = py === minY || py === maxY;
+      const isEdgeX = px === minX || px === maxX;
+      let isDoor = false;
+      if (r.doorSide === 'north' && py === minY && px === midX) isDoor = true;
+      if (r.doorSide === 'south' && py === maxY && px === midX) isDoor = true;
+      if (r.doorSide === 'west' && px === minX && py === midY) isDoor = true;
+      if (r.doorSide === 'east' && px === maxX && py === midY) isDoor = true;
 
-        // Check if door location
-        let isDoor = false;
-        const midX = Math.floor((minX + maxX) / 2);
-        const midY = Math.floor((minY + maxY) / 2);
-
-        if (r.doorSide === 'north' && py === minY && px === midX) isDoor = true;
-        if (r.doorSide === 'south' && py === maxY && px === midX) isDoor = true;
-        if (r.doorSide === 'west' && px === minX && py === midY) isDoor = true;
-        if (r.doorSide === 'east' && px === maxX && py === midY) isDoor = true;
-
-        if (isDoor) {
-          cells[py][px] = 'corridor';
-        } else if (isEdgeY || isEdgeX) {
-          cells[py][px] = 'wall';
-        } else {
-          cells[py][px] = r.type;
-        }
-      }
+      if (isDoor) cells[py][px] = 'corridor';
+      else if (isEdgeY || isEdgeX) cells[py][px] = 'wall';
+      else cells[py][px] = r.type;
     }
-  });
+  }
+}
 
-  return { ...floor, cells };
+/** Overlay room blocks onto existing painted cells. Does not wipe corridors/walls outside rooms. */
+export function syncRoomBlocksToGrid(floor: Floor, rows: number, cols: number): Floor {
+  if (!floor.rooms || floor.rooms.length === 0) return normaliseFloor(floor, rows, cols);
+
+  const base = normaliseFloor(floor, rows, cols);
+  const cells = base.cells.map((row) => [...row]);
+  floor.rooms.forEach((r) => stampRoom(cells, r, rows, cols));
+  return { ...base, cells, rooms: floor.rooms };
+}
+
+/** Bake room geometry into cells so consumers that only read `cells` (wayfinding, Android) match the builder. */
+export function bakeMapForSave(doc: HospitalMapDoc): HospitalMapDoc {
+  return {
+    ...doc,
+    floors: doc.floors.map((f) => syncRoomBlocksToGrid(f, doc.rows, doc.cols)),
+  };
+}
+
+export function roomsOverlap(a: RoomBlock, b: RoomBlock): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+export function findEmptyPlacement(
+  rooms: RoomBlock[],
+  w: number,
+  h: number,
+  cols: number,
+  rows: number,
+): { x: number; y: number } {
+  const candidate: RoomBlock = { id: 'tmp', name: '', type: 'ward-a', x: 1, y: 1, w, h };
+  for (let y = 0; y <= rows - h; y++) {
+    for (let x = 0; x <= cols - w; x++) {
+      candidate.x = x;
+      candidate.y = y;
+      if (!rooms.some((r) => roomsOverlap(r, candidate))) return { x, y };
+    }
+  }
+  return { x: 0, y: 0 };
+}
+
+export function isFloorEmpty(floor: Floor): boolean {
+  const hasRooms = (floor.rooms?.length ?? 0) > 0;
+  const hasAnchors = (floor.anchors?.length ?? 0) > 0;
+  const painted = floor.cells?.some((row) => row.some((c) => c !== 'empty' && c !== 'corridor'));
+  return !hasRooms && !hasAnchors && !painted;
 }
 
 export function emptyFloor(index: number, rows: number, cols: number): Floor {

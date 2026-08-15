@@ -4,18 +4,20 @@
 
 - `DATABASE_URL` and `DIRECT_URL` for Neon Postgres.
 - `JWT_SECRET` set to a long random secret.
-- `CLIENT_URL` set to the production frontend origin.
-- `PUBLIC_APP_URL` set to the public website origin for sitemap and canonical URLs.
+- `CLIENT_URL=https://hoscore.in`
+- `PUBLIC_APP_URL=https://hoscore.in`
 - `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, and `R2_PUBLIC_URL` for Cloudflare R2 uploads.
 - Optional pricing overrides: `NEON_STORAGE_USD_PER_GB_MONTH`, `R2_STORAGE_USD_PER_GB_MONTH`, `R2_CLASS_A_USD_PER_MILLION`, `R2_CLASS_B_USD_PER_MILLION`.
 
 ## Build And Release
 
+Production is two Vercel projects: web (`client` → hoscore.in) and API (`server` → api.hoscore.in).
+
 1. Run `npm run lint --prefix client`.
 2. Run `npm run build`.
-3. Apply Prisma migrations with `npx prisma migrate deploy --schema server/prisma/schema.prisma`.
+3. Prisma migrations run on API deploy via `server` `vercel-build` (`prisma migrate deploy`). Do not use `prisma db push` in production.
 4. Do not run the seed script against production unless intentionally resetting demo data.
-5. Verify `/health`, `/robots.txt`, and `/sitemap.xml` after deployment.
+5. Verify `https://api.hoscore.in/health`, `https://hoscore.in/robots.txt`, and `https://api.hoscore.in/sitemap.xml` after deployment.
 
 ## Security Checklist
 

@@ -32,7 +32,12 @@ import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.example.hoscore.core.network.CreatePrescriptionRequest
+import com.example.hoscore.core.network.ServiceLocator
+import com.example.hoscore.core.network.apiCall
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,6 +69,66 @@ fun QueueScreen() {
     val pendingState by vm.pendingState.collectAsState()
     
     var showDatePicker by remember { mutableStateOf(false) }
+    var confirmItem by remember { mutableStateOf<com.example.hoscore.core.network.QueueItem?>(null) }
+    var consultItem by remember { mutableStateOf<com.example.hoscore.core.network.QueueItem?>(null) }
+    var diagnosis by remember { mutableStateOf("") }
+    var medicines by remember { mutableStateOf("") }
+    var consultSaving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    if (confirmItem != null) {
+        val item = confirmItem!!
+        val starting = item.status.uppercase() == "WAITING"
+        val nextLabel = if (starting) "Start consultation and call this patient?" else "Mark this consult completed?"
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmItem = null },
+            title = { Text("Confirm", fontWeight = FontWeight.Bold) },
+            text = { Text(nextLabel) },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.advance(item)
+                    confirmItem = null
+                    if (starting) {
+                        diagnosis = ""
+                        medicines = ""
+                        consultItem = item
+                    }
+                }) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmItem = null }) { Text("Cancel") }
+            },
+        )
+    }
+    consultItem?.let { item ->
+        com.example.hoscore.core.ui.components.FormDialog(
+            title = "Consult ${item.patientName}",
+            onDismiss = { consultItem = null },
+            onSubmit = {
+                consultSaving = true
+                scope.launch {
+                    val res = apiCall {
+                        ServiceLocator.api.createPrescription(
+                            CreatePrescriptionRequest(
+                                patientId = item.patientId,
+                                patientName = item.patientName,
+                                doctorName = item.doctorName,
+                                diagnosis = diagnosis.ifBlank { "OPD consult" },
+                                medicines = medicines,
+                                status = "ISSUED",
+                            )
+                        )
+                    }
+                    consultSaving = false
+                    if (res is Resource.Success) consultItem = null
+                }
+            },
+            submitLabel = if (consultSaving) "Saving…" else "Save chart",
+            submitEnabled = !consultSaving && medicines.isNotBlank(),
+        ) {
+            com.example.hoscore.core.ui.components.FormField(diagnosis, { diagnosis = it }, "Diagnosis")
+            com.example.hoscore.core.ui.components.FormField(medicines, { medicines = it }, "Medicines", singleLine = false)
+        }
+    }
     if (showDatePicker) {
         val dpState = rememberDatePickerState()
         DatePickerDialog(
@@ -183,8 +248,23 @@ fun QueueScreen() {
                                 }
                                 if (q.status.uppercase() != "COMPLETED") {
                                     Spacer(Modifier.height(12.dp))
+                                    if (q.status.uppercase() == "IN_CONSULTATION") {
+                                        Button(
+                                            onClick = {
+                                                diagnosis = ""
+                                                medicines = ""
+                                                consultItem = q
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = t.emerald),
+                                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                                        ) {
+                                            Text("Write prescription", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                        }
+                                        Spacer(Modifier.height(8.dp))
+                                    }
                                     Button(
-                                        onClick = { vm.advance(q) },
+                                        onClick = { confirmItem = q },
                                         shape = RoundedCornerShape(12.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = t.primary),
                                         modifier = Modifier.fillMaxWidth().height(42.dp),

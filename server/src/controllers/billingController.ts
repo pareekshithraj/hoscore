@@ -3,6 +3,7 @@ import { prisma } from '../index.js';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { generateAndUploadReceipt } from '../services/pdfService.js';
+import { createOrder, getRazorpayKeyId, isRazorpayLive, verifyPaymentSignature } from '../services/razorpay.js';
 
 const hid = (req: Request) => (req as any).user?.hospitalId;
 
@@ -144,14 +145,22 @@ export const createPatientBillOrder = async (req: Request, res: Response) => {
     if (!existing) return res.status(404).json({ error: 'Bill not found for your account' });
     if (existing.status === 'PAID') return res.status(400).json({ error: 'This bill is already paid' });
 
-    const order = await razorpay.orders.create({
+    const hospitalId = existing.hospitalId || existing.hospital?.id || 'patient';
+    const order = await createOrder({
+      hospitalId,
       amount: Math.round(existing.totalAmount * 100),
-      currency: 'INR',
-      receipt: existing.id,
+      userCount: 1,
+      plan: 'BILL',
     });
 
     await prisma.billing.update({ where: { id: existing.id }, data: { razorpayOrderId: order.id } });
-    res.json({ orderId: order.id, amount: order.amount, currency: order.currency });
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: getRazorpayKeyId(),
+      mockMode: !isRazorpayLive || String(order.id).startsWith('order_mock_'),
+    });
   } catch (err) {
     console.error('Patient bill order error:', err);
     res.status(500).json({ error: 'Failed to start payment' });
@@ -182,12 +191,8 @@ export const verifyPatientBillPayment = async (req: Request, res: Response) => {
     if (!existing) return res.status(404).json({ error: 'Order not found for your account' });
     if (existing.status === 'PAID') return res.status(400).json({ error: 'This bill is already paid' });
 
-    const generatedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
-      .update(razorpay_order_id + '|' + razorpay_payment_id)
-      .digest('hex');
-
-    if (generatedSignature !== razorpay_signature) {
+    const mock = !isRazorpayLive || String(razorpay_order_id).startsWith('order_mock_');
+    if (!mock && !verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
       return res.status(400).json({ error: 'Invalid payment signature' });
     }
 

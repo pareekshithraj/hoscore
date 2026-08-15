@@ -28,6 +28,34 @@ export function buildVerifyAccessTokenPayload(accessToken: string, authKey: stri
  * e.g. 919876543210. We send our own pre-generated OTP so it matches what we
  * store in the DB (MSG91 can also generate, but we keep verification server-side).
  */
+const SMS_HTTP_URL = 'https://control.msg91.com/api/sendhttp.php';
+const SMS_SENDER = process.env.MSG91_SENDER || 'HOSCOR';
+
+/** Transactional SMS for queue/call alerts. Uses MSG91 sendhttp when live. */
+export async function sendAlertSms(mobile: string, message: string): Promise<boolean> {
+  if (!isMsg91Live) {
+    console.log(`📱 [MOCK SMS] ${mobile} -> ${message}`);
+    return true;
+  }
+  try {
+    await axios.get(SMS_HTTP_URL, {
+      params: {
+        authkey: AUTH_KEY,
+        mobiles: mobile,
+        message,
+        sender: SMS_SENDER,
+        route: 4,
+        country: 91,
+      },
+      timeout: 10000,
+    });
+    return true;
+  } catch (err: any) {
+    console.error('MSG91 alert SMS failed:', err?.response?.data || err?.message);
+    return false;
+  }
+}
+
 export async function sendSmsOtp(mobile: string, otp: string): Promise<boolean> {
   if (!isMsg91Live || !TEMPLATE_ID) {
     console.log(`📱 [MOCK SMS OTP] ${mobile} -> ${otp}`);

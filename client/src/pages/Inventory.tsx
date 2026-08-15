@@ -17,6 +17,8 @@ interface InventoryItem {
   unit: string;
   price: number;
   supplier?: string;
+  batchNumber?: string;
+  expiryDate?: string;
 }
 
 export const Inventory = () => {
@@ -28,7 +30,9 @@ export const Inventory = () => {
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
   const itemTypes = ['Medicine', 'Consumable', 'Equipment', 'Lab Reagent'];
   
-  const [formData, setFormData] = useState({ itemName: '', type: 'Medicine', stock: 100, reorderLevel: 20, price: 10, supplier: '' });
+  const [formData, setFormData] = useState({ itemName: '', type: 'Medicine', stock: 100, reorderLevel: 20, price: 10, supplier: '', batchNumber: '', expiryDate: '' });
+  const [restockTarget, setRestockTarget] = useState<InventoryItem | null>(null);
+  const [restockQty, setRestockQty] = useState(0);
 
   const fetchInventory = () => {
     setLoading(true);
@@ -46,6 +50,16 @@ export const Inventory = () => {
     } catch (err) { console.error(err); }
   };
 
+  const handleRestock = async () => {
+    if (!restockTarget) return;
+    try {
+      await api.patch(`/inventory/${restockTarget.id}/stock`, { stock: restockTarget.stock + Number(restockQty || 0) });
+      setRestockTarget(null);
+      setRestockQty(0);
+      fetchInventory();
+    } catch (err) { console.error(err); }
+  };
+
   useEffect(() => {
     fetchInventory();
   }, []);
@@ -55,7 +69,7 @@ export const Inventory = () => {
     try {
       await api.post('/inventory', { ...formData, stock: Number(formData.stock), reorderLevel: Number(formData.reorderLevel), price: Number(formData.price) });
       setIsModalOpen(false);
-      setFormData({ itemName: '', type: 'Medicine', stock: 100, reorderLevel: 20, price: 10, supplier: '' });
+      setFormData({ itemName: '', type: 'Medicine', stock: 100, reorderLevel: 20, price: 10, supplier: '', batchNumber: '', expiryDate: '' });
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -172,7 +186,7 @@ export const Inventory = () => {
                   <td className="px-6 py-4 text-sm font-bold text-[var(--text-primary)]">{formatINR(item.price)}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Restock"><RefreshCw className="w-4 h-4" /></button>
+                      <button onClick={() => { setRestockTarget(item); setRestockQty(item.reorderLevel); }} className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors" title="Restock"><RefreshCw className="w-4 h-4" /></button>
                       <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-sky-400 hover:bg-[var(--inner-bg)] rounded-lg cursor-pointer transition-colors"><Edit2 className="w-4 h-4" /></button>
                       <button onClick={() => setDeleteTarget(item)} className="p-1.5 text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer transition-colors"><Trash2 className="w-4 h-4" /></button>
                     </div>
@@ -222,6 +236,16 @@ export const Inventory = () => {
             <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Supplier</label>
             <input value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} type="text" placeholder="Supplier name" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold text-[var(--text-primary)] focus:outline-none" />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Batch</label>
+              <input value={formData.batchNumber} onChange={e => setFormData({...formData, batchNumber: e.target.value})} type="text" placeholder="Batch no." className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Expiry</label>
+              <input value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} type="date" className="w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-xl text-sm font-semibold" />
+            </div>
+          </div>
           <div className="pt-4 flex gap-3">
             <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-[var(--card-border)] rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--inner-bg)] cursor-pointer">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer">Add Item</button>
@@ -247,6 +271,20 @@ export const Inventory = () => {
             <div className="flex gap-3">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl border border-[var(--card-border)] px-4 py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--inner-bg)] cursor-pointer">Cancel</button>
               <button onClick={handleDelete} className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 shadow-md cursor-pointer">Delete Item</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restockTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6">
+            <h3 className="font-bold mb-2">Restock {restockTarget.itemName}</h3>
+            <p className="text-xs text-[var(--text-muted)] mb-3">Current stock {restockTarget.stock}</p>
+            <input type="number" value={restockQty} onChange={(e) => setRestockQty(Number(e.target.value))} className="w-full rounded-xl border px-3 py-2 text-sm mb-4" />
+            <div className="flex gap-2">
+              <button onClick={() => setRestockTarget(null)} className="flex-1 rounded-xl border px-4 py-2 text-xs font-bold">Cancel</button>
+              <button onClick={handleRestock} className="flex-1 rounded-xl bg-blue-600 text-white px-4 py-2 text-xs font-bold">Add stock</button>
             </div>
           </div>
         </div>

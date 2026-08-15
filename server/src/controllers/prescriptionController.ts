@@ -7,7 +7,11 @@ const hid = (req: Request) => (req as any).user?.hospitalId;
 
 export const getAll = async (req: Request, res: Response) => {
   try {
-    const prescriptions = await prisma.prescription.findMany({ where: { hospitalId: hid(req) }, orderBy: { createdAt: 'desc' } });
+    const prescriptions = await prisma.prescription.findMany({
+      where: { hospitalId: hid(req) },
+      orderBy: { createdAt: 'desc' },
+      include: { patient: true, doctor: true },
+    });
     res.json(prescriptions);
   } catch (err) { res.status(500).json({ error: 'Failed to fetch prescriptions' }); }
 };
@@ -59,7 +63,7 @@ export const updateStatus = async (req: Request, res: Response) => {
 
     const rx = await prisma.prescription.update({ where: { id: existing.id }, data: { status: newStatus } });
 
-    // Auto-deduct matching medicine items from Inventory when status transitions to DISPENSED or CURRENT
+    const deducted: Array<{ itemName: string; quantity: number; remaining: number }> = [];
     if ((newStatus === 'DISPENSED' || newStatus === 'CURRENT') && currentStatus !== 'DISPENSED' && currentStatus !== 'CURRENT' && existing.medicines) {
       try {
         let medicineList: Array<{ name?: string; itemName?: string; quantity?: number; count?: number }> = [];
@@ -77,10 +81,11 @@ export const updateStatus = async (req: Request, res: Response) => {
               where: { hospitalId, itemName: { contains: medName, mode: 'insensitive' } }
             });
             if (item && item.stock >= qty) {
-              await prisma.inventory.update({
+              const updatedItem = await prisma.inventory.update({
                 where: { id: item.id },
                 data: { stock: Math.max(0, item.stock - qty) }
               });
+              deducted.push({ itemName: item.itemName, quantity: qty, remaining: updatedItem.stock });
             }
           }
         }
@@ -89,8 +94,16 @@ export const updateStatus = async (req: Request, res: Response) => {
       }
     }
 
-    await logAudit(req, 'UPDATE', 'Prescription', rx.id, `Status set from ${existing.status} to ${rx.status}`);
-    res.json(rx);
+    await logAudit(
+      req,
+      'UPDATE',
+      'Prescription',
+      rx.id,
+      deducted.length
+        ? `Dispensed ${rx.id}: deducted ${deducted.map((d) => `${d.quantity}× ${d.itemName}`).join(', ')}`
+        : `Status set from ${existing.status} to ${rx.status}`,
+    );
+    res.json({ ...rx, deducted });
   } catch (err) { res.status(500).json({ error: 'Failed to update prescription' }); }
 };
 

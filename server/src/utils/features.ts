@@ -106,6 +106,7 @@ export const STAFF_TYPE_PRESETS = [
     role: 'PHARMACIST',
     description: 'Prescription and inventory workflow.',
     permissions: [
+      FEATURES.DASHBOARD,
       FEATURES.PRESCRIPTIONS,
       FEATURES.INVENTORY,
       FEATURES.CALENDAR,
@@ -119,6 +120,7 @@ export const STAFF_TYPE_PRESETS = [
     role: 'LAB_TECH',
     description: 'Lab order processing and shared hospital communication.',
     permissions: [
+      FEATURES.DASHBOARD,
       FEATURES.LABS,
       FEATURES.CALENDAR,
       FEATURES.NOTICES,

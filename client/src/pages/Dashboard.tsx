@@ -14,6 +14,8 @@ import {
   Pill,
   Building2,
   QrCode,
+  Stethoscope,
+  Play,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HospitalQRPassModal } from "../components/HospitalQRPassModal";
@@ -141,6 +143,11 @@ export const Dashboard = () => {
   const [patients, setPatients] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [beds, setBeds] = useState<any[]>([]);
+  const [myQueue, setMyQueue] = useState<any[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
+  const [labOrders, setLabOrders] = useState<any[]>([]);
+  const [pendingBookings, setPendingBookings] = useState<any[]>([]);
+  const [admissionsList, setAdmissionsList] = useState<any[]>([]);
 
   // Pharmacist portal state
   const [rxSearchId, setRxSearchId] = useState("");
@@ -170,16 +177,31 @@ export const Dashboard = () => {
   const loadStatsAndData = async (showPulse = false) => {
     if (!showPulse) setLoading(true);
     try {
-      const [statsRes, ptsRes, docsRes, bedsRes] = await Promise.all([
+      const today = new Date().toISOString().split("T")[0];
+      const [statsRes, ptsRes, docsRes, bedsRes, queueRes, apptRes, labsRes, pendingRes, admRes] = await Promise.all([
         api.get("/stats"),
         api.get("/patients").catch(() => []),
         api.get("/doctors").catch(() => []),
-        api.get("/beds").catch(() => [])
+        api.get("/beds").catch(() => []),
+        api.get(`/queue?date=${today}`).catch(() => []),
+        api.get("/appointments").catch(() => []),
+        api.get("/labs").catch(() => []),
+        api.get("/queue/pending-appointments").catch(() => []),
+        api.get("/admissions").catch(() => []),
       ]);
       setStats(statsRes);
       setPatients(ptsRes || []);
       setDoctors(docsRes || []);
       setBeds(bedsRes || []);
+      setMyQueue(Array.isArray(queueRes) ? queueRes : []);
+      setLabOrders(Array.isArray(labsRes) ? labsRes : []);
+      setPendingBookings(Array.isArray(pendingRes) ? pendingRes : []);
+      setAdmissionsList(Array.isArray(admRes) ? admRes : []);
+      const mine = (Array.isArray(apptRes) ? apptRes : []).filter((a: any) => {
+        const d = a.date ? new Date(a.date).toISOString().split("T")[0] : "";
+        return d === today;
+      });
+      setTodayAppointments(mine);
     } catch (err) {
       console.error("Failed to load dashboard core statistics", err);
     } finally {
@@ -234,8 +256,13 @@ export const Dashboard = () => {
 
   const handleDispense = async (rxId: string) => {
     try {
-      await api.patch(`/prescriptions/${rxId}/status`, { status: "DISPENSED" });
-      setRxSuccessMsg("Prescription successfully dispensed.");
+      const res = await api.patch(`/prescriptions/${rxId}/status`, { status: "DISPENSED" });
+      const deducted = Array.isArray(res?.deducted) ? res.deducted : [];
+      setRxSuccessMsg(
+        deducted.length
+          ? `Dispensed. Stock deducted: ${deducted.map((d: any) => `${d.quantity}× ${d.itemName} (${d.remaining} left)`).join("; ")}`
+          : "Prescription dispensed. No matching inventory lines to deduct.",
+      );
       // Refresh patient prescriptions data
       const updatedPatient = await api.get(`/patients/search/${rxSearchId}`);
       setRxPatient(updatedPatient);
@@ -618,6 +645,154 @@ export const Dashboard = () => {
           hospitalId={activeContext?.hospitalId || "HSP-MAIN"}
         />
       </div>
+
+      {role === "DOCTOR" && (() => {
+        const myName = user?.name?.toLowerCase() || "";
+        const myEmail = user?.email?.toLowerCase() || "";
+        const matchedDoc = doctors.find((d: any) => d.email?.toLowerCase() === myEmail || d.name?.toLowerCase() === myName);
+        const doctorQueue = myQueue.filter((q: any) =>
+          !matchedDoc ? true : q.doctorName === matchedDoc.name || q.doctorId === matchedDoc.id
+        );
+        const waiting = doctorQueue.filter((q: any) => q.status === "WAITING");
+        const inConsult = doctorQueue.filter((q: any) => q.status === "IN_CONSULTATION");
+        const next = waiting[0];
+        const myAppts = todayAppointments.filter((a: any) =>
+          a.doctorId === matchedDoc?.id || a.doctor?.name === matchedDoc?.name || a.doctorName === matchedDoc?.name
+        );
+        return (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-500/20 bg-[var(--card-bg)] p-5 shadow-sm lg:col-span-2">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-black text-[var(--text-primary)]">
+                  <Stethoscope className="h-4 w-4 text-emerald-500" /> My day
+                </h3>
+                <Link to="/dashboard/queue" className="text-xs font-bold text-blue-600">Open OPD →</Link>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                  <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Waiting</p>
+                  <p className="text-2xl font-black">{waiting.length}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                  <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">In consult</p>
+                  <p className="text-2xl font-black">{inConsult.length}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                  <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Today's visits</p>
+                  <p className="text-2xl font-black">{myAppts.length || upcomingAppts.length}</p>
+                </div>
+              </div>
+              {next ? (
+                <Link
+                  to="/dashboard/queue"
+                  className="flex items-center justify-between rounded-xl bg-blue-600 px-4 py-3 text-white"
+                >
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-100">Next patient</p>
+                    <p className="text-sm font-black">{next.patientName || next.patient?.name}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold"><Play className="h-4 w-4" /> Call next</span>
+                </Link>
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">No patients waiting in your queue.</p>
+              )}
+            </div>
+            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-black text-[var(--text-primary)]">Today's appointments</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {(myAppts.length ? myAppts : upcomingAppts).slice(0, 6).map((a: any) => (
+                  <div key={a.id} className="rounded-lg border border-[var(--card-border)] bg-[var(--inner-bg)] px-3 py-2">
+                    <p className="text-xs font-bold truncate">{a.patient?.name || a.patientName || "Patient"}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">{a.time || "—"} · {a.status}</p>
+                  </div>
+                ))}
+                {(myAppts.length ? myAppts : upcomingAppts).length === 0 && (
+                  <p className="text-xs text-[var(--text-muted)]">No visits booked today.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {role === "RECEPTIONIST" && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-amber-500/20 bg-[var(--card-bg)] p-5 shadow-sm lg:col-span-2">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-black text-[var(--text-primary)]">Front desk — today</h3>
+              <Link to="/dashboard/queue" className="text-xs font-bold text-blue-600">Open queue →</Link>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Waiting</p>
+                <p className="text-2xl font-black">{myQueue.filter((q) => q.status === "WAITING").length}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">In consult</p>
+                <p className="text-2xl font-black">{myQueue.filter((q) => q.status === "IN_CONSULTATION").length}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Online bookings</p>
+                <p className="text-2xl font-black">{pendingBookings.length}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/dashboard/queue" className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white">Check in next</Link>
+              <Link to="/dashboard/patients" className="rounded-xl border border-[var(--card-border)] px-4 py-2 text-xs font-bold">Register patient</Link>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-black">Pending check-ins</h3>
+            {pendingBookings.slice(0, 6).map((a: any) => (
+              <p key={a.id} className="text-xs font-bold border-b border-[var(--card-border)] py-2">{a.patient?.name || a.patientName} · {a.time}</p>
+            ))}
+            {pendingBookings.length === 0 && <p className="text-xs text-[var(--text-muted)]">No online bookings waiting.</p>}
+          </div>
+        </div>
+      )}
+
+      {role === "NURSE" && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-emerald-500/20 bg-[var(--card-bg)] p-5 shadow-sm lg:col-span-2">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-black">Ward — my day</h3>
+              <Link to="/dashboard/admissions" className="text-xs font-bold text-blue-600">Census →</Link>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Occupied beds</p>
+                <p className="text-2xl font-black">{beds.filter((b: any) => String(b.status).includes("OCCUPIED")).length}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Active IPD</p>
+                <p className="text-2xl font-black">{admissionsList.filter((a) => a.status === "Active").length}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--card-border)] bg-[var(--inner-bg)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">OPD waiting</p>
+                <p className="text-2xl font-black">{myQueue.filter((q) => q.status === "WAITING").length}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/dashboard/vitals" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white">Record vitals</Link>
+              <Link to="/dashboard/admissions" className="rounded-xl border border-[var(--card-border)] px-4 py-2 text-xs font-bold">Beds</Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {role === "LAB_TECH" && (
+        <div className="rounded-2xl border border-violet-500/20 bg-[var(--card-bg)] p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-black">Lab inbox</h3>
+            <Link to="/dashboard/labs" className="text-xs font-bold text-blue-600">All orders →</Link>
+          </div>
+          <p className="text-2xl font-black mb-3">{labOrders.filter((o) => !o.result || o.status === "PENDING" || o.status === "ORDERED").length} awaiting results</p>
+          {labOrders.filter((o) => !o.result || o.status === "PENDING" || o.status === "ORDERED").slice(0, 5).map((o: any) => (
+            <p key={o.id} className="text-xs font-bold border-b border-[var(--card-border)] py-2">{o.testName} · {o.patientName || o.patient?.name}</p>
+          ))}
+          <Link to="/dashboard/labs" className="mt-3 inline-block rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white">Enter results</Link>
+        </div>
+      )}
 
       {role === "PHARMACIST" ? (
         /* ==================== PHARMACIST PORTAL ==================== */
