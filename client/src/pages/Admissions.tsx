@@ -9,6 +9,7 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PatientPicker } from '../components/clinical/PatientPicker';
+import { initials } from '../utils/clinical';
 
 export const Admissions = () => {
   const [admissions, setAdmissions] = useState<any[]>([]);

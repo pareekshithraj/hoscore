@@ -265,14 +265,6 @@ export const MapBuilder = () => {
       return { r: start.r, c: curr.c };
     }
   }, []);
-    const dr = Math.abs(curr.r - start.r);
-    const dc = Math.abs(curr.c - start.c);
-    if (dr >= dc) {
-      return { r: curr.r, c: start.c };
-    } else {
-      return { r: start.r, c: curr.c };
-    }
-  }, []);
 
   const wallPreview = useMemo(() => {
     if (activeTool === 'wall_draw' && wallStart && hoverCell) {

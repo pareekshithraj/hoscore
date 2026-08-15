@@ -4,6 +4,7 @@ import { Heart, HeartPulse, Plus, X } from 'lucide-react';
 import { EmptyState, LoadingState, PageHeader, StatusPill, StatCard } from '../components/ui';
 import { formatShortDate, vitalsFlags } from '../utils/clinical';
 import { PatientPicker } from '../components/clinical/PatientPicker';
+import { cn } from '../lib/cn';
 
 export const Vitals = () => {
   const [vitals, setVitals] = useState<any[]>([]);

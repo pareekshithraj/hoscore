@@ -45,7 +45,7 @@ export const PatientDetail = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const age = useMemo(() => calcAge(patient?.dateOfBirth, today), [patient, today]);
+  const age = useMemo(() => calcAge(patient?.dateOfBirth), [patient]);
 
   const bills = useMemo(() => {
     if (!patient?.admissions) return [];
